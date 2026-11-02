@@ -1,4 +1,4 @@
-<!-- Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: standalone build setup only, without toolchain, UI, versioning or deployment targets. -->
+<!-- Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: standalone game references and UI packaging, without toolchain, versioning or deployment targets. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\..\build\GameReferences.props" />
   <PropertyGroup>
@@ -35,6 +35,9 @@
       <Private>false</Private>
     </Reference>
     <ProjectReference Include="..\SteppedStreets.Core\SteppedStreets.Core.csproj" />
+    <None Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\CREDITS.md" Link="CREDITS.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\README.md" Link="README.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="BuildUserInterface" BeforeTargets="Build">
     <Warning Condition="'$(SkipUI)' == 'true' Or !Exists('$(MSBuildProjectDirectory)\..\SteppedStreets.UI\node_modules')"

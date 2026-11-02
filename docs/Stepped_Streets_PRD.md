@@ -290,6 +290,10 @@ Mods load from `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II
 
 ## Changes
 
+Integration review, 2 November 2026: all four wave 4 branches are merged, and temporary contract stubs are removed. Zoning now checks the live built height instead of the target raster. The build rejects the entire operation before any brush if the outer blend or sampled brush margin reaches a building, another road or water. Narrow-lot advice was corrected because narrowing also reduces bank capacity. The Release output includes the GPL licence, credits, player guide, DLLs, panel and icon.
+
+Remaining differences from the intended player flow: the overlay draws geometry but does not yet show per-pad height labels; individual heights are logged and empty-lot reasons appear in the panel. A click captures the whole named street, and Shift-click accepts a connected street when the union remains one unbranched chain. The 8 m apron and 24 m blend caps can exceed Bank grade on extreme sites. These are implementation limits, not passed acceptance criteria.
+
 Draft 3, 2 November 2026. Wave 4 implementation and the owner's v1 decisions; the first in-game test is still pending.
 
 - Status, §3 and §5.1: wave 4 built but untested in game; Planted bank and Low wall are the only v1 looks, with quays explicitly out. The toolbar button sits beside Zones; Ctrl+Shift+S opens or toggles the tool. Clear and Close do not undo terrain. Build order is terrain → zoning → optional walls.

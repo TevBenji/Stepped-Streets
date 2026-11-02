@@ -47,13 +47,13 @@ namespace SteppedStreets.Tool
                 StepLook look = plannedLook;
                 var patches = StepPlanPatches.ToPatches(buildPlan, bankGrade);
                 float bankWidth = StepPlanPatches.BankWidth(buildPlan, snapshot.GroundHeight, bankGrade);
-                int slopedPatches = patches.Count(patch => patch.Sloped);
-                Log(Invariant($"terrain: {patches.Count} patches ({patches.Count - slopedPatches} level pads, {slopedPatches} sloped banks), bank width {bankWidth:0.0} m"));
+                int aprons = patches.Count - buildPlan.Pads.Count - buildPlan.Steps.Count;
+                Log(Invariant($"terrain: {patches.Count} patches ({buildPlan.Pads.Count} level pads, {buildPlan.Steps.Count} sloped banks, {aprons} apron strips), bank width {bankWidth:0.0} m"));
                 State.Stage = ToolStage.Building;
                 State.Summary = "Building the ground, then zoning the level cells...";
                 State.Messages = buildPlan.Messages.ToArray();
                 Touch();
-                terrainBuild.Begin(patches, bankWidth, report => ZoneLevelCells(buildPlan, zoneName, bankGrade, look, report));
+                terrainBuild.Begin(patches, bankWidth, report => ZoneLevelCells(buildPlan, zoneName, bankGrade, look, report), snapshot.Blocked);
             }
             catch (Exception exception) { Fail(exception, "The street could not be built. Ground changes already made are permanent."); }
         }

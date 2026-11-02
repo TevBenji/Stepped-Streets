@@ -8,6 +8,30 @@ namespace SteppedStreets.Tests.Terrain
     public sealed class TerraformApplyMathTests
     {
         [Fact]
+        public void ObstacleBeyondPadStillBlocksItsTerrainBlend()
+        {
+            var ring = new[] { new float2(0f, 0f), new float2(24f, 0f), new float2(24f, 24f), new float2(0f, 24f) };
+            var raster = TerraformRaster.Build(new[] { (ring, 2f, 0) }, 1.75f, 8f);
+
+            Assert.Throws<InvalidOperationException>(() => TerraformApplyMath.RequireClearGround(raster, point => point.y >= 28f));
+            TerraformApplyMath.RequireClearGround(raster, point => point.y >= 48f);
+            TerraformApplyMath.RequireClearGround(raster, null);
+        }
+
+        [Fact]
+        public void ObstacleCheckIncludesBrushEdgesButIgnoresUntouchedTexels()
+        {
+            var raster = new TerraformRaster
+            {
+                Origin = float2.zero, Cell = 1.75f, Width = 2, Height = 1,
+                Target = new[] { 2f, 2f }, Weight = new[] { 1f, 0f }
+            };
+            Assert.Throws<InvalidOperationException>(() => TerraformApplyMath.RequireClearGround(raster, point => point.x >= 5f));
+            raster.Weight[0] = 0f;
+            TerraformApplyMath.RequireClearGround(raster, point => true);
+        }
+
+        [Fact]
         public void Prepared_patches_copy_rings_and_keep_flat_and_sloped_targets_in_order()
         {
             var ring = new[] { new float3(0f, 10f, 0f), new float3(16f, 12f, 0f), new float3(16f, 14f, 16f) };

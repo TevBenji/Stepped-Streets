@@ -89,7 +89,8 @@ namespace SteppedStreets.Build
         }
 
         /// <summary>Starts a terrain build; completion is delivered once on the calling game thread.</summary>
-        public void Begin(IReadOnlyList<PlannedTerraform> patches, float bankWidth, Action<TerrainBuildReport> whenDone)
+        public void Begin(IReadOnlyList<PlannedTerraform> patches, float bankWidth, Action<TerrainBuildReport> whenDone,
+            Func<float2, bool> blocked = null)
         {
             if (Busy)
             {
@@ -113,8 +114,14 @@ namespace SteppedStreets.Build
                 _originalHeights = CopyHeights();
                 var original = _originalHeights;
                 // The worker owns no live game data; the copied arrays stay alive until it finishes and curtains are measured.
-                _rasterJob = Task.Run(() => TerraformRaster.Build(items, RasterCell, bankWidth, MaximumRasterCells,
-                    vertexHeights, position => SampleHeight(ref original, position)));
+                _rasterJob = Task.Run(() =>
+                {
+                    var raster = TerraformRaster.Build(items, RasterCell, bankWidth, MaximumRasterCells,
+                        vertexHeights, position => SampleHeight(ref original, position));
+                    // Pad checks alone miss obstacles under the bank outside the pad. Abort before applying any brush.
+                    TerraformApplyMath.RequireClearGround(raster, blocked);
+                    return raster;
+                });
             }
             catch (Exception exception)
             {
@@ -122,11 +129,10 @@ namespace SteppedStreets.Build
             }
         }
 
-        /// <summary>Uses the verified target after success, otherwise freshly read live terrain.</summary>
+        /// <summary>Reads the built ground; convergence permits some residual error, so the target cannot prove a cell is level.</summary>
         public float HeightAt(float2 position)
         {
             ReadLiveHeights();
-            if (_verified && _raster != null && _raster.TrySample(position, LiveHeight, out float height)) return height;
             return LiveHeight(position);
         }
 

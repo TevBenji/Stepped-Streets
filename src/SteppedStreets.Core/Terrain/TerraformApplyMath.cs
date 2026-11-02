@@ -8,6 +8,7 @@
 // that are already zoned.
 // Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: extracted patch inputs and Shift rollback timing from Game/Build/BuildService.Terrain.cs:94-114,404-416; added input validation, snapshot copies and the inverse low-strength curve; removed game and plan types.
 // The original header above describes the source file; none of its ParkManager or GridRoadGenerator code is included here.
+// The protected-ground check below is original Stepped Streets integration work, Tevin Benjamin, 2026-11.
 
 using System;
 using System.Collections.Generic;
@@ -17,6 +18,25 @@ namespace SteppedStreets.Core.Terrain
 {
     public static class TerraformApplyMath
     {
+        /// <summary>Rejects a build whose brush footprint would reach protected ground, including its outer blend.</summary>
+        public static void RequireClearGround(TerraformRaster raster, Func<float2, bool> blocked)
+        {
+            if (raster == null || blocked == null) return;
+            // The game resamples our mask onto ~3.5 m terrain texels. Keep one terrain texel clear around its edges.
+            float clearance = raster.Cell * 0.5f + 3.5f;
+            for (int row = 0; row < raster.Height; row++)
+                for (int column = 0; column < raster.Width; column++)
+                {
+                    int index = row * raster.Width + column;
+                    if (raster.Weight[index] <= 0f || !math.isfinite(raster.Target[index])) continue;
+                    float2 centre = raster.Center(column, row);
+                    for (int across = -1; across <= 1; across++)
+                        for (int along = -1; along <= 1; along++)
+                            if (blocked(centre + new float2(across, along) * clearance))
+                                throw new InvalidOperationException("The terrain blend reaches a building, another road or water. Choose a clearer frontage or reduce its depth. Nothing was changed.");
+                }
+        }
+
         /// <summary>Copies patch geometry before a worker uses it; later patches keep their overwrite order.</summary>
         public static List<(float2[] ring, float target, int layer)> PreparePatches(IReadOnlyList<PlannedTerraform> patches,
             out List<float[]> vertexHeights)

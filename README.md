@@ -8,7 +8,7 @@ Stepped Streets is a Cities: Skylines II code mod by Tevin Benjamin (TevBenji). 
 
 1. Click **Stepped Streets** in the bottom toolbar beside **Zones**, or press **Ctrl+Shift+S** to open the tool.
 2. Hover a street to see its grade, for example **12% climb**. Flatter stretches are left alone.
-3. Click the street. **Shift-click** adds the next segment of the same street.
+3. Click to select the named street. **Shift-click** can add a connected street if the selection remains one chain without branches.
 4. Choose **Side**, **Zone**, **Lot width** and **Step look**. Open the advanced settings to adjust the width floor, depth, grade, step height, bank grade or earthwork limit.
 5. Check the pad and step preview, the summary and any reasons for empty lots.
 6. Click **Build**, then accept **“Ground changes are permanent, like the game's terrain tools. Build?”** The build changes terrain, zones the level cells, then adds walls if selected.
@@ -49,6 +49,7 @@ Walls start 4 m behind the kerb and run to the pad's back edge. The build reads 
 | “Too steep for lots this wide” | The step exceeds Highest step or the bank allowance. Change the width or advanced settings and inspect the new preview. Low wall uses the same allowance. |
 | Too much earthwork | A pad would need more cut or fill than the limit permits. |
 | Blocked | Buildings, another road or water leave too little safe space for a pad. |
+| “The terrain blend reaches a building, another road or water” | The outer bank or brush margin would touch protected ground. The whole build stops before changing terrain; choose a clearer frontage or reduce depth. |
 | Too short for a lot | The remaining end of the street cannot fit the narrowest width. |
 | “Ground changes are permanent, like the game's terrain tools. Build?” | Confirm before terrain is changed. Save first if you want to return to the original ground. |
 
@@ -60,6 +61,9 @@ The summary lists the planned lots, the step height range and empty lots. Build 
 - One street is built at a time. Shift-click extends that street; it is not an area tool.
 - Zoning verification checks **one game cell per run**, rather than every requested cell. Its count is a count of runs, not total zoned cells.
 - Wall placement counts emitted definitions without checking the resulting objects.
+- Pad checks can shorten lots, but an obstructed outer terrain blend rejects the whole build before any brush runs. The check includes one terrain texel of clearance around the sampled brush footprint.
+- The preview draws pad and step geometry; empty-lot reasons appear in the panel, and individual pad heights are in the build log.
+- The apron is capped at 8 m and the outer blend at 24 m. Extreme sites can exceed the requested bank grade at those caps; the in-game terrain report is still needed.
 - English only. No custom assets, quay walls or direct house placement.
 - In-game appearance, houses staying on individual pads, performance and coexistence with other mods still need manual testing.
 
@@ -78,7 +82,7 @@ dotnet build SteppedStreets.sln -c Release
 dotnet test SteppedStreets.sln
 ```
 
-The mod's csproj picks up the built panel. Build output stays under the project; **building never installs or deploys the mod**.
+After `npm ci`, the mod's csproj builds the panel into the DLL output folder and includes LICENSE, credits and this guide. Build output stays under the project; **building never installs or deploys the mod**.
 
 The default `ManagedPath` in `build/GameReferences.props` is `D:\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed`. Override it for another installation:
 

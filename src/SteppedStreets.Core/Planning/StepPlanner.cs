@@ -362,7 +362,7 @@ namespace SteppedStreets.Core.Planning
                     continue;
                 string wording = plan.EmptyLots.First(lot => lot.Reason == reason).Wording;
                 reasons.Add(reason == EmptyLotReason.TooSteep ? "too steep for this width" : wording);
-                string advice = reason == EmptyLotReason.TooSteep ? ". Try narrower lots."
+                string advice = reason == EmptyLotReason.TooSteep ? ". Adjust lot width, bank grade or highest step."
                     : reason == EmptyLotReason.TooMuchEarthwork ? " (over " + Number(request.EarthworkLimit) + " m). Raise the earthwork limit."
                     : ".";
                 plan.messages.Add(Lots(count) + " left empty: " + wording + advice);

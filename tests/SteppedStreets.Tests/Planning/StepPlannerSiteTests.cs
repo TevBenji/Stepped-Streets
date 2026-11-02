@@ -103,7 +103,7 @@ namespace SteppedStreets.Tests.Planning
             Assert.Equal("4 lots, no steps, 4 lots left empty (too steep for this width; too much earthwork; blocked by a building, road or water)", plan.SummaryLine);
             Assert.Equal(new[]
             {
-                "2 lots left empty: too steep for lots this wide. Try narrower lots.",
+                "2 lots left empty: too steep for lots this wide. Adjust lot width, bank grade or highest step.",
                 "1 lot left empty: too much earthwork (over 4 m). Raise the earthwork limit.",
                 "1 lot left empty: blocked by a building, road or water.",
             }, plan.Messages);
