@@ -34,3 +34,13 @@ and reading the selection from `SelectedInfoUISystem` (`Game/Suite/SuiteSteps.Bu
 `src/SteppedStreets/Spike/*.cs`, `src/SteppedStreets.Core/Planning/StepPlanPatches.cs` and `StreetChain.cs`. The idea of a
 sloped strip that ramps between two levels comes from Placemaker's lot fillers (`Core/Layers/Types/Zoning/LotLevel.cs`),
 and the 1 m zoning-quad inset from its `Core/Build/ZoneGuard.cs` (`QuadShrink`).
+
+## Wave 4: low walls and documentation
+
+The low-wall build uses the same Placemaker commit (`e654b32`, jackwrichards, GPL-3.0):
+
+- `src/SteppedStreets/Build/WallBuildSystem.cs`: object-definition fields adapted from `Game/Build/BuildService.Emit.cs:534-569`; named prefab/entity lookup adapted from `Game/Build/SurfaceCloneSystem.cs:162-171`, using `StaticObjectPrefab` for the existing EU_Wall02 garden wall. Retained the emitter's original header and credits. Removed nets, surface clones, grouping, snapping, scale variation and audit code; added measured `ObjectGeometryData.m_Size.z` piece length, a logged 3 m fallback, fixed pad heights, end-to-end pieces and a completion report. Apply at +2 frames and definition cleanup at +4 follow this mod's `ZoneBuildSystem`, itself adapted from Placemaker's `BuildService.Terrain.cs` and invisible build tool. No new net emitter, fallback brush or water code is included.
+- Placemaker's object-definition pattern credits **ParkingLotTool by KruemelGames (GPL-3.0)**. Its retained emitter header also credits **ParkManager by tomkpunkt** and **Grid Road Generator by Ti4goc (GPL-3.0)** for net definitions; this wall system uses only the object path. `SurfaceCloneSystem` also credits ParkingLotTool; this mod creates no cloned prefabs.
+- `Core/Layers/Parking/Kerbs.cs:34-45` was studied for the EU_Wall02 choice, 0.2 m thickness, 0.9 m height and local-Z direction. Those asset facts inform the wall placement; its kerb planner was not copied.
+
+`src/SteppedStreets.Core/Planning/StepPlanWalls.cs` and `tests/SteppedStreets.Tests/Planning/StepPlanWallsTests.cs` are original work by Tevin Benjamin, as are the registration block and player guide. Wall geometry uses the existing planner's corners and whole-column banks. No code is copied from `LotLevel.cs`, `PolishLookLayer.cs`, `TerraceField.LimitBanks` or `Resolve`. The full GPL-3.0 licence was already present in the root `LICENSE` and is retained unchanged.
