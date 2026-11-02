@@ -96,3 +96,8 @@ The panel (`src/SteppedStreets.UI/src/Panel.tsx`, `Panel.module.css`), defensive
 ## Wave 4: integration review
 
 Original integration corrections, Tevin Benjamin, 2026-11: `TerraformApplyMath.RequireClearGround` and its tests reject protected ground under the outer blend and brush margin before any brush runs; `TerrainBuildSystem.HeightAt` reads live terrain for zoning instead of substituting the target. The tool's patch log counts aprons separately, and planner advice no longer assumes narrower lots always permit a taller step. The project packages LICENSE, CREDITS.md and README.md beside its DLLs and UI assets. No additional reference code was copied for these corrections.
+
+## Panel styling fix
+
+- `src/SteppedStreets.UI/tools/css-presence.js` is adapted from Placemaker's `UI/tools/css-presence.js` (jackwrichards, GPL-3.0), which follows the official Cities: Skylines II UI mod template: the bundle exports `hasCSS`, without which the game never loads the panel's stylesheet.
+- The panel's look (dark docked panel, small-caps sections, label-left rows, segmented choices, accent footer button and the UI sound calls) follows Placemaker's `UI/src/styles/_tokens.scss`, `components/common.module.scss`, `components/panel.module.scss` and `components/dialog.module.scss`. The panel code and stylesheet are written for Stepped Streets; no Placemaker component is copied.

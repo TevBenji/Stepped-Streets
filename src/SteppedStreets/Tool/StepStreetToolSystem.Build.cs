@@ -65,7 +65,6 @@ namespace SteppedStreets.Tool
                 if (State.Stage != ToolStage.Building) return;
                 if (!IsActive) throw new InvalidOperationException("The active tool changed during the terrain build.");
                 Log("terrain: " + terrainReport.Summary);
-                Message(terrainReport.Summary);
                 if (!terrainReport.Reached)
                 {
                     State.Stage = ToolStage.Failed;
@@ -115,7 +114,6 @@ namespace SteppedStreets.Tool
                 if (State.Stage != ToolStage.Building) return;
                 if (!IsActive) throw new InvalidOperationException("The active tool changed during the zoning build.");
                 Log("zoning: " + zoneReport.Summary);
-                Message(zoneReport.Summary);
                 if (zoneReport.Zoned < zoneReport.Requested)
                     Message("Some zoning runs were not verified. Check the zoning log for the affected cells.");
                 if (look != StepLook.LowWall)
@@ -139,7 +137,6 @@ namespace SteppedStreets.Tool
                 if (wallReport != null)
                 {
                     Log("walls: " + wallReport.Summary);
-                    Message(wallReport.Summary);
                     if (wallReport.Placed < wallReport.Requested)
                         Message("Some low wall pieces could not be placed. The planted banks remain.");
                 }

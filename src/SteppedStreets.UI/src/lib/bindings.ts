@@ -31,3 +31,9 @@ export function act(name: Action | SettingTrigger, value?: string | number): voi
         else trigger(GROUP, name, value);
     } catch (error) { console.error(`[SteppedStreets] Trigger ${name} failed`, error); }
 }
+
+/** The game's own UI sounds, through its audio binding; silent when the binding is missing. */
+export function playSound(sound: "hover-item" | "select-item" | "toggle-on" | "toggle-off"): void {
+    try { trigger("audio", "playSound", sound, 1); }
+    catch { /* no audio binding */ }
+}

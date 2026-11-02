@@ -3,6 +3,7 @@ const path = require("path");
 const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const { CssLintPlugin } = require("./tools/css-lint");
+const { CSSPresencePlugin } = require("./tools/css-presence");
 const mod = require("./mod.json");
 
 module.exports = {
@@ -48,6 +49,7 @@ module.exports = {
     experiments: { outputModule: true },
     plugins: [
         new MiniCssExtractPlugin({ filename: "[name].css" }),
+        new CSSPresencePlugin(),
         new CssLintPlugin(),
         new webpack.BannerPlugin({
             banner: `Cities: Skylines II UI Module\n\nId: ${mod.id}\nAuthor: ${mod.author}\nVersion: ${mod.version}\nDependencies: ${mod.dependencies.join(",")}`,
