@@ -2,13 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Unity.Mathematics;
 
 namespace SteppedStreets.Core.Planning
 {
     /// <summary>
-    /// Turns one steep street into level pads that step up the hill (PRD rules R1 to R4, R8 and R10).
-    /// Banks, aprons, earthwork, walls and obstacles (R5 to R7, R9) come later.
+    /// Turns one steep street into level pads, leaving room for banks and rejecting unsafe lots before building.
     /// </summary>
     public static class StepPlanner
     {
@@ -51,6 +51,11 @@ namespace SteppedStreets.Core.Planning
             new float2(1f - 1f / CellSize, 1f - 1f / CellSize),
         };
 
+        private static readonly float2[] ObstacleSamples =
+        {
+            new float2(0.5f, 0.5f), new float2(0f, 0f), new float2(1f, 0f), new float2(1f, 1f), new float2(0f, 1f),
+        };
+
         public static StepPlan Plan(StepPlanRequest request)
         {
             var centreline = request?.Centreline;
@@ -64,6 +69,10 @@ namespace SteppedStreets.Core.Planning
                 throw new ArgumentException($"Lots must be {MinimumRows} to {MaximumRows} cells deep.", nameof(request));
             if (request.HighestStep <= 0f)
                 throw new ArgumentException("The highest step must be above zero.", nameof(request));
+            if (!math.isfinite(request.BankGrade) || request.BankGrade <= 0f)
+                throw new ArgumentException("The bank grade must be finite and above zero.", nameof(request));
+            if (!math.isfinite(request.EarthworkLimit) || request.EarthworkLimit < 0f)
+                throw new ArgumentException("The earthwork limit must be finite and at least zero.", nameof(request));
 
             // R2 lays lots from the downhill end. A street whose two ends are level keeps the order it was given.
             bool reversed = centreline[centreline.Count - 1].y < centreline[0].y;
@@ -88,6 +97,8 @@ namespace SteppedStreets.Core.Planning
                     "This street is flatter than {0:0.#}%: nothing to step here.",
                     request.MinimumGrade * 100f);
             }
+
+            Describe(plan, request);
 
             return plan;
         }
@@ -171,16 +182,37 @@ namespace SteppedStreets.Core.Planning
 
                 // R3 and R4: a pad after a gap has no neighbour to step from, so only later pads are narrowed.
                 float height = PadHeight(street, start, end);
-                bool tooSteep = previousPad != null && TooTall(height - previousPad.Height, request);
+                bool tooSteep = previousPad != null && TooTall(height - previousPad.Height, width, previousPad, request);
                 while (tooSteep && width > request.NarrowestWidthCells)
                 {
                     width--;
                     end = street.ChordEnd(start, width * CellSize);
                     height = PadHeight(street, start, end);
-                    tooSteep = TooTall(height - previousPad.Height, request);
+                    tooSteep = TooTall(height - previousPad.Height, width, previousPad, request);
                 }
 
                 var outline = Outline(street, start, end, width * CellSize, sideSign, request.RoadHalfWidth, depth, height);
+                var pad = new Pad
+                {
+                    Side = side, Corners = outline, Height = height, Start = start, End = end,
+                    WidthCells = width, DepthCells = request.DepthCells,
+                };
+                EmptyLotReason? reason = tooSteep ? EmptyLotReason.TooSteep : (EmptyLotReason?)null;
+                if (!reason.HasValue && request.Blocked != null)
+                {
+                    int rows = ClearRows(pad, request.Blocked);
+                    if (rows < MinimumRows)
+                        reason = EmptyLotReason.Blocked;
+                    else if (rows < pad.DepthCells)
+                    {
+                        pad.DepthCells = rows;
+                        outline = Outline(street, start, end, width * CellSize, sideSign, request.RoadHalfWidth, rows * CellSize, height);
+                        pad.Corners = outline;
+                    }
+                }
+                if (!reason.HasValue && request.GroundHeight != null && ExceedsEarthwork(pad, request))
+                    reason = EmptyLotReason.TooMuchEarthwork;
+
                 if (previousLot != null && Overlaps(outline, previousLot))
                 {
                     start += OverlapNudge;
@@ -188,11 +220,11 @@ namespace SteppedStreets.Core.Planning
                 }
 
                 previousLot = outline;
-                if (tooSteep)
+                if (reason.HasValue)
                 {
                     plan.emptyLots.Add(new EmptyLot
                     {
-                        Side = side, Corners = outline, Start = start, End = end, Reason = EmptyLotReason.TooSteep,
+                        Side = side, Corners = outline, Start = start, End = end, Reason = reason.Value,
                     });
                     // The empty lot holds the drop between the pads either side of it (as a bank, later), so the next pad
                     // starts a fresh run instead of being measured against the pad behind the gap.
@@ -200,16 +232,7 @@ namespace SteppedStreets.Core.Planning
                 }
                 else
                 {
-                    var pad = new Pad
-                    {
-                        Side = side,
-                        Corners = outline,
-                        Height = height,
-                        Start = start,
-                        End = end,
-                        WidthCells = width,
-                        DepthCells = request.DepthCells,
-                    };
+                    pad.StreetProfile = street.FrontProfile(start, end, width);
                     if (previousPad != null)
                         plan.steps.Add(StepBetween(previousPad, pad));
                     plan.pads.Add(pad);
@@ -220,11 +243,40 @@ namespace SteppedStreets.Core.Planning
             }
         }
 
+        private static int ClearRows(Pad pad, Func<float2, bool> blocked)
+        {
+            // Every retained row must be clear: a clean row behind an obstacle cannot reconnect to the road.
+            for (int row = 0; row < pad.DepthCells; row++)
+                for (int column = 0; column < pad.WidthCells; column++)
+                    foreach (var sample in ObstacleSamples)
+                        if (blocked(pad.PointAt(column + sample.x, row + sample.y)))
+                            return row;
+            return pad.DepthCells;
+        }
+
+        private static bool ExceedsEarthwork(Pad pad, StepPlanRequest request)
+        {
+            bool WithinLimit(float2 point) => math.abs(request.GroundHeight(point) - pad.Height) <= request.EarthworkLimit + StepTolerance;
+            foreach (var corner in pad.Corners)
+                if (!WithinLimit(corner.xz))
+                    return true;
+            for (int row = 0; row < pad.DepthCells; row++)
+                for (int column = 0; column < pad.WidthCells; column++)
+                    if (!WithinLimit(pad.PointAt(column + 0.5f, row + 0.5f)))
+                        return true;
+            return false;
+        }
+
         // R3: the street's height at the middle of the lot's front. PRD open question 1 may move it to the uphill corner,
         // which would be math.max(street.PointAt(start).y, street.PointAt(end).y).
         private static float PadHeight(Street street, float start, float end) => street.PointAt((start + end) * 0.5f).y;
 
-        private static bool TooTall(float rise, StepPlanRequest request) => math.abs(rise) > request.HighestStep + StepTolerance;
+        private static bool TooTall(float rise, int width, Pad previousPad, StepPlanRequest request)
+        {
+            // The candidate must fit its own bank cap; the earlier pad actually gives up the columns for this step.
+            float bankStep = StepPlanPatches.HighestStepFor(math.min(width, previousPad.WidthCells), request.BankGrade);
+            return math.abs(rise) > math.min(request.HighestStep, bankStep) + StepTolerance;
+        }
 
         // The lot is a rectangle on the chord of its stretch of street: on a bend the chord is the closest straight line
         // to the kerb, and zone cells must be square.
@@ -284,18 +336,49 @@ namespace SteppedStreets.Core.Planning
 
             foreach (var lot in plan.emptyLots)
             {
-                if (lot.Reason == EmptyLotReason.TooSteep)
+                if (lot.Reason != EmptyLotReason.LeftOver)
                     summary.EmptyCount++;
             }
 
             return summary;
         }
 
+        private static void Describe(StepPlan plan, StepPlanRequest request)
+        {
+            string Number(float value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+            string Lots(int count) => count.ToString(CultureInfo.InvariantCulture) + (count == 1 ? " lot" : " lots");
+            var summary = plan.Summary;
+            string steps = plan.Steps.Count == 0 ? "no steps"
+                : (plan.Steps.Count == 1 ? "step " : "steps ") + Number(summary.LowestStep)
+                    + (summary.TallestStep - summary.LowestStep > StepTolerance ? "-" + Number(summary.TallestStep) : "") + " m";
+            plan.SummaryLine = Lots(summary.LotCount) + ", " + steps;
+            var reasons = new List<string>();
+            if (plan.Message != null)
+                plan.messages.Add(plan.Message);
+            foreach (var reason in new[] { EmptyLotReason.TooSteep, EmptyLotReason.TooMuchEarthwork, EmptyLotReason.Blocked })
+            {
+                int count = plan.EmptyLots.Count(lot => lot.Reason == reason);
+                if (count == 0)
+                    continue;
+                string wording = plan.EmptyLots.First(lot => lot.Reason == reason).Wording;
+                reasons.Add(reason == EmptyLotReason.TooSteep ? "too steep for this width" : wording);
+                string advice = reason == EmptyLotReason.TooSteep ? ". Try narrower lots."
+                    : reason == EmptyLotReason.TooMuchEarthwork ? " (over " + Number(request.EarthworkLimit) + " m). Raise the earthwork limit."
+                    : ".";
+                plan.messages.Add(Lots(count) + " left empty: " + wording + advice);
+            }
+            if (summary.EmptyCount > 0)
+                plan.SummaryLine += ", " + Lots(summary.EmptyCount) + " left empty (" + string.Join("; ", reasons) + ")";
+        }
+
         private static bool IsLevel(Pad pad, int column, int row, Func<float2, float> groundHeight, float tolerance)
         {
             foreach (var sample in LevelSamples)
             {
-                float offset = math.abs(groundHeight(pad.PointAt(column + sample.x, row + sample.y)) - pad.Height);
+                // Row 0 touches the kerb for zoning, but its driveway occupies the front. Check its back quarter (6–7 m)
+                // so a graded apron does not disconnect otherwise level columns from the road.
+                float depth = row == 0 ? math.max(0.75f, sample.y) : row + sample.y;
+                float offset = math.abs(groundHeight(pad.PointAt(column + sample.x, depth)) - pad.Height);
                 // Written this way round so a sampler that returns NaN (no ground there) counts as not level.
                 if (!(offset <= tolerance))
                     return false;
@@ -366,6 +449,16 @@ namespace SteppedStreets.Core.Planning
             }
 
             public float Length => distances[distances.Count - 1];
+
+            public List<float2> FrontProfile(float start, float end, int width)
+            {
+                var profile = new List<float2> { new float2(0f, PointAt(start).y) };
+                for (int index = 0; index < distances.Count; index++)
+                    if (distances[index] > start && distances[index] < end)
+                        profile.Add(new float2(width * (distances[index] - start) / (end - start), points[index].y));
+                profile.Add(new float2(width, PointAt(end).y));
+                return profile;
+            }
 
             /// <summary>The centreline point at a distance along the street; heights interpolate linearly between points.</summary>
             public float3 PointAt(float distance)

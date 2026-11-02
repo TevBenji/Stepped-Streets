@@ -1,4 +1,5 @@
 // Stepped Streets, the stepped-lot planner. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+using System;
 using System.Collections.Generic;
 using Unity.Mathematics;
 
@@ -11,6 +12,8 @@ namespace SteppedStreets.Core.Planning
         Right,
         Both,
     }
+
+    public enum StepLook { PlantedBank, LowWall }
 
     /// <summary>One street to plan, and the player's settings for it.</summary>
     public sealed class StepPlanRequest
@@ -37,6 +40,20 @@ namespace SteppedStreets.Core.Planning
 
         /// <summary>The tallest step, in metres, allowed between two neighbouring pads.</summary>
         public float HighestStep { get; set; }
+
+        /// <summary>Rise over run of the bank between neighbouring pads.</summary>
+        public float BankGrade { get; set; } = 0.4f;
+
+        public StepLook Look { get; set; } = StepLook.PlantedBank;
+
+        /// <summary>The most cut or fill, in metres, allowed at a pad sample.</summary>
+        public float EarthworkLimit { get; set; } = 4f;
+
+        /// <summary>World (x, z) to ground height; null skips the earthwork check.</summary>
+        public Func<float2, float> GroundHeight { get; set; }
+
+        /// <summary>True on building lots, other roads or water; null skips the obstacle check.</summary>
+        public Func<float2, bool> Blocked { get; set; }
 
         /// <summary>How far, in metres, the ground as built may sit off a pad's height and still count as level (R8).</summary>
         public float LevelTolerance { get; set; } = 0.3f;

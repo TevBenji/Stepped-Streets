@@ -44,3 +44,7 @@ The low-wall build uses the same Placemaker commit (`e654b32`, jackwrichards, GP
 - `Core/Layers/Parking/Kerbs.cs:34-45` was studied for the EU_Wall02 choice, 0.2 m thickness, 0.9 m height and local-Z direction. Those asset facts inform the wall placement; its kerb planner was not copied.
 
 `src/SteppedStreets.Core/Planning/StepPlanWalls.cs` and `tests/SteppedStreets.Tests/Planning/StepPlanWallsTests.cs` are original work by Tevin Benjamin, as are the registration block and player guide. Wall geometry uses the existing planner's corners and whole-column banks. No code is copied from `LotLevel.cs`, `PolishLookLayer.cs`, `TerraceField.LimitBanks` or `Resolve`. The full GPL-3.0 licence was already present in the root `LICENSE` and is retained unchanged.
+Wave 4 planner completion is original work by Tevin Benjamin, 2026-11, GPL-3.0:
+
+- `src/SteppedStreets.Core/Planning/StepPlanRequest.cs`, `StepPlan.cs`, `StepPlanner.cs` and `StepPlanPatches.cs`: bank capacity per lot width, road-height aprons, sampled earthwork and obstacle checks, hillside-aware smoothstep blend sizing, and preview summaries and messages. No additional Placemaker code was copied or adapted; the existing terrain raster and surface interpolation retain their credits above.
+- `tests/SteppedStreets.Tests/Planning/StepPlannerTests.cs`, `StepPlannerSiteTests.cs` and `StepPlanPatchesTests.cs`: synthetic planner rules, apron continuity, preview wording, deterministic results, and off-game raster checks at 8%, 12% and 15%.

@@ -11,18 +11,64 @@ namespace SteppedStreets.Tests.Planning
 {
     public sealed class StepPlannerTests
     {
+        [Fact]
+        public void ThreeCellPadsCannotCarryStepsAboveTheirBankCapacity()
+        {
+            var plan = StepPlanner.Plan(Straight(0.15f, lotWidth: 3, narrowest: 3, highestStep: 10f));
+
+            Assert.Empty(plan.Steps);
+            Assert.Contains(plan.EmptyLots, lot => lot.Reason == EmptyLotReason.TooSteep);
+        }
+
+        [Fact]
+        public void NarrowingUsesEachCandidatesBankCapacity()
+        {
+            var plan = StepPlanner.Plan(Straight(0.15f, lotWidth: 4, narrowest: 2, highestStep: 4f));
+
+            Assert.Empty(plan.Steps);
+            Assert.DoesNotContain(plan.Pads, pad => pad.WidthCells < 4);
+        }
+
+        [Fact]
+        public void TwoCellPadsLeaveGapsInsteadOfGivingUpAZonedColumn()
+        {
+            var plan = StepPlanner.Plan(Straight(0.08f));
+
+            Assert.Empty(plan.Steps);
+            Assert.NotEmpty(plan.Pads);
+            Assert.Contains(plan.EmptyLots, lot => lot.Reason == EmptyLotReason.TooSteep);
+        }
+
+        [Theory]
+        [InlineData(3, 3.2f)]
+        [InlineData(4, 6.4f)]
+        public void StepsAtTheBankLimitKeepTwoLevelColumns(int width, float rise)
+        {
+            var plan = StepPlanner.Plan(Straight(rise / (width * 8f), width, width));
+
+            Assert.NotEmpty(plan.Steps);
+            Assert.All(plan.Steps, step => Assert.Equal(width - 2, StepPlanPatches.BankColumns(step, 0.4f)));
+        }
+
+        [Fact]
+        public void BankGradeAndLowWallUseTheSamePhysicalLimit()
+        {
+            var request = Straight(0.08f, 3, 3);
+            request.BankGrade = 0.2f;
+            request.Look = StepLook.LowWall;
+            Assert.Empty(StepPlanner.Plan(request).Steps);
+
+            request.BankGrade = 0.4f;
+            Assert.NotEmpty(StepPlanner.Plan(request).Steps);
+        }
+
         // PRD 5.3: step = grade × lot width.
         [Theory]
-        [InlineData(0.06f, 2, 0.96f)]
         [InlineData(0.06f, 3, 1.44f)]
-        [InlineData(0.08f, 2, 1.28f)]
         [InlineData(0.08f, 3, 1.92f)]
-        [InlineData(0.10f, 2, 1.60f)]
         [InlineData(0.10f, 3, 2.40f)]
-        [InlineData(0.12f, 2, 1.92f)]
         [InlineData(0.12f, 3, 2.88f)]
-        [InlineData(0.15f, 2, 2.40f)]
-        [InlineData(0.15f, 3, 3.60f)]
+        [InlineData(0.15f, 4, 4.80f)]
         public void StepsMatchThePrdTable(float grade, int lotWidth, float expectedStep)
         {
             var plan = StepPlanner.Plan(Straight(grade, lotWidth, lotWidth, highestStep: 10f));
@@ -53,9 +99,9 @@ namespace SteppedStreets.Tests.Planning
         [Fact]
         public void TooSteepLotsAreLeftEmptyOrNarrowed()
         {
-            // 15 % with 3-cell lots steps 3.6 m; a 3-cell lot beside a 2-cell one steps 15 % × 20 m = 3.0 m.
+            // Narrowing still saves half the width difference, but a candidate also needs room for its bank.
             var fixedWidth = StepPlanner.Plan(Straight(0.15f, lotWidth: 3, narrowest: 3, highestStep: 3.2f));
-            var narrowable = StepPlanner.Plan(Straight(0.15f, lotWidth: 3, narrowest: 2, highestStep: 3.2f));
+            var narrowable = StepPlanner.Plan(Straight(0.1f, lotWidth: 6, narrowest: 3, highestStep: 4f));
 
             var empty = fixedWidth.EmptyLots.Where(lot => lot.Reason == EmptyLotReason.TooSteep).ToList();
             Assert.NotEmpty(empty);
@@ -63,8 +109,8 @@ namespace SteppedStreets.Tests.Planning
             Assert.Equal(empty.Count, fixedWidth.Summary.EmptyCount);
 
             Assert.Equal(0, narrowable.Summary.EmptyCount);
-            Assert.Contains(narrowable.Pads, pad => pad.WidthCells == 2);
-            Assert.All(narrowable.Steps, step => Assert.True(math.abs(step.Rise) <= 3.2f));
+            Assert.Contains(narrowable.Pads, pad => pad.WidthCells == 4);
+            Assert.All(narrowable.Steps, step => Assert.True(math.abs(step.Rise) <= 4f + 0.001f));
         }
 
         [Fact]
