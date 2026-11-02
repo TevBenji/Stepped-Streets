@@ -1,6 +1,6 @@
 # Credits
 
-Stepped Streets is by Tevin Benjamin and is licensed under GPL-3.0.
+Stepped Streets is by TevBenji and is licensed under GPL-3.0.
 
 The build setup is adapted from [Placemaker by jackwrichards](https://github.com/jackwrichards/placemaker), GPL-3.0, commit `e654b32`:
 
