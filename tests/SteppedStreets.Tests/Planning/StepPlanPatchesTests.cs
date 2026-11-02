@@ -49,19 +49,39 @@ namespace SteppedStreets.Tests.Planning
         public void SteppedTwelvePercentStreetBuildsWithoutCurtains()
         {
             var plan = StepPlanner.Plan(StepPlannerTests.Straight(0.12f, lotWidth: 3, narrowest: 3));
-            var patches = StepPlanPatches.ToPatches(plan, 0.4f);
-            // The ground climbs with the street (from (100, 100) towards (0.6, 0.8) at 12 %) and is flat across it.
-            float Ground(float2 position) => 40f + 0.12f * math.dot(position - new float2(100f, 100f), new float2(0.6f, 0.8f));
-            var items = patches.Select(patch => (ring: patch.Ring.Select(corner => corner.xz).ToArray(), target: patch.TargetHeight, layer: 0)).ToArray();
 
-            var raster = TerraformRaster.Build(items, 1.75f, 4f, vertexHeights: patches.Select(TerraformSurface.VertexHeights).ToArray(),
-                original: Ground);
-            float Final(float2 position) => raster.TrySample(position, Ground, out float height) ? height : Ground(position);
-            var curtains = TerrainMetrics.Curtains(Final, Ground, raster.Origin,
-                raster.Origin + new float2(raster.Width, raster.Height) * raster.Cell);
+            var curtains = BuildCurtains(plan, 0.12f, bank: 4f);
 
             Assert.NotEmpty(plan.Steps);
             Assert.True(curtains.Count == 0, curtains.ToString());
+        }
+
+        [Fact]
+        public void SteppedFifteenPercentStreetBuildsWithoutCurtainsAtTheComputedBankWidth()
+        {
+            // 3 m steps; pad corners stand 1.8 m off the ground, which a 4 m blend draws as sheets.
+            var plan = StepPlanner.Plan(StepPlannerTests.Straight(0.15f, lotWidth: 3, narrowest: 2, highestStep: 3f));
+
+            var curtains = BuildCurtains(plan, 0.15f, StepPlanPatches.BankWidth(plan, position => Ground(0.15f, position), 0.4f));
+
+            Assert.NotEmpty(plan.Steps);
+            Assert.True(curtains.Count == 0, curtains.ToString());
+        }
+
+        // The ground climbs with the Straight street (from (100, 100) towards (0.6, 0.8)) and is flat across it.
+        private static float Ground(float grade, float2 position) =>
+            40f + grade * math.dot(position - new float2(100f, 100f), new float2(0.6f, 0.8f));
+
+        // The plan's patches through the build's raster (1.75 m cells), measured against the ground they replace.
+        private static TerrainMetrics.Curtain BuildCurtains(StepPlan plan, float grade, float bank)
+        {
+            var patches = StepPlanPatches.ToPatches(plan, 0.4f);
+            float Original(float2 position) => Ground(grade, position);
+            var items = patches.Select(patch => (ring: patch.Ring.Select(corner => corner.xz).ToArray(), target: patch.TargetHeight, layer: 0)).ToArray();
+            var raster = TerraformRaster.Build(items, 1.75f, bank, vertexHeights: patches.Select(TerraformSurface.VertexHeights).ToArray(),
+                original: Original);
+            float Final(float2 position) => raster.TrySample(position, Original, out float height) ? height : Original(position);
+            return TerrainMetrics.Curtains(Final, Original, raster.Origin, raster.Origin + new float2(raster.Width, raster.Height) * raster.Cell);
         }
 
         [Fact]

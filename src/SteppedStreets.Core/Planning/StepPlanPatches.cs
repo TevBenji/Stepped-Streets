@@ -85,8 +85,12 @@ namespace SteppedStreets.Core.Planning
                     largest = math.max(largest, math.abs(pad.Height - groundHeight(corner.xz)));
             }
 
-            return math.clamp(largest / bankGrade, NarrowestBank, WidestBank);
+            // The raster blends with a smoothstep, whose steepest point is 1.5 times its average grade. Without this factor a
+            // 15 % street shows sheets (TerrainMetrics) at its pad corners.
+            return math.clamp(SmoothstepPeak * largest / bankGrade, NarrowestBank, WidestBank);
         }
+
+        private const float SmoothstepPeak = 1.5f;
 
         /// <summary>
         /// One zoning quad in world (x, z) per cell, given as (column, row) the way <see cref="StepPlanner.LevelCells"/> returns
