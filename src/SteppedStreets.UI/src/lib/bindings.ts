@@ -20,12 +20,16 @@ export function useToolState() {
     return useMemo(() => readState(raw), [raw]);
 }
 
-export type Action = "toggleTool" | "close" | "clearSelection" | "build";
-export type SettingTrigger = "setSide" | "setZone" | "setLook" | "setLotWidth" | "setNarrowest" | "setDepth"
-    | "setMinimumGrade" | "setHighestStep" | "setBankGrade" | "setEarthworkLimit";
+export type Action = "toggleTool" | "close" | "clearArea" | "closeArea" | "undo" | "build" | "reroll";
+export type TextTrigger = "setStyle" | "setRoad" | "setMixPattern" | "setZoneMix";
+export type NumberTrigger = "setBlockDepth" | "setMaxRoadGrade" | "setSteepestBuildable" | "setLotWidth" | "setLotDepth"
+    | "setEarthworkLimit" | "setBankGrade" | "setLotSpacing" | "setTreeDensity" | "setSeed";
+export type ToggleTrigger = "setLevelLots" | "setRetainingWalls" | "setTrees";
 export function act(name: Action): void;
-export function act(name: SettingTrigger, value: string | number): void;
-export function act(name: Action | SettingTrigger, value?: string | number): void {
+export function act(name: TextTrigger, value: string): void;
+export function act(name: NumberTrigger, value: number): void;
+export function act(name: ToggleTrigger, value: boolean): void;
+export function act(name: Action | TextTrigger | NumberTrigger | ToggleTrigger, value?: string | number | boolean): void {
     try {
         if (value === undefined) trigger(GROUP, name);
         else trigger(GROUP, name, value);

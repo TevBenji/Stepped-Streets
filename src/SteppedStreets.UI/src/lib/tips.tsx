@@ -11,7 +11,7 @@ export function ToolbarTip({ children }: { children: React.ReactElement }) {
     if (!ui.Tooltip) return children;
     return <ui.Tooltip direction="up" delayTime={250} tooltip={<div className={styles.tip}>
         <strong>Stepped Streets</strong>
-        <div>Turn a steep street into level, stepped lots.</div>
+        <div>Draw an area on a hill and plan a stepped neighbourhood.</div>
         <div className={styles.hotkey}>Ctrl+Shift+S</div>
     </div>}>{children}</ui.Tooltip>;
 }
