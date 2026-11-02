@@ -1,1 +1,16 @@
 reference/
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+TestResults/
+*.trx
+*.nupkg
+*.snupkg
+.dotnet/
+.nuget/
+.tmp/
