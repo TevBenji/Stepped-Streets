@@ -55,6 +55,15 @@ namespace SteppedStreets
             {
                 Logger.Error(exception, "Stepped Streets: the spike trigger failed to register");
             }
+
+            try
+            {
+                updateSystem.UpdateBefore<Build.WallBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate);
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "Stepped Streets wall system registration failed");
+            }
         }
 
         public void OnDispose()
