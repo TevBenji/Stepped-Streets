@@ -258,6 +258,8 @@ namespace SteppedStreets.Core.Planning
                 Rise = later.Height - earlier.Height,
                 EdgeFront = new float3(front.x, earlier.Height, front.y),
                 EdgeBack = new float3(back.x, earlier.Height, back.y),
+                Earlier = earlier,
+                Later = later,
             };
         }
 

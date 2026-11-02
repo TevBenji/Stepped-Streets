@@ -29,7 +29,7 @@
       <HintPath>$(ManagedPath)\netstandard.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <GameReference Include="Game;Colossal.Logging;Colossal.Core;Colossal.Mathematics;Unity.Entities;Unity.Collections;Unity.Mathematics;Unity.Burst;UnityEngine.CoreModule" />
+    <GameReference Include="Game;Colossal.Logging;Colossal.Core;Colossal.Mathematics;Colossal.IO.AssetDatabase;Colossal.Localization;Unity.Entities;Unity.Collections;Unity.Mathematics;Unity.Burst;UnityEngine.CoreModule" />
     <Reference Include="@(GameReference)">
       <HintPath>$(ManagedPath)\%(Identity).dll</HintPath>
       <Private>false</Private>
