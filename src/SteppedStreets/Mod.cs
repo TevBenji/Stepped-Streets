@@ -11,6 +11,10 @@ namespace SteppedStreets
         public void OnLoad(UpdateSystem updateSystem)
         {
             Logger.Info("Stepped Streets loading");
+            try { updateSystem.UpdateAt<Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
+            catch (System.Exception exception) { Logger.Error(exception, "Stepped Streets build tool registration failed"); }
+            try { updateSystem.UpdateBefore<Build.ZoneBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
+            catch (System.Exception exception) { Logger.Error(exception, "Stepped Streets zoning system registration failed"); }
         }
 
         public void OnDispose()
