@@ -114,8 +114,18 @@ namespace SteppedStreets.Tests.Neighbourhood
             yield return NoisyHill();
         }
 
+        /// <summary>A mountain: slopes up to about 50 %, for the steep-ground mode.</summary>
+        public static SyntheticSite Mountain() => new SyntheticSite
+        {
+            Name = "mountain",
+            Ground = point => 250f * math.exp(-math.distancesq(point, new float2(500f, 560f)) / (2f * 300f * 300f)),
+            Boundary = Square(0f, 1000f),
+        };
+
         public static SyntheticSite ByName(string name)
         {
+            if (name == "mountain") return Mountain();
+            if (name == "slope-30") return Slope(30f);
             foreach (var site in All()) if (site.Name == name) return site;
             throw new ArgumentException(name);
         }

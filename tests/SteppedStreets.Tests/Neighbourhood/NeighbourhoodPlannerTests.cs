@@ -19,6 +19,9 @@ namespace SteppedStreets.Tests.Neighbourhood
             yield return new object[] { "cone", "lane" };
             yield return new object[] { "slope-18", "steep-allowed" };
             yield return new object[] { "noisy-hill", "no-road" };
+            yield return new object[] { "mountain", "steep" };
+            yield return new object[] { "slope-30", "steep" };
+            yield return new object[] { "mountain", "steep-lane" };
         }
 
         // The three rule tests read the same plans; planning each site once keeps the suite quick.
@@ -37,6 +40,13 @@ namespace SteppedStreets.Tests.Neighbourhood
                 if (variant == "terraced") r.Style = NeighbourhoodStyle.TerracedBlocks;
                 if (variant == "lane") r.Style = NeighbourhoodStyle.MountainLane;
                 if (variant == "steep-allowed") r.SteepestBuildable = 0.22f;
+                if (variant.StartsWith("steep") && variant != "steep-allowed")
+                {
+                    r.SteepGround = true;
+                    r.SteepestBuildable = 0.5f;
+                    r.EarthworkLimit = 8f;
+                }
+                if (variant == "steep-lane") r.Style = NeighbourhoodStyle.MountainLane;
             });
             return (request, NeighbourhoodPlanner.Plan(request));
         }
@@ -46,7 +56,7 @@ namespace SteppedStreets.Tests.Neighbourhood
         public void RoadsKeepTheirGradesRadiiAndJunctionRules(string name, string variant)
         {
             var (request, plan) = Planned(name, variant);
-            float streetRadius = NeighbourhoodPlanner.MinimumRadius(request.Style), linkRadius = NeighbourhoodPlanner.LinkRadius(request.Style);
+            float streetRadius = NeighbourhoodPlanner.MinimumRadius(request.Style), linkRadius = NeighbourhoodPlanner.LinkRadius(request);
             float contourRun = 0f, contourRise = 0f;
             foreach (var road in plan.Roads)
             {
@@ -81,7 +91,8 @@ namespace SteppedStreets.Tests.Neighbourhood
                 junctions.Add(node);
                 for (int first = 0; first < directions.Count; first++)
                     for (int second = first + 1; second < directions.Count; second++)
-                        Assert.True(math.degrees(math.acos(math.clamp(math.dot(directions[first], directions[second]), -1f, 1f))) >= 59f, "a junction sharper than 60°");
+                        Assert.True(math.degrees(math.acos(math.clamp(math.dot(directions[first], directions[second]), -1f, 1f))) >= RoadNetwork.SharpestJunction(request) - 1f,
+                            $"a junction sharper than {RoadNetwork.SharpestJunction(request)}°");
             }
             for (int first = 0; first < junctions.Count; first++)
                 for (int second = first + 1; second < junctions.Count; second++)
@@ -157,7 +168,7 @@ namespace SteppedStreets.Tests.Neighbourhood
                         if (math.abs(field.Height[index] - field.Original[index]) < 0.05f && math.abs(field.Height[other] - field.Original[other]) < 0.05f) continue;
                         float slope = math.abs(field.Height[index] - field.Height[other]) / field.Cell;
                         float natural = math.abs(field.Original[index] - field.Original[other]) / field.Cell;
-                        if (slope > math.max(request.BankGrade, natural) + 0.02f) steep++;
+                        if (slope > math.max(NeighbourhoodPlanner.EffectiveBankGrade(request), natural) + 0.02f) steep++;
                     }
                 }
             Assert.True(steep == 0, $"{steep} node pairs steeper than the bank grade");
@@ -220,6 +231,38 @@ namespace SteppedStreets.Tests.Neighbourhood
             float share = plan.Lots.Count(lot => lot.Zone == "A") / (float)plan.Lots.Count;
             Assert.InRange(share, pattern == MixPattern.Even ? 0.7f : 0.6f, pattern == MixPattern.Even ? 0.8f : 0.9f);
             Assert.All(plan.Lots, lot => Assert.True(lot.Zone == "A" || lot.Zone == "B"));
+        }
+
+        [Fact]
+        public void ARingOnBumpyGroundHasNoJumpAtItsSeam()
+        {
+            // A 200 m ring over bumps: fitted as an open line, its first and last heights came out metres apart.
+            var ring = new List<float2>();
+            for (int index = 0; index < 314; index++)
+            {
+                float angle = index * 2f * math.PI / 314f;
+                ring.Add(new float2(math.cos(angle), math.sin(angle)) * 200f);
+            }
+            float Ground(float2 point) => 40f + 3f * math.sin(point.x / 23f) * math.cos(point.y / 17f) + point.x * 0.02f;
+            var heights = RoadProfile.FitRing(ring, Ground, RoadProfile.LandingGrade, 5);
+            for (int index = 0; index < ring.Count; index++)
+            {
+                int next = (index + 1) % ring.Count;
+                float grade = math.abs(heights[next] - heights[index]) / math.distance(ring[index], ring[next]);
+                Assert.True(grade <= RoadProfile.LandingGrade + 1e-3f, $"{grade:P1} at {index}");
+            }
+        }
+
+        [Fact]
+        public void TheZoneMixTextSurvivesTyposAndRoundTrips()
+        {
+            var mix = new[] { new ZoneShare { Zone = "Residential \"Low\"", Share = 70f }, new ZoneShare { Zone = "Commercial", Share = 30f } };
+            var read = ZoneShare.ParseList(ZoneShare.WriteList(mix));
+            Assert.Equal(new[] { "Residential \"Low\"", "Commercial" }, read.Select(share => share.Zone));
+            Assert.Equal(new[] { 70f, 30f }, read.Select(share => share.Share));
+            // A missing colon once looped forever; now the broken entry is skipped and the default comes back.
+            foreach (string broken in new[] { "[{\"zone\"\"Residential Low\",\"share\":100}]", "[{\"share\":100,\"zone\"}]", "", null, "[{\"zone\":\"A\",\"share\":0}]" })
+                Assert.Equal("Residential Low", Assert.Single(ZoneShare.ParseList(broken)).Zone);
         }
     }
 

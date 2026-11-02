@@ -36,6 +36,9 @@ running along the foot of a hill.
 - [ ] Try each style: Contour suburb, Terraced blocks, Mountain lane.
 - [ ] Try a zone mix of two or three zones with Clumps, Random and Even.
 - [ ] Draw an area away from any road: the plan still appears and says "Not connected".
+- [ ] Turn on **Steep hills** and draw on a steep hill or mountain side: Steepest buildable jumps to 50 % and Most earth to
+      8 m, the plan reaches higher up the slope, and connectors run long and shallow across it. Turn it off: both come back
+      within 30 % and 8 m.
 
 ## 4. Building
 
@@ -49,6 +52,9 @@ Press Build and confirm. Watch the panel's progress and the log.
 - [ ] Zoning: the zone colours appear on the lots; the log's "zoning:" lines show runs zoned per zone.
 - [ ] Trees appear on the steep ground and banks, not on lots or roads.
 - [ ] No freeze over about 2 seconds at any stage.
+- [ ] Start a second build and pick another tool (or press Esc) while it runs: the build still finishes (the panel shows
+      the build report when reopened), and the tool you picked stays active.
+- [ ] After the build, the panel's line under "Built" lists what was really built, zoned and planted.
 - [ ] After unpausing for a while: houses grow on the level pads, one per pad, not half sunk.
 
 ## 5. Things to watch (likely first fixes)

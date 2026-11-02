@@ -30,6 +30,9 @@ namespace SteppedStreets.Tool
         private const float MinimumMargin = 80f;
         private const float MaximumMargin = 460f;
         private const float RoadReach = 400f;
+        // The fingerprint watches only the area and a strip round it (its banks): houses growing further out while the plan is
+        // open must not keep sending Build back to re-plan.
+        private const float FingerprintMargin = 40f;
 
         private readonly float2 origin;
         private readonly int columns, rows;
@@ -60,13 +63,16 @@ namespace SteppedStreets.Tool
             var terrain = world.GetOrCreateSystemManaged<TerrainSystem>();
             var heightData = terrain.GetHeightData();
             long fingerprint = 17;
+            float2 watchLow = low - FingerprintMargin, watchHigh = high + FingerprintMargin;
             for (int row = 0; row < rows; row++)
                 for (int column = 0; column < columns; column++)
                 {
                     float height = TerrainUtils.SampleHeight(ref heightData, new float3(origin.x + column * HeightSpacing, 0f, origin.y + row * HeightSpacing));
                     if (!math.isfinite(height)) throw new InvalidOperationException("The terrain returned a height that is not a number.");
                     heights[row * columns + column] = height;
-                    if ((row & 7) == 0 && (column & 7) == 0) fingerprint = fingerprint * 31 + (long)math.round(height * 10f);
+                    float2 node = origin + new float2(column, row) * HeightSpacing;
+                    if ((row & 7) == 0 && (column & 7) == 0 && math.all(node >= watchLow) && math.all(node <= watchHigh))
+                        fingerprint = fingerprint * 31 + (long)math.round(height * 10f);
                 }
 
             // Water deeper than 0.1 m blocks the nodes around it.
@@ -81,8 +87,8 @@ namespace SteppedStreets.Tool
                     MarkBox(new float2(x, z) - WaterSpacing * 0.6f, new float2(x, z) + WaterSpacing * 0.6f, _ => true);
                 }
 
-            BuildingCount = CaptureBuildings(entities, origin, maximum);
-            fingerprint = fingerprint * 31 + BuildingCount;
+            BuildingCount = CaptureBuildings(entities, origin, maximum, watchLow, watchHigh, out int watchedBuildings);
+            fingerprint = fingerprint * 31 + watchedBuildings;
             fingerprint = fingerprint * 31 + ExistingRoads.Length;
             Fingerprint = fingerprint;
         }
@@ -123,9 +129,10 @@ namespace SteppedStreets.Tool
                 }
         }
 
-        private int CaptureBuildings(EntityManager entities, float2 minimum, float2 maximum)
+        private int CaptureBuildings(EntityManager entities, float2 minimum, float2 maximum, float2 watchLow, float2 watchHigh, out int watched)
         {
             int count = 0;
+            watched = 0;
             using (var query = entities.CreateEntityQuery(ComponentType.ReadOnly<Game.Buildings.Building>(),
                 ComponentType.ReadOnly<Game.Objects.Transform>(), ComponentType.ReadOnly<PrefabRef>(),
                 ComponentType.Exclude<Temp>(), ComponentType.Exclude<Deleted>()))
@@ -143,6 +150,7 @@ namespace SteppedStreets.Tool
                     float2 upper = math.max(math.max(lot[0], lot[1]), math.max(lot[2], lot[3]));
                     if (math.any(upper < minimum) || math.any(lower > maximum)) continue;
                     count++;
+                    if (math.all(upper >= watchLow) && math.all(lower <= watchHigh)) watched++;
                     // A node a few metres outside the lot still counts, so grading keeps a clear margin round the building.
                     MarkBox(lower - 4f, upper + 4f, node =>
                     {

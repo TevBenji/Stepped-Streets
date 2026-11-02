@@ -25,6 +25,7 @@ namespace SteppedStreets.Core.Neighbourhood
     {
         private const float Shoulder = 1.5f;
         private const float PadMargin = 1.5f;
+        private const float SteepCorridorChange = 1.5f;
         private const int MaximumNodes = 600000;
         private const byte Free = 0, Locked = 1, Road = 2, Held = 3;
 
@@ -37,6 +38,7 @@ namespace SteppedStreets.Core.Neighbourhood
         private readonly float[] upper, lower;
         private readonly float grade;
         private readonly float straightStep, diagonalStep, cap;
+        private bool followHillside;
         private readonly Func<float2, float> ground;
 
         public int Count => Columns * Rows;
@@ -119,15 +121,21 @@ namespace SteppedStreets.Core.Neighbourhood
             float halfWidth = request.RoadHalfWidth;
             // A bank meets hillside that itself rises at up to the steepest buildable grade, so the steeper the buildable
             // ground, the further a cut must reach to meet it.
-            float climb = math.max(0.08f, request.BankGrade / 1.082f - request.SteepestBuildable);
-            float bankReach = math.clamp((request.EarthworkLimit + 1f) / climb + 4f, 16f, 48f);
+            float bankGrade = NeighbourhoodPlanner.EffectiveBankGrade(request);
+            float climb = math.max(0.08f, bankGrade / 1.082f - request.SteepestBuildable);
+            float bankReach = math.clamp((request.EarthworkLimit + 1f) / climb + 4f, 16f, request.SteepGround ? 96f : 48f);
             float2 minimum = float.MaxValue, maximum = float.MinValue;
             foreach (var road in plan.Roads)
                 foreach (var point in road.Points) { minimum = math.min(minimum, point.xz); maximum = math.max(maximum, point.xz); }
             foreach (var lot in lots)
                 foreach (var corner in lot.Pad.Corners) { minimum = math.min(minimum, corner.xz); maximum = math.max(maximum, corner.xz); }
             float margin = halfWidth + bankReach + 12f;
-            var field = new GroundField(minimum - margin, maximum + margin, request.BankGrade, request.EarthworkLimit, request.GroundHeight);
+            var field = new GroundField(minimum - margin, maximum + margin, bankGrade, request.EarthworkLimit, request.GroundHeight)
+            {
+                // ponytail: only in steep mode, where ground at the bank limit is common; gentle sites keep the plain cones
+                // their tests were tuned on. Turn it on everywhere if a gentle site ever shows a cliff at a steep patch.
+                followHillside = request.SteepGround,
+            };
             int count = field.Count;
             for (int index = 0; index < count; index++)
             {
@@ -145,8 +153,12 @@ namespace SteppedStreets.Core.Neighbourhood
             for (int index = 0; index < count; index++) roadDistance[index] = nearest[index] = float.MaxValue;
             float corridor = halfWidth + Shoulder;
             var touched = new List<int>();
-            foreach (var road in plan.Roads)
+            // The road each corridor node belongs to most (the deepest corridor), for steep mode's road-by-road test.
+            var owner = new int[count];
+            var ownerWeight = new float[count];
+            for (int roadIndex = 0; roadIndex < plan.Roads.Count; roadIndex++)
             {
+                var road = plan.Roads[roadIndex];
                 touched.Clear();
                 // At an existing road the corridor stops square: past the join is that road's ground, not ours.
                 bool squareStart = plan.Nodes[road.StartNode].ExistingRoadId != 0, squareEnd = plan.Nodes[road.EndNode].ExistingRoadId != 0;
@@ -172,6 +184,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 foreach (int index in touched)
                 {
                     float depth = corridor - nearest[index] + 0.05f;
+                    if (depth * depth > ownerWeight[index]) { ownerWeight[index] = depth * depth; owner[index] = roadIndex; }
                     weightSum[index] += depth * depth;
                     weightedHeight[index] += depth * depth * nearestHeight[index];
                     roadDistance[index] = math.min(roadDistance[index], nearest[index]);
@@ -213,12 +226,58 @@ namespace SteppedStreets.Core.Neighbourhood
                 }
                 // An existing road's own corridor keeps its ground even under a new road's end: the game joins the two there.
                 bool locked = nearExisting[index] || (request.Blocked != null && request.Blocked(field.Position(index)));
+                // On ground too steep for any clean bank, a deep cut or fill under a road is left to the game's road, which
+                // builds its own retaining walls; forcing it into the terrain would leave a cliff where the bank gives out.
+                bool roadHere = roadDistance[index] <= corridor
+                    && (!request.SteepGround || math.abs(roadHeight[index] - field.Original[index]) <= SteepCorridorChange);
                 if (locked) field.Hold(index, Locked, field.Original[index]);
-                else if (roadDistance[index] <= corridor) field.Hold(index, Road, roadHeight[index]);
+                // In steep mode a road node is tested like a pad, below, once the untouched ground's cones are known.
+                else if (roadHere && !request.SteepGround) field.Hold(index, Road, roadHeight[index]);
                 else { field.upper[index] = float.MaxValue; field.lower[index] = float.MinValue; }
             }
             field.ReleaseClashingShoulders(roadDistance, halfWidth);
             field.Sweep(cancellation);
+            if (request.SteepGround)
+            {
+                // A corridor node the cones already push off the road's height would need a cut or fill that never meets the
+                // ground, or a bank to the road above that steep: it is left to the game's road (its own retaining walls)
+                // rather than forced into a cliff. Roads go one at a time, contour streets first, each tested against those
+                // already held.
+                var byRoad = new List<int>[plan.Roads.Count];
+                for (int index = 0; index < count; index++)
+                {
+                    if (field.state[index] != Free || !(roadDistance[index] <= corridor)) continue;
+                    if (math.abs(roadHeight[index] - field.Original[index]) > SteepCorridorChange) continue;
+                    (byRoad[owner[index]] ?? (byRoad[owner[index]] = new List<int>())).Add(index);
+                }
+                var order = new List<int>();
+                for (int road = 0; road < plan.Roads.Count; road++) order.Add(road);
+                order.Sort((first, second) =>
+                {
+                    int kind = (plan.Roads[first].Kind == RoadKind.Contour ? 0 : 1).CompareTo(plan.Roads[second].Kind == RoadKind.Contour ? 0 : 1);
+                    return kind != 0 ? kind : first.CompareTo(second);
+                });
+                var held = new List<int>();
+                var heap = new MinHeap();
+                foreach (int road in order)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    if (byRoad[road] == null) continue;
+                    held.Clear();
+                    foreach (int index in byRoad[road])
+                    {
+                        float height = roadHeight[index];
+                        if (field.lower[index] > height + 0.01f || field.upper[index] < height - 0.01f) continue;
+                        field.Hold(index, Road, height);
+                        held.Add(index);
+                    }
+                    field.Grow(held, heap);
+                }
+                // Blended junction corners can still differ from a neighbour by more than a bank allows; the nodes that give
+                // way take their bank from their neighbours.
+                field.ReleaseClashingShoulders(roadDistance, -1f);
+                field.Sweep(cancellation);
+            }
 
             if (request.LevelLots)
             {
@@ -273,6 +332,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 bool released = false;
                 for (int index = 0; index < Count; index++)
                 {
+                    // Normally only the shoulder (outside the carriageway) gives way; a negative half width lets any node.
                     if (state[index] != Road || roadDistance[index] <= halfWidth) continue;
                     bool clash = false;
                     int column = index % Columns, row = index / Columns;
@@ -281,7 +341,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         int x = column + OffsetX[neighbour], y = row + OffsetY[neighbour];
                         if (x < 0 || y < 0 || x >= Columns || y >= Rows) continue;
                         int other = y * Columns + x;
-                        float step = neighbour < 4 ? straightStep : diagonalStep;
+                        float step = Step(index, other, neighbour < 4 ? straightStep : diagonalStep);
                         if (state[other] != Free && math.abs(Height[other] - Height[index]) > step + 0.01f) clash = true;
                     }
                     if (!clash) continue;
@@ -334,18 +394,30 @@ namespace SteppedStreets.Core.Neighbourhood
             float high = upper[index], low = lower[index];
             int x = column + direction, y = row + direction, back = column - direction;
             bool insideX = x >= 0 && x < Columns, insideY = y >= 0 && y < Rows, insideBack = back >= 0 && back < Columns;
-            if (insideX) Pull(row * Columns + x, straightStep, ref high, ref low);
-            if (insideY) Pull(y * Columns + column, straightStep, ref high, ref low);
-            if (insideX && insideY) Pull(y * Columns + x, diagonalStep, ref high, ref low);
-            if (insideBack && insideY) Pull(y * Columns + back, diagonalStep, ref high, ref low);
+            if (insideX) Pull(index, row * Columns + x, straightStep, ref high, ref low);
+            if (insideY) Pull(index, y * Columns + column, straightStep, ref high, ref low);
+            if (insideX && insideY) Pull(index, y * Columns + x, diagonalStep, ref high, ref low);
+            if (insideBack && insideY) Pull(index, y * Columns + back, diagonalStep, ref high, ref low);
             bool changed = false;
             if (high < upper[index] && high <= Original[index] + cap) { upper[index] = high; changed = true; }
             if (low > lower[index] && low >= Original[index] - cap) { lower[index] = low; changed = true; }
             return changed;
         }
 
-        private void Pull(int other, float step, ref float high, ref float low)
+        /// <summary>
+        /// How far two neighbouring nodes may differ: the bank grade over their distance, or, on steep ground (steep mode), the
+        /// hillside's own difference where it is larger, so the grading never makes a slope steeper than the hill already is.
+        /// </summary>
+        private float Step(int index, int other, float bankStep)
         {
+            if (!followHillside) return bankStep;
+            float natural = math.abs(Original[index] - Original[other]);
+            return natural > bankStep ? natural : bankStep;
+        }
+
+        private void Pull(int index, int other, float bankStep, ref float high, ref float low)
+        {
+            float step = Step(index, other, bankStep);
             float otherUpper = upper[other], otherLower = lower[other];
             if (otherUpper < float.MaxValue && otherUpper + step < high) high = otherUpper + step;
             if (otherLower > float.MinValue && otherLower - step > low) low = otherLower - step;
@@ -367,7 +439,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     if (x < 0 || y < 0 || x >= Columns || y >= Rows) continue;
                     int other = y * Columns + x;
                     if (state[other] != Free) continue;
-                    float candidate = value + (neighbour < 4 ? straightStep : diagonalStep);
+                    float candidate = value + Step(index, other, neighbour < 4 ? straightStep : diagonalStep);
                     if (candidate < upper[other] && candidate <= Original[other] + cap) { upper[other] = candidate; heap.Push(candidate, other); }
                 }
             }
@@ -384,7 +456,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     if (x < 0 || y < 0 || x >= Columns || y >= Rows) continue;
                     int other = y * Columns + x;
                     if (state[other] != Free) continue;
-                    float candidate = value - (neighbour < 4 ? straightStep : diagonalStep);
+                    float candidate = value - Step(index, other, neighbour < 4 ? straightStep : diagonalStep);
                     if (candidate > lower[other] && candidate >= Original[other] - cap) { lower[other] = candidate; heap.Push(-candidate, other); }
                 }
             }

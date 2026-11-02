@@ -12,9 +12,13 @@ namespace SteppedStreets.Core.Neighbourhood
     {
         private const float ShortestStandalone = 300f;
 
-        /// <summary>Removes links whose streets are gone and every part of the network that cannot be reached.</summary>
-        public static bool Prune(List<Street> streets)
+        /// <summary>
+        /// Removes links whose streets are gone and pieces of network too small to keep; true when a connection survives.
+        /// <paramref name="loose"/> counts the kept pieces no connection reaches, while one does.
+        /// </summary>
+        public static bool Prune(List<Street> streets, out int loose)
         {
+            foreach (var street in streets) street.Pruned = false;
             bool changed = true;
             while (changed)
             {
@@ -24,7 +28,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     if (street.Removed || street.Kind == RoadKind.Contour) continue;
                     bool lost = (street.Start.Street >= 0 && streets[street.Start.Street].Removed)
                         || (street.End.Street >= 0 && streets[street.End.Street].Removed);
-                    if (lost) { street.Removed = true; changed = true; }
+                    if (lost) { street.Pruned = true; changed = true; }
                 }
             }
 
@@ -37,15 +41,18 @@ namespace SteppedStreets.Core.Neighbourhood
             bool connected = rooted.Contains(true);
             int largest = -1;
             for (int id = 0; id < lengths.Count; id++) if (largest < 0 || lengths[id] > lengths[largest]) largest = id;
+            // Keep what a connection reaches, and every network big enough to be a neighbourhood of its own even if no road
+            // reaches it (the area need not touch a road, and the hilltop is often the best of it); with no connection at all,
+            // at least the largest. Beside a connected network, a lone street nothing links to is a road to nowhere: it goes.
+            var streetsIn = new int[lengths.Count];
+            for (int index = 0; index < count; index++) if (component[index] >= 0) streetsIn[component[index]]++;
+            var kept = new bool[lengths.Count];
+            for (int id = 0; id < lengths.Count; id++)
+                kept[id] = rooted[id] || (lengths[id] >= ShortestStandalone && (!connected || streetsIn[id] >= 2)) || (!connected && id == largest);
+            loose = 0;
+            for (int id = 0; id < lengths.Count; id++) if (connected && kept[id] && !rooted[id]) loose++;
             for (int index = 0; index < count; index++)
-            {
-                if (streets[index].Removed) continue;
-                int id = component[index];
-                // With a connection, keep what it reaches. Without one (the area need not touch a road), keep every network
-                // big enough to be a neighbourhood of its own, or at least the largest.
-                bool keep = connected ? rooted[id] : (lengths[id] >= ShortestStandalone || id == largest);
-                if (!keep) streets[index].Removed = true;
-            }
+                if (!streets[index].Removed && !kept[component[index]]) streets[index].Pruned = true;
             return connected;
         }
 
@@ -223,9 +230,9 @@ namespace SteppedStreets.Core.Neighbourhood
                     for (int second = first + 1; second < list.Count; second++)
                     {
                         float angle = math.degrees(math.acos(math.clamp(math.dot(list[first].Direction, list[second].Direction), -1f, 1f)));
-                        if (angle >= 59f) continue;
+                        if (angle >= SharpestJunction(request) - 1f) continue;
                         int blamed = streets[owners[list[first].Road]].Kind == RoadKind.Contour ? list[second].Road : list[first].Road;
-                        Flag(blamed, "a junction was sharper than 60°");
+                        Flag(blamed, "a junction was too sharp");
                     }
             }
             for (int first = 0; first < junctions.Count; first++)
@@ -240,7 +247,9 @@ namespace SteppedStreets.Core.Neighbourhood
             // Clearance between roads away from the nodes they share: both corridors (road and shoulders), and room for a bank
             // no steeper than the bank grade across their difference in height.
             float clearance = (request.RoadHalfWidth + 1.5f) * 2f + 1f;
-            float bank = request.BankGrade / 1.1f;
+            // In steep mode the step between two roads may be a retaining wall (the game's road builds one where the ground
+            // cannot be banked), so roads may sit closer above one another than a clean bank would allow.
+            float bank = BankBetweenRoads(request);
             var buckets = new SpatialBuckets<int2>(48f);
             float reach = clearance + 20f;
             for (int road = 0; road < plan.Roads.Count; road++)
@@ -249,7 +258,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     float2 position = plan.Roads[road].Points[point].xz;
                     buckets.Add(position - reach, position + reach, new int2(road, point));
                 }
-            float nodeReach = request.RoadHalfWidth * 2f + 22f;
+            float nodeReach = SharedNodeReach(request);
             for (int road = 0; road < plan.Roads.Count; road++)
             {
                 var planned = plan.Roads[road];
@@ -263,13 +272,33 @@ namespace SteppedStreets.Core.Neighbourhood
                         float needed = clearance + math.abs(otherRoad.Points[other.y].y - planned.Points[point].y) / bank;
                         if (math.distance(otherRoad.Points[other.y].xz, position) >= needed) continue;
                         if (NearShared(planned, otherRoad, plan, position, nodeReach)) continue;
-                        int blamed = streets[owners[road]].Kind == RoadKind.Contour ? other.x : road;
+                        // Two connections clashing: the later one goes, as the first serves the largest network.
+                        var kind = streets[owners[road]].Kind;
+                        int blamed = kind == RoadKind.Contour || (kind == RoadKind.Connection && streets[owners[other.x]].Kind == RoadKind.Connection)
+                            ? other.x : road;
                         Flag(blamed, "two roads came too close");
                     }
                 }
             }
             return bad;
         }
+
+        /// <summary>
+        /// The grade of the bank two roads at different heights need between them. In steep mode the step may be a retaining
+        /// wall (the game's road builds one where the ground cannot be banked), so roads may sit closer above one another.
+        /// </summary>
+        internal static float BankBetweenRoads(NeighbourhoodRequest request) =>
+            request.SteepGround ? 1.5f : NeighbourhoodPlanner.EffectiveBankGrade(request) / 1.1f;
+
+        /// <summary>
+        /// The sharpest junction angle, in degrees. On steep ground a link meeting a street square would have to climb straight
+        /// up the slope for its first and last 30 m, which no gentle road can do, so steep mode lets links join at 35°, as
+        /// switchback roads in hill towns do.
+        /// </summary>
+        internal static float SharpestJunction(NeighbourhoodRequest request) => request.SteepGround ? 35f : 60f;
+
+        /// <summary>How far from a node two roads that share it are let off the clearance.</summary>
+        internal static float SharedNodeReach(NeighbourhoodRequest request) => request.RoadHalfWidth * 2f + 22f;
 
         private static bool NearShared(PlannedRoad first, PlannedRoad second, NeighbourhoodPlan plan, float2 position, float reach)
         {

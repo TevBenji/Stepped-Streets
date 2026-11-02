@@ -31,7 +31,12 @@ namespace SteppedStreets.Core.Neighbourhood
         private readonly List<Street> streets;
         private readonly float minimumRadius;
         private readonly float halfWidth;
+        private readonly float junctionCosine;
         private readonly float[] roadDistance;
+        // The height of the road nearest each node (where roadDistance is stamped), for the height-aware clearance.
+        private readonly float[] roadHeight;
+        // Where accepted connections leave the existing roads: a later connection starts a junction's spacing away.
+        private readonly List<float2> connectionStarts = new List<float2>();
         private CancellationToken cancellation;
 
         public RoadLinks(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, float minimumRadius)
@@ -41,7 +46,10 @@ namespace SteppedStreets.Core.Neighbourhood
             this.streets = streets;
             this.minimumRadius = minimumRadius;
             halfWidth = request.RoadHalfWidth;
+            // The rule itself; the validation, measuring the same way, allows a degree more for rounding.
+            junctionCosine = math.cos(math.radians(RoadNetwork.SharpestJunction(request)));
             roadDistance = new float[survey.Count];
+            roadHeight = new float[survey.Count];
             for (int index = 0; index < roadDistance.Length; index++) roadDistance[index] = float.MaxValue;
             foreach (var street in streets) Stamp(street);
         }
@@ -51,7 +59,8 @@ namespace SteppedStreets.Core.Neighbourhood
         // A link leaving at 62° is this far along before it clears the street it left by the road clearance.
         private float Exempt => (Clearance + 2f) / 0.88f;
 
-        private void Stamp(Street street) => ContourStreets.Stamp(survey, street.Points, Clearance + 8f, roadDistance);
+        // As far as the validation looks for a road too close (its clearance plus 20 m).
+        private void Stamp(Street street) => ContourStreets.Stamp(survey, street.Points, Clearance + 20f, roadDistance, street.Heights, roadHeight);
 
         internal sealed class Candidate
         {
@@ -172,7 +181,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 }
             // Traced ramps: the shape a builder uses on steep ground, at a constant angle to curved contours.
             foreach (float side in new[] { 1f, -1f })
-                foreach (float share in new[] { 0.7f, 0.5f, 0.35f, 0.24f })
+                foreach (float share in request.SteepGround ? SteepShares : Shares)
                 {
                     var traced = Trace(from, fromPoint, to, side, share);
                     if (traced != null && (best == null || traced.Score < best.Score)) best = traced;
@@ -211,7 +220,9 @@ namespace SteppedStreets.Core.Neighbourhood
                     float2 position = points[point].xz;
                     if (!survey.InsideGrid(position, 24f)) continue;
                     float distance = Poly.Contains(survey.Boundary, position) ? 0f : Poly.DistanceToBoundary(survey.Boundary, position);
-                    if (distance <= 400f) starts.Add((road, point, distance));
+                    bool taken = false;
+                    foreach (var other in connectionStarts) taken |= math.distance(other, position) < JunctionSpacing;
+                    if (distance <= 400f && !taken) starts.Add((road, point, distance));
                 }
             }
             starts.Sort((x, y) => x.Distance != y.Distance ? x.Distance.CompareTo(y.Distance)
@@ -282,6 +293,7 @@ namespace SteppedStreets.Core.Neighbourhood
             }
             if (best == null) return false;
             var existing = roads[bestStart.Road];
+            connectionStarts.Add(existing.Points[bestStart.Point].xz);
             Accept(RoadKind.Connection, best, new Attachment
             {
                 Street = -1, Point = -1, Existing = true, ExistingId = existing.Id,
@@ -370,15 +382,23 @@ namespace SteppedStreets.Core.Neighbourhood
             float2 travel = a.Tangent(fromPoint) * side;
             float2 normal = Geometry.Left(a.Tangent(fromPoint));
             if (math.dot(normal, survey.UphillAt(start)) * climb < 0f) normal = -normal;
-            float lean = math.radians(RampLean), arrivalLean = math.radians(18f);
+            // Steep mode: leave and arrive at a sharper angle (see RoadNetwork.SharpestJunction), so the ends need not climb the fall line.
+            float lean = math.radians(request.SteepGround ? 55f : RampLean), arrivalLean = math.radians(request.SteepGround ? 55f : 18f);
+            // Where the ramp starts turning in to meet the street: on steep ground only close by, or the turn climbs the slope.
+            float arrival = request.SteepGround ? 14f : 34f;
+            // The length the rise needs (a little over, more for the gentler share), for steep mode's adaptive climb below.
+            float needed = ShortestFor(math.abs(b.Heights[NearestPoint(b, start)] - a.Heights[fromPoint])) * (0.95f / gradeShare);
             float2 heading = math.normalize(normal * math.cos(lean) + travel * math.sin(lean));
             float maximumTurn = step / (minimumRadius * 1.1f);
             float target = request.MaxRoadGrade * gradeShare;
             var points = new List<float2> { start };
             float2 position = start;
             float travelled = 0f;
-            float limit = request.BlockDepth * 6f;
-            bool clearedStart = false;
+            // On steep ground a ramp may switch back: it runs further, turning through uphill where it runs out of room.
+            float limit = request.BlockDepth * (request.SteepGround ? 12f : 6f);
+            bool clearedStart = false, turning = false;
+            int hairpins = 0;
+            float lookAhead = 2f * minimumRadius * 1.1f + 12f;
             while (travelled < limit)
             {
                 int nearest = NearestPoint(b, position);
@@ -408,7 +428,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 bool cleared = travelled > 8f && survey.Sample(roadDistance, position) >= Clearance + 3f;
                 if (!clearedStart) clearedStart = cleared;
                 if (!clearedStart) desired = heading;
-                else if (travelled > 20f && distance < 34f)
+                else if (travelled > 20f && distance < arrival)
                 {
                     // Arriving: lean the same way the ramp travels, into the street, near square.
                     float2 axis = b.Tangent(nearest);
@@ -419,15 +439,43 @@ namespace SteppedStreets.Core.Neighbourhood
                 }
                 else
                 {
+                    // Looking ahead every 16 m is enough: the look-ahead itself reaches 50 m.
+                    if (request.SteepGround && !turning && hairpins < MostHairpins && travelled > Exempt + 8f
+                        && ((int)(travelled / step) & 3) == 0 && !AheadClear(b, position, heading, lookAhead))
+                    {
+                        travel = -travel;
+                        turning = true;
+                        hairpins++;
+                    }
                     float2 uphill = survey.UphillAt(position) * climb;
                     if (math.lengthsq(uphill) < 0.5f) uphill = heading;
                     float slope = survey.SlopeAt(position);
                     float2 across = Geometry.Left(uphill);
                     if (math.dot(across, travel) < 0f) across = -across;
-                    float rise = slope <= target ? 1f : target / slope;
+                    float goal = target;
+                    if (request.SteepGround)
+                    {
+                        // Climb what is left over what is left of the length the rise needs: the steep departure is made up for
+                        // further on, so the ramp is long enough for its rise when it arrives.
+                        float riseLeft = math.abs(b.Heights[nearest] - survey.GroundAt(position));
+                        float lengthLeft = needed - travelled - arrival;
+                        goal = lengthLeft > step ? math.clamp(riseLeft / lengthLeft, 0.01f, request.MaxRoadGrade * 0.9f) : request.MaxRoadGrade * 0.9f;
+                    }
+                    float rise = slope <= goal ? 1f : goal / slope;
                     desired = math.normalize(across * math.sqrt(1f - rise * rise) + uphill * rise);
                 }
                 float angle = math.atan2(heading.x * desired.y - heading.y * desired.x, math.dot(heading, desired));
+                if (turning)
+                {
+                    if (math.abs(angle) < math.radians(20f)) turning = false;
+                    else if (math.abs(angle) > math.radians(120f))
+                    {
+                        // A hairpin swings through uphill, so the ramp keeps climbing instead of turning back down the hill.
+                        float2 up = survey.UphillAt(position) * climb;
+                        float toUp = math.atan2(heading.x * up.y - heading.y * up.x, math.dot(heading, up));
+                        angle = math.lengthsq(up) > 0.5f && math.abs(toUp) > 0.05f ? toUp : math.sign(angle) * maximumTurn;
+                    }
+                }
                 angle = math.clamp(angle, -maximumTurn, maximumTurn);
                 heading = math.normalize(new float2(heading.x * math.cos(angle) - heading.y * math.sin(angle), heading.x * math.sin(angle) + heading.y * math.cos(angle)));
                 position += heading * step;
@@ -438,6 +486,24 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (!clearedStart && travelled > 40f) return null;
             }
             return null;
+        }
+
+        private const int MostHairpins = 3;
+        private static readonly float[] Shares = { 0.7f, 0.5f, 0.35f, 0.24f };
+        // On steep ground the climb adapts as the ramp goes (see Trace), so two rates cover it and halve the long traces.
+        private static readonly float[] SteepShares = { 0.9f, 0.7f };
+
+        /// <summary>True when the ramp can go on straight for <paramref name="reach"/> metres: on streetable ground and clear of roads.</summary>
+        private bool AheadClear(Street target, float2 position, float2 heading, float reach)
+        {
+            for (float distance = 8f; distance <= reach; distance += 8f)
+            {
+                float2 probe = position + heading * distance;
+                if (survey.StreetRoomAt(probe) < 0f) return false;
+                int nearest = NearestPoint(target, probe);
+                if (math.distance(probe, target.Points[nearest]) > 30f && survey.Sample(roadDistance, probe) < Clearance) return false;
+            }
+            return true;
         }
 
         private int AllowedNear(Street street, int point)
@@ -467,33 +533,42 @@ namespace SteppedStreets.Core.Neighbourhood
         }
 
         /// <summary>Checks one candidate path and fits its height profile; null when it breaks a rule.</summary>
-        internal static readonly int[] Failures = new int[8];
         internal Candidate Evaluate(List<float2> path, float startHeight, float endHeight, float startExempt, float endExempt, bool connection,
             float2 startAxis = default, float2 endAxis = default)
         {
             if (path.Count < 3) return null;
             float length = Geometry.Length(path);
-            if (length < 16f) { Failures[0]++; return null; }
+            if (length < 16f) return null;
             // Cheapest first: a road too short for its rise fails whatever its shape.
-            if (length < ShortestFor(math.abs(endHeight - startHeight))) { Failures[4]++; return null; }
+            if (length < ShortestFor(math.abs(endHeight - startHeight))) return null;
             // T-junctions of 60° or more, measured as the validation measures them: the road's direction at the node.
-            if (!SquareEnough(path, true, startAxis) || !SquareEnough(path, false, endAxis)) { Failures[7]++; return null; }
-            if (Geometry.TightestRadius(path, 12f, out _) < minimumRadius * 0.98f) { Failures[1]++; return null; }
+            if (!SquareEnough(path, true, startAxis) || !SquareEnough(path, false, endAxis)) return null;
+            if (Geometry.TightestRadius(path, 12f, out _) < minimumRadius * 0.98f) return null;
             var stations = Geometry.Stations(path);
             for (int index = 1; index < path.Count - 1; index++)
             {
                 if (stations[index] < startExempt || length - stations[index] < endExempt) continue;
                 float room = connection ? survey.ConnectionRoomAt(path[index]) : survey.StreetRoomAt(path[index]);
-                if (room < 0f) { Failures[2]++; return null; }
-                if (survey.Sample(roadDistance, path[index]) < Clearance) { Failures[3]++; return null; }
+                if (room < 0f) return null;
+                if (survey.Sample(roadDistance, path[index]) < Clearance) return null;
             }
             var heights = RoadProfile.Fit(path, survey.GroundAt, request.MaxRoadGrade, startHeight, endHeight);
-            if (heights == null) { Failures[4]++; return null; }
+            if (heights == null) return null;
             float earthwork = 0f;
             for (int index = 0; index < path.Count; index++)
                 earthwork = math.max(earthwork, math.abs(heights[index] - survey.GroundAt(path[index])));
-            if (earthwork > request.EarthworkLimit) { Failures[5]++; return null; }
-            Failures[6]++;
+            if (earthwork > request.EarthworkLimit) return null;
+            // The validation's clearance, heights and all: room for a bank across the difference in height to the road beside.
+            // Near its ends a road shares a node with the street it joins, which the validation lets off the same way.
+            float bank = RoadNetwork.BankBetweenRoads(request), nodeReach = RoadNetwork.SharedNodeReach(request);
+            float fromStart = connection ? startExempt : math.max(startExempt, nodeReach), fromEnd = math.max(endExempt, nodeReach);
+            for (int index = 1; index < path.Count - 1; index++)
+            {
+                if (stations[index] < fromStart || length - stations[index] < fromEnd) continue;
+                float distance = survey.Sample(roadDistance, path[index]);
+                if (distance > Clearance + 20f) continue;
+                if (distance < Clearance + math.abs(heights[index] - roadHeight[NearestNode(path[index])]) / bank) return null;
+            }
             // Clean ramps over squiggles: every degree the road turns costs half a metre.
             float turning = 0f;
             for (int index = 2; index < path.Count; index++)
@@ -504,14 +579,18 @@ namespace SteppedStreets.Core.Neighbourhood
             return new Candidate { Points = path, Heights = heights, Score = length + 3f * earthwork + 0.5f * turning };
         }
 
-        private static bool SquareEnough(List<float2> path, bool atStart, float2 axis)
+        private int NearestNode(float2 point)
         {
-            if (math.lengthsq(axis) < 1e-6f) return true;
-            return math.abs(math.dot(RoadNetwork.EndDirection(path, atStart), math.normalizesafe(axis))) <= MinimumJunctionCosine;
+            int column = math.clamp((int)math.round((point.x - survey.Origin.x) / survey.Cell), 0, survey.Columns - 1);
+            int row = math.clamp((int)math.round((point.y - survey.Origin.y) / survey.Cell), 0, survey.Rows - 1);
+            return row * survey.Columns + column;
         }
 
-        // cos 60°: the rule itself; the validation, measuring the same way, allows a degree more for rounding.
-        private const float MinimumJunctionCosine = 0.5f;
+        private bool SquareEnough(List<float2> path, bool atStart, float2 axis)
+        {
+            if (math.lengthsq(axis) < 1e-6f) return true;
+            return math.abs(math.dot(RoadNetwork.EndDirection(path, atStart), math.normalizesafe(axis))) <= junctionCosine;
+        }
 
         /// <summary>A junction keeps 40 m from the street's other junctions and clear of its open ends.</summary>
         internal bool JunctionAllowed(Street street, int point)

@@ -42,6 +42,10 @@ namespace SteppedStreets.Tests.Neighbourhood
             var standalone = SyntheticSites.NoisyHill();
             standalone.Road = false;
             renders.Add((standalone, "noisy-hill-no-road", null));
+            void Steep(NeighbourhoodRequest request) { request.SteepGround = true; request.SteepestBuildable = 0.5f; request.EarthworkLimit = 8f; }
+            renders.Add((SyntheticSites.Mountain(), "mountain-steep", Steep));
+            renders.Add((SyntheticSites.Slope(30f), "slope-30-steep", Steep));
+            renders.Add((SyntheticSites.Mountain(), "mountain-steep-lane", request => { Steep(request); request.Style = NeighbourhoodStyle.MountainLane; }));
 
             foreach (var (site, name, adjust) in renders)
             {

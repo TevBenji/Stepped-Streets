@@ -1,4 +1,4 @@
-<!-- Stepped Streets. Original artwork by Tevin Benjamin, 2026-11. GPL-3.0. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Stepped Streets. Original artwork by Tevin Benjamin, 2026-11. GPL-3.0. -->
   <path d="M5 39 43 17M6 35V25h11v4M19 27V17h11v4M32 19V9h11v4M6 25l5-3 6 3M19 17l5-3 6 3M32 9l5-3 6 3M5 43l38-22"/>
 </svg>

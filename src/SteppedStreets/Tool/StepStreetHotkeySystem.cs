@@ -11,6 +11,7 @@ namespace SteppedStreets.Tool
     public sealed partial class StepStreetHotkeySystem : GameSystemBase
     {
         private ProxyAction hotkey;
+        private NeighbourhoodToolSystem tool;
         private float nextErrorLog;
 
         [Preserve]
@@ -23,9 +24,11 @@ namespace SteppedStreets.Tool
                     hotkey = Mod.Settings?.GetAction(SteppedStreetsSettings.StepStreetAction);
                     if (hotkey != null) hotkey.shouldBeEnabled = true;
                 }
+                if (tool == null) tool = World.GetOrCreateSystemManaged<NeighbourhoodToolSystem>();
+                // The build has to keep going when the player switches tools mid-build, and this system always runs.
+                tool.BuildTick();
                 var input = InputManager.instance;
-                if (hotkey != null && hotkey.WasPerformedThisFrame() && input != null && !input.hasInputFieldFocus)
-                    World.GetOrCreateSystemManaged<NeighbourhoodToolSystem>().Toggle();
+                if (hotkey != null && hotkey.WasPerformedThisFrame() && input != null && !input.hasInputFieldFocus) tool.Toggle();
             }
             catch (Exception exception)
             {

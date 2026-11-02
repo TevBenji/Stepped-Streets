@@ -16,6 +16,7 @@ interface SliderProps {
     onChange: (value: number) => void;
     onDragStart: () => void;
     onDragEnd: () => void;
+    disabled?: boolean;
 }
 export const vanilla: { Slider?: ComponentType<SliderProps>; focusDisabled?: FocusKey } = {};
 export function initializeVanilla(registry: ModuleRegistry) {

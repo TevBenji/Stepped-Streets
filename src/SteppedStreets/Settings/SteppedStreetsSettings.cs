@@ -48,7 +48,11 @@ namespace SteppedStreets.Settings
         [SettingsUISection(Section, Group)]
         public int MaxRoadGradePercent { get; set; }
 
-        [SettingsUISlider(min = 8, max = 30, step = 1, scalarMultiplier = 1, unit = Game.UI.Unit.kPercentage)]
+        /// <summary>Steep hills and mountains: buildable ground up to 60 % and earthwork up to 12 m. Off: 30 % and 8 m.</summary>
+        [SettingsUISection(Section, Group)]
+        public bool SteepGround { get; set; }
+
+        [SettingsUISlider(min = 8, max = 60, step = 1, scalarMultiplier = 1, unit = Game.UI.Unit.kPercentage)]
         [SettingsUISection(Section, Group)]
         public int SteepestBuildablePercent { get; set; }
 
@@ -74,10 +78,25 @@ namespace SteppedStreets.Settings
         [SettingsUISection(Section, Group)]
         public bool LevelLots { get; set; }
 
-        [SettingsUISlider(min = 1f, max = 8f, step = 0.5f, scalarMultiplier = 1)]
+        [SettingsUISlider(min = 1f, max = 12f, step = 0.5f, scalarMultiplier = 1)]
         [SettingsUICustomFormat(fractionDigits = 1)]
         [SettingsUISection(Section, Group)]
         public float EarthworkLimit { get; set; }
+
+        // The steepest ground and the most earth each mode allows (methods, so the Options page lists no extra rows).
+        public int SteepestBuildableLimit() => SteepGround ? 60 : 30;
+        public float EarthworkCeiling() => SteepGround ? 12f : 8f;
+
+        /// <summary>
+        /// Turning steep ground on lifts the steepest buildable ground to at least 50 % and the earthwork to at least 8 m, so the
+        /// switch alone opens up a mountain; turning it off brings both back within the normal limits.
+        /// </summary>
+        public void SetSteepGround(bool on)
+        {
+            SteepGround = on;
+            SteepestBuildablePercent = on ? Math.Max(SteepestBuildablePercent, 50) : Math.Min(SteepestBuildablePercent, SteepestBuildableLimit());
+            EarthworkLimit = on ? Math.Max(EarthworkLimit, 8f) : Math.Min(EarthworkLimit, EarthworkCeiling());
+        }
 
         [SettingsUISlider(min = 0.2f, max = 0.5f, step = 0.05f, scalarMultiplier = 1)]
         [SettingsUICustomFormat(fractionDigits = 2)]
@@ -119,6 +138,7 @@ namespace SteppedStreets.Settings
             BlockDepth = 90;
             MaxRoadGradePercent = 8;
             SteepestBuildablePercent = 15;
+            SteepGround = false;
             ZoneMix = DefaultZoneMix;
             MixPattern = MixPattern.Clumps;
             LotWidthCells = 3;
@@ -137,61 +157,15 @@ namespace SteppedStreets.Settings
         }
 
         /// <summary>The zone mix rows, read leniently: a broken string falls back to the default mix.</summary>
-        public List<ZoneShare> ZoneShares() => ParseZoneMix(ZoneMix);
-
-        public static List<ZoneShare> ParseZoneMix(string json)
+        public List<ZoneShare> ZoneShares()
         {
-            var shares = new List<ZoneShare>();
-            try
-            {
-                // ponytail: a tiny reader for [{"zone":"..","share":n},..], the only shape the panel writes; use a JSON
-                // library if the mix grows more fields.
-                int index = 0;
-                string text = json ?? "";
-                while ((index = text.IndexOf("\"zone\"", index, StringComparison.Ordinal)) >= 0)
-                {
-                    int open = text.IndexOf('"', text.IndexOf(':', index) + 1);
-                    var zone = new StringBuilder();
-                    int position = open + 1;
-                    for (; position < text.Length && text[position] != '"'; position++)
-                    {
-                        if (text[position] == '\\' && position + 1 < text.Length) position++;
-                        zone.Append(text[position]);
-                    }
-                    int shareKey = text.IndexOf("\"share\"", position, StringComparison.Ordinal);
-                    int next = text.IndexOf("\"zone\"", position, StringComparison.Ordinal);
-                    float share = 1f;
-                    if (shareKey >= 0 && (next < 0 || shareKey < next))
-                    {
-                        int start = text.IndexOf(':', shareKey) + 1, end = start;
-                        while (end < text.Length && "0123456789.-eE+ ".IndexOf(text[end]) >= 0) end++;
-                        float.TryParse(text.Substring(start, end - start).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out share);
-                    }
-                    if (zone.Length > 0 && share > 0f && !float.IsNaN(share) && !float.IsInfinity(share))
-                        shares.Add(new ZoneShare { Zone = zone.ToString(), Share = share });
-                    index = position;
-                }
-            }
-            catch (Exception exception)
-            {
-                Mod.Logger.Warn("Stepped Streets: the zone mix could not be read (" + exception.Message + "); using the default.");
-                shares.Clear();
-            }
-            if (shares.Count == 0) shares.Add(new ZoneShare { Zone = "Residential Low", Share = 100f });
-            return shares;
+            // Cached on the text: the panel reads the mix every frame.
+            if (parsedShares == null || !ReferenceEquals(parsedText, ZoneMix)) { parsedShares = ZoneShare.ParseList(ZoneMix); parsedText = ZoneMix; }
+            return new List<ZoneShare>(parsedShares);
         }
 
-        public static string WriteZoneMix(IEnumerable<ZoneShare> shares)
-        {
-            var json = new StringBuilder("[");
-            foreach (var share in shares)
-            {
-                if (json.Length > 1) json.Append(',');
-                json.Append("{\"zone\":\"").Append((share.Zone ?? "").Replace("\\", "\\\\").Replace("\"", "\\\""))
-                    .Append("\",\"share\":").Append(share.Share.ToString("0.##", CultureInfo.InvariantCulture)).Append('}');
-            }
-            return json.Append(']').ToString();
-        }
+        private string parsedText;
+        private List<ZoneShare> parsedShares;
 
         /// <summary>
         /// English labels for the Options page. The game builds its label ids from type and property names, so without these
@@ -223,14 +197,15 @@ namespace SteppedStreets.Settings
             Label(nameof(RoadName), "Road type", "The road prefab for new streets, by name (for example Small Road).");
             Label(nameof(BlockDepth), "Block depth (m)", "Road spacing on the ground between neighbouring contour streets.");
             Label(nameof(MaxRoadGradePercent), "Max road grade", "No new road is steeper than this.");
-            Label(nameof(SteepestBuildablePercent), "Steepest buildable ground", "Steeper ground gets no roads or lots and is planted as forest.");
+            Label(nameof(SteepGround), "Steep hills and mountains", "Build on ground up to 60% steep: links switch back in hairpins and banks reach further. Off: up to 30%.");
+            Label(nameof(SteepestBuildablePercent), "Steepest buildable ground", "Steeper ground gets no roads or lots and is planted as forest (above 30% only with steep hills on).");
             Label(nameof(ZoneMix), "Zone mix", "The zones and their shares, as the panel writes them.");
             Label(nameof(MixPattern), "Mix mode", "Random per lot, clumps of neighbouring lots, or an even split.");
             Label(nameof(LotWidthCells), "Lot width (cells)", "Cells along the kerb per lot.");
             Label(nameof(NarrowestWidthCells), "Narrowest width (cells)", "How far a lot may narrow on a climbing road to keep its step low.");
             Label(nameof(DepthCells), "Lot depth (cells)", "Cells back from the road.");
             Label(nameof(LevelLots), "Level the lots", "Grade each lot into a level pad with soft banks before zoning.");
-            Label(nameof(EarthworkLimit), "Most earth (m)", "A lot that needs more cut or fill than this is left out.");
+            Label(nameof(EarthworkLimit), "Most earth (m)", "A lot that needs more cut or fill than this is left out (above 8 m only with steep hills on).");
             Label(nameof(BankGrade), "Steepest bank", "Rise over run of the steepest bank the grading makes; 0.4 is 40%.");
             Label(nameof(HighestStep), "Highest step (m)", "The tallest step between neighbouring lots along a climbing road.");
             Label(nameof(LotSpacing), "Space between lots", "-1 decides from the slope (Auto); otherwise 0, 1 or 2 empty cells.");

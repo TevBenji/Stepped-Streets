@@ -38,7 +38,13 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>Points where another street joins this one.</summary>
         public readonly List<int> Junctions = new List<int>();
 
-        public bool Removed;
+        /// <summary>Broke a rule: gone for good.</summary>
+        public bool Broken;
+
+        /// <summary>Cut off from the kept network; worked out afresh by every prune.</summary>
+        public bool Pruned;
+
+        public bool Removed => Broken || Pruned;
 
         public Street(RoadKind kind, List<float2> points, float[] heights)
         {

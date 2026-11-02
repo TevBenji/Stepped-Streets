@@ -2,10 +2,10 @@
 // The look follows Placemaker's panel (jackwrichards, GPL-3.0): a dark panel docked on the right, small-caps sections,
 // label-left rows, segmented choices and one accent button in the footer. Plain elements rather than cs2/ui components,
 // so nothing depends on the vanilla themes, which left the first version unstyled.
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./lib/bindings";
 import { ErrorBoundary } from "./lib/errorBoundary";
-import { formatArea, MixPattern, NeighbourhoodStyle, Option, statusLine, thousands, ToolState, zoneColour, ZoneShare } from "./lib/state";
+import { formatArea, MixPattern, NeighbourhoodStyle, Option, statusDetail, statusLine, thousands, ToolState, zoneColour, ZoneShare } from "./lib/state";
 import { vanilla } from "./lib/vanilla";
 import icon from "./assets/stepped-streets.svg";
 import closeIcon from "./assets/close.svg";
@@ -68,19 +68,22 @@ function NumberControl({ label, value, minimum, maximum, step, format, disabled,
     const [drag, setDrag] = useState<number | null>(null);
     const dragging = useRef(false);
     const pending = useRef(value);
+    // A released drag keeps showing its value until the tool sends it back, so the thumb doesn't jump to the old one first.
+    useEffect(() => { if (!dragging.current) setDrag(null); }, [value]);
     const snap = (raw: number) =>
         Number(Math.max(minimum, Math.min(maximum, minimum + Math.round((raw - minimum) / step) * step)).toFixed(6));
     // Settings re-plan the area, so a drag sends one value when it ends rather than one per frame.
     const commit = (raw: number) => {
         const next = snap(raw);
-        if (!disabled && Number.isFinite(next) && next !== value) onCommit(next);
+        if (!disabled && Number.isFinite(next) && next !== value) { onCommit(next); return true; }
+        return false;
     };
     const shown = drag ?? value;
     const filled = Math.max(0, Math.min(100, 100 * (shown - minimum) / (maximum - minimum)));
     const Slider = vanilla.Slider;
     return <>
         <div className={styles.slider}>
-            {Slider && !disabled ? <Slider focusKey={vanilla.focusDisabled} value={shown} start={minimum} end={maximum} gamepadStep={step}
+            {Slider ? <Slider focusKey={vanilla.focusDisabled} value={shown} start={minimum} end={maximum} gamepadStep={step} disabled={disabled}
                 valueTransformer={(start, end, ratio) => snap(start + ratio * (end - start))}
                 onDragStart={() => { dragging.current = true; pending.current = value; }}
                 onChange={next => {
@@ -88,7 +91,7 @@ function NumberControl({ label, value, minimum, maximum, step, format, disabled,
                     if (dragging.current) { pending.current = snap(next); setDrag(pending.current); }
                     else commit(next);
                 }}
-                onDragEnd={() => { dragging.current = false; setDrag(null); commit(pending.current); }}
+                onDragEnd={() => { dragging.current = false; if (!commit(pending.current)) setDrag(null); }}
             /> : <div className={styles.stepper}>
                 <Button className={styles.stepButton} label={`Decrease ${label}`} disabled={disabled || shown <= minimum}
                     onSelect={() => commit(shown - step)}>-</Button>
@@ -122,6 +125,8 @@ function Picker({ label, options, value, disabled, onPick, children }: React.Pro
     label?: string; options: Option[]; value: string; disabled: boolean; onPick: (name: string) => void;
 }>) {
     const [open, setOpen] = useState(false);
+    // Disabling closes the list, so it doesn't pop back open after the build or the confirmation.
+    useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
     // A saved choice the game no longer lists still shows, so the button never reads blank.
     const shown = options.some(option => option.name === value) ? options : [{ name: value, label: value }, ...options];
     const current = shown.find(option => option.name === value)?.label ?? value;
@@ -148,14 +153,18 @@ function ZoneMix({ mix, zones, disabled }: { mix: ZoneShare[]; zones: Option[]; 
     const total = mix.reduce((sum, entry) => sum + entry.share, 0);
     const labelOf = (name: string) => zones.find(zone => zone.name === name)?.label ?? name;
     const unused = zones.find(zone => !mix.some(entry => entry.zone === zone.name));
+    // The tool drops zones the game doesn't have (a removed asset pack), so a mix of only those would be refused.
+    const known = (name: string) => zones.length === 0 || zones.some(zone => zone.name === name);
     return <>
         {mix.map((entry, index) => {
             const replace = (change: Partial<ZoneShare>) => send(mix.map((other, at) => at === index ? { ...other, ...change } : other));
-            const label = labelOf(entry.zone);
+            const missing = !known(entry.zone);
+            const label = labelOf(entry.zone) + (missing ? " (not installed)" : "");
+            const lastKnown = !mix.some((other, at) => at !== index && known(other.zone));
             return <div key={entry.zone} className={styles.mixEntry}>
                 <Picker options={zones.filter(zone => zone.name === entry.zone || !mix.some(other => other.zone === zone.name))}
                     value={entry.zone} disabled={disabled} onPick={zone => replace({ zone })}>
-                    <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled || mix.length === 1}
+                    <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled || mix.length === 1 || lastKnown}
                         onSelect={() => send(mix.filter((_, at) => at !== index))}>
                         <img className={styles.closeIcon} src={closeIcon} />
                     </Button>
@@ -163,7 +172,7 @@ function ZoneMix({ mix, zones, disabled }: { mix: ZoneShare[]; zones: Option[]; 
                 <div className={styles.row}>
                     {/* ponytail: shares start at 5, because the tool drops a row whose share is 0; the remove button covers "none". */}
                     <NumberControl label={`${label} share`} value={entry.share} minimum={5} maximum={100} step={5}
-                        format={value => String(Math.round(value))} disabled={disabled} onCommit={share => replace({ share })} />
+                        format={value => String(Math.round(value))} disabled={disabled || missing} onCommit={share => replace({ share })} />
                     <div className={styles.shareOfTotal}>{Math.round(100 * entry.share / total)}%</div>
                 </div>
             </div>;
@@ -238,6 +247,7 @@ function NeighbourhoodPanel() {
                 <div className={styles.content}>
                     <div className={classes(styles.status, statusTone(state))} aria-live="polite">
                         <div className={styles.statusText}>{statusLine(state)}</div>
+                        {statusDetail(state) ? <div className={styles.statusDetail}>{statusDetail(state)}</div> : null}
                         {building ? <div className={styles.progressTrack}>
                             <div className={styles.progress} style={{ width: `${100 * state.progress}%` }} />
                         </div> : null}
@@ -267,8 +277,9 @@ function NeighbourhoodPanel() {
                             format={metres} trigger="setBlockDepth" disabled={disabled} />
                         <NumberRow label="Max road grade" value={settings.maxRoadGradePercent} minimum={4} maximum={12} step={1}
                             format={percent} trigger="setMaxRoadGrade" disabled={disabled} />
-                        <NumberRow label="Steepest buildable" value={settings.steepestBuildablePercent} minimum={8} maximum={30} step={1}
-                            format={percent} trigger="setSteepestBuildable" disabled={disabled} />
+                        <ToggleRow label="Steep hills" value={settings.steepGround} trigger="setSteepGround" disabled={disabled} />
+                        <NumberRow label="Steepest buildable" value={settings.steepestBuildablePercent} minimum={8}
+                            maximum={settings.steepGround ? 60 : 30} step={1} format={percent} trigger="setSteepestBuildable" disabled={disabled} />
                     </Section>
 
                     <Section title="Zones">
@@ -285,7 +296,7 @@ function NeighbourhoodPanel() {
 
                     <Section title="Grading">
                         <ToggleRow label="Level the lots" value={settings.levelLots} trigger="setLevelLots" disabled={disabled} />
-                        <NumberRow label="Most earth" value={settings.earthworkLimit} minimum={1} maximum={8} step={0.5}
+                        <NumberRow label="Most earth" value={settings.earthworkLimit} minimum={1} maximum={settings.steepGround ? 12 : 8} step={0.5}
                             format={tenthMetres} trigger="setEarthworkLimit" disabled={disabled} />
                         <NumberRow label="Steepest bank" value={settings.bankGradePercent} minimum={20} maximum={50} step={5}
                             format={percent} trigger="setBankGrade" disabled={disabled} />

@@ -81,11 +81,11 @@ it must look good enough for screenshots and be explainable in an interview.
 
 | # | Rule |
 |---|---|
-| G1 | **Don't build on steep ground.** Ground steeper than Steepest buildable (default 15 %, range 8–30 %) on the smoothed survey gets no roads and no lots; it is planted as forest. About 10 % is the sweet spot. |
+| G1 | **Don't build on steep ground.** Ground steeper than Steepest buildable (default 15 %, range 8–30 %, up to 60 % with Steep hills on) on the smoothed survey gets no roads and no lots; it is planted as forest. About 10 % is the sweet spot. |
 | G2 | **Roads follow the contours.** Contour streets are contour lines of the smoothed ground (σ 12 m), at heights ΔH = g × S apart, where S is Block depth (road spacing on the ground) and g the 60th-percentile slope of buildable ground. They are clipped to buildable land, smoothed (Chaikin), held to a minimum radius, and dropped when shorter than 80 m. A level that comes closer than 0.65 S to an accepted street is clipped there; where accepted streets are more than 1.7 S apart, an in-between level fills the gap. Their profile follows the ground with at most 3 % grade (Contour suburb) or stays level (Terraced blocks). |
-| G3 | **Connectors climb gently.** Neighbouring contour streets are linked about every Link spacing along their shared length (every street gets at least one link). A link leaves and meets its streets at right angles and bends across the slope (an S-curve) until its length L satisfies ΔH ÷ L ≤ Max road grade (default 8 %, at most 12 %); where no S-curve fits, it is dropped rather than made steep. Junctions are T-junctions at 60° or more and at least 40 m apart. |
+| G3 | **Connectors climb gently.** Neighbouring contour streets are linked about every Link spacing along their shared length (every street gets at least one link). A link leaves and meets its streets at right angles and bends across the slope (an S-curve) until its length L satisfies ΔH ÷ L ≤ Max road grade (default 8 %, at most 12 %); where no S-curve fits, it is dropped rather than made steep. Junctions are T-junctions at 60° or more and at least 40 m apart. With Steep hills on, links may join at 35° or more and switch back: on 40 % ground a square junction would have to climb the fall line for its first and last 30 m. |
 | G4 | **Connection.** When an existing road lies within 400 m of the area, one road joins the network to it, within Max road grade, attached to that road's edge or node (it may run outside the area). The area need not touch a road (owner, 2 November 2026): without a reachable road the network is built standalone and the panel says it is not connected. |
-| G5 | **Validate and repair.** Every road is checked for grade, radius, junction angle and spacing, clearance from other roads, water, buildings, existing roads and wild ground. A failing road is dropped; roads cut off from the connection are dropped. |
+| G5 | **Validate and repair.** Every road is checked for grade, radius, junction angle and spacing, clearance from other roads, water, buildings, existing roads and wild ground. A failing road is dropped. Pieces of network no connection reaches are kept when they are at least 300 m of two or more joined streets (the panel says how many need a road of their own); smaller pieces and lone unlinked streets are dropped. |
 | G6 | **Grade the lots.** Lots go along both sides of every new road (StepPlanner R1–R10: chord rectangles, pads at the street height at the middle of the lot front, earthwork limit, obstacle trimming). The ground is one field: road corridors (road plus 1.5 m shoulders, level across), then pads, each held level; between and around them the ground eases back to the hillside no steeper than Steepest bank (default 40 %). Where a pad cannot keep its height without a steeper bank, the clashing part of the pad yields and becomes bank. |
 | G7 | **Give space.** On steeper ground lots get gaps: Auto leaves 1 cell where the ground across a lot is steeper than half the buildable limit and 2 cells above three quarters of it; the player can force 0, 1 or 2. Gaps are planted. |
 | G8 | **Terrace whole blocks.** In Terraced blocks the streets are straighter and level, so each block side is one level terrace; links are straight connectors with no lots. |
@@ -116,13 +116,14 @@ zoning), so the build follows it:
 | Road type | the game's small two-lane road | ground-level, non-highway road prefabs |
 | Block depth (road spacing) | 90 m | 60–200 m |
 | Max road grade | 8 % | 4–12 % |
-| Steepest buildable ground | 15 % | 8–30 % |
+| Steep hills | off | on lifts Steepest buildable to ≥ 50 % and Most earth to ≥ 8 m; off caps them at 30 % and 8 m |
+| Steepest buildable ground | 15 % | 8–30 % (8–60 % with Steep hills) |
 | Link spacing | 200 m | 100–400 m |
 | Zone mix | Residential Low 100 % | rows of zone and share; "Mix in another zone" |
 | Mix mode | Clumps | Random, Clumps, Even |
 | Lot width, lot depth | 3 cells, 3 cells | 2–6 cells each |
 | Level the lots | on | |
-| Most earth | 4 m | 1–8 m |
+| Most earth | 4 m | 1–8 m (1–12 m with Steep hills) |
 | Steepest bank | 40 % | 20–50 % |
 | Space between lots | Auto | Auto, 0, 1, 2 cells |
 | Retaining walls | off | |
@@ -254,7 +255,13 @@ After each milestone: build, run all tests, install to the Mods folder, commit, 
 
 ## Changes
 
-Draft 4, 2 November 2026. The owner rejected the one-street tool after the first in-game look and asked for a generator that lays out a whole hillside neighbourhood from a drawn area (his v2 hand-off prompt, approved the same day; it supersedes the wave 5 spec in `docs/HILLSIDE-NEIGHBOURHOODS.md`).
+Draft 5, 2 November 2026. After a code review and the owner's request for steep hills and mountains behind a switch.
+
+- §5.2 G1, G3: Steep hills mode (off by default): buildable ground up to 60 %, earthwork up to 12 m, links joining at 35° or more with an adaptive climb and hairpins, banks reaching further.
+- §5.2 G5: unreached networks of 300 m or more with two or more streets are kept and reported, instead of dropped whenever any connection exists (the owner: the area should build even when it can't connect).
+- §5.4: Steep hills setting; Steepest buildable and Most earth ranges widen with it.
+
+Draft 4, 2 November 2026. The owner rejected the one-street tool after the first in-game look and asked for a generator that lays out a whole hillside neighbourhood from a drawn area (their v2 hand-off prompt, approved the same day; it supersedes the wave 5 spec in `docs/HILLSIDE-NEIGHBOURHOODS.md`).
 
 - §1–§4 rewritten for the neighbourhood generator; the non-goal "laying out new roads or whole neighbourhoods" is lifted; the street picker is removed.
 - §5.1: area drawing (corners, drag, right-click removes, Ctrl+Z, Esc), live preview, Reroll, the permanent-change prompt. The area need not touch a road (owner's follow-up the same day); the connection is best effort within 400 m.

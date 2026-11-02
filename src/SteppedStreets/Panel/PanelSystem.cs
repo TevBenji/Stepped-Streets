@@ -74,19 +74,19 @@ namespace SteppedStreets.Panel
                 Trigger<string>("setZoneMix", value => ChangeSettings(settings =>
                 {
                     if (value == null || value.Length > 4000) return false;
-                    var shares = SteppedStreetsSettings.ParseZoneMix(value);
+                    var shares = ZoneShare.ParseList(value);
                     // Only zones the game has; the rest would zone nothing.
                     if (_zones.Count > 0) shares.RemoveAll(share => !_zones.ContainsKey(share.Zone));
                     if (shares.Count == 0) return false;
-                    settings.ZoneMix = SteppedStreetsSettings.WriteZoneMix(shares);
+                    settings.ZoneMix = ZoneShare.WriteList(shares);
                     return true;
                 }));
                 NumberTrigger("setBlockDepth", 60, 200, (settings, value) => settings.BlockDepth = (int)Math.Round(value / 5.0) * 5);
                 NumberTrigger("setMaxRoadGrade", 4, 12, (settings, value) => settings.MaxRoadGradePercent = Whole(value));
-                NumberTrigger("setSteepestBuildable", 8, 30, (settings, value) => settings.SteepestBuildablePercent = Whole(value));
+                NumberTrigger("setSteepestBuildable", 8, 60, (settings, value) => settings.SteepestBuildablePercent = Math.Min(Whole(value), settings.SteepestBuildableLimit()));
                 NumberTrigger("setLotWidth", 2, 6, (settings, value) => settings.LotWidthCells = Whole(value));
                 NumberTrigger("setLotDepth", 2, 6, (settings, value) => settings.DepthCells = Whole(value));
-                NumberTrigger("setEarthworkLimit", 1, 8, (settings, value) => settings.EarthworkLimit = (float)(Math.Round(value * 2.0) / 2.0));
+                NumberTrigger("setEarthworkLimit", 1, 12, (settings, value) => settings.EarthworkLimit = Math.Min((float)(Math.Round(value * 2.0) / 2.0), settings.EarthworkCeiling()));
                 NumberTrigger("setBankGrade", 20, 50, (settings, value) => settings.BankGrade = (float)(Math.Round(value / 5.0) * 5.0 / 100.0));
                 NumberTrigger("setLotSpacing", -1, 2, (settings, value) => settings.LotSpacing = Whole(value));
                 NumberTrigger("setTreeDensity", 10, 100, (settings, value) => settings.TreeDensityPercent = (int)Math.Round(value / 5.0) * 5);
@@ -94,6 +94,7 @@ namespace SteppedStreets.Panel
                 BoolTrigger("setLevelLots", (settings, value) => settings.LevelLots = value);
                 BoolTrigger("setRetainingWalls", (settings, value) => settings.RetainingWalls = value);
                 BoolTrigger("setTrees", (settings, value) => settings.Trees = value);
+                BoolTrigger("setSteepGround", (settings, value) => settings.SetSteepGround(value));
             }
             catch (Exception exception)
             {
@@ -213,6 +214,7 @@ namespace SteppedStreets.Panel
             return true;
         }
 
+        // ponytail: rebuilt every frame (a few hundred bytes; the zone mix parse is cached); add a settings version if it shows up.
         private static string SettingsJson(SteppedStreetsSettings settings)
         {
             var json = new StringBuilder("{\"style\":");
@@ -221,6 +223,7 @@ namespace SteppedStreets.Panel
             json.Append(",\"blockDepth\":").Append(Integer(settings.BlockDepth));
             json.Append(",\"maxRoadGradePercent\":").Append(Integer(settings.MaxRoadGradePercent));
             json.Append(",\"steepestBuildablePercent\":").Append(Integer(settings.SteepestBuildablePercent));
+            json.Append(",\"steepGround\":").Append(settings.SteepGround ? "true" : "false");
             json.Append(",\"zoneMix\":[");
             var shares = settings.ZoneShares();
             for (int index = 0; index < shares.Count; index++)

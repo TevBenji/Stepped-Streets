@@ -214,6 +214,17 @@ namespace SteppedStreets.Core.Neighbourhood
                 ? list : Empty;
         }
 
+        /// <summary>Items in every bucket that the square of <paramref name="reach"/> around the point touches; an item may repeat.</summary>
+        public IEnumerable<T> Within(float2 point, float reach)
+        {
+            int x0 = (int)math.floor((point.x - reach) / bucketSize), x1 = (int)math.floor((point.x + reach) / bucketSize);
+            int y0 = (int)math.floor((point.y - reach) / bucketSize), y1 = (int)math.floor((point.y + reach) / bucketSize);
+            for (int y = y0; y <= y1; y++)
+                for (int x = x0; x <= x1; x++)
+                    if (buckets.TryGetValue(Key(x, y), out var list))
+                        foreach (var item in list) yield return item;
+        }
+
         private static readonly List<T> Empty = new List<T>();
     }
 }

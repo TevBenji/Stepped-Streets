@@ -71,6 +71,36 @@ namespace SteppedStreets.Core.Neighbourhood
             return heights;
         }
 
+        /// <summary>
+        /// A closed street's profile: fitted three laps over, keeping the middle lap (so the averaging and the limiter see the
+        /// ring as endless), then the grade limited once more round the ring, across the seam too.
+        /// </summary>
+        public static float[] FitRing(IReadOnlyList<float2> ring, Func<float2, float> ground, float maximumGrade, int averagingPoints = 0)
+        {
+            int count = ring.Count;
+            var laps = new List<float2>(count * 3);
+            for (int lap = 0; lap < 3; lap++)
+                for (int index = 0; index < count; index++) laps.Add(ring[index]);
+            var fitted = Fit(laps, ground, maximumGrade, null, null, averagingPoints);
+            var heights = new float[count];
+            Array.Copy(fitted, count, heights, 0, count);
+            for (int pass = 0; pass < 12; pass++)
+            {
+                bool changed = false;
+                for (int step = 1; step <= 2 * count; step++)
+                {
+                    // Forward round the ring, then backward.
+                    int index = step <= count ? step % count : (2 * count - step) % count;
+                    int previous = step <= count ? (index - 1 + count) % count : (index + 1) % count;
+                    float most = maximumGrade * math.distance(ring[index], ring[previous]);
+                    float limited = math.clamp(heights[index], heights[previous] - most, heights[previous] + most);
+                    if (limited != heights[index]) { heights[index] = limited; changed = true; }
+                }
+                if (!changed) break;
+            }
+            return heights;
+        }
+
         /// <summary>The steepest grade between neighbouring points.</summary>
         public static float SteepestGrade(IReadOnlyList<float3> points)
         {

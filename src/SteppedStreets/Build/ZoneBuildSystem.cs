@@ -223,17 +223,25 @@ namespace SteppedStreets.Build
             var states = new CellState[_quads.Length];
             var centres = new float2[_quads.Length];
             var blockedCauses = new string[_quads.Length];
+            float2 low = float2.zero, high = float2.zero;
             for (int index = 0; index < _quads.Length; index++)
             {
                 var quad = _quads[index];
                 centres[index] = 0.25f * (quad[0] + quad[1] + quad[2] + quad[3]);
+                low = index == 0 ? centres[index] : math.min(low, centres[index]);
+                high = index == 0 ? centres[index] : math.max(high, centres[index]);
             }
-            // ponytail: M1 scans live blocks once for a short list of quads; use Zones.SearchSystem for street-scale batches.
+            // ponytail: scans the city's blocks once, skipping those that can't reach the quads; use Zones.SearchSystem if a
+            // huge city still makes this slow.
             using (var entities = _zoneBlocks.ToEntityArray(Allocator.Temp))
             {
                 foreach (var entity in entities)
                 {
                     var block = EntityManager.GetComponentData<Block>(entity);
+                    // A block reaches at most half its diagonal (8 m cells) from its centre.
+                    float reach = math.length((float2)block.m_Size) * 4f + 1f;
+                    float2 position = block.m_Position.xz;
+                    if (math.any(position < low - reach) || math.any(position > high + reach)) continue;
                     var cells = EntityManager.GetBuffer<Cell>(entity, true);
                     if (cells.Length < block.m_Size.x * block.m_Size.y) continue;
                     for (int index = 0; index < centres.Length; index++)

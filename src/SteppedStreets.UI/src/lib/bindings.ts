@@ -24,7 +24,7 @@ export type Action = "toggleTool" | "close" | "clearArea" | "closeArea" | "undo"
 export type TextTrigger = "setStyle" | "setRoad" | "setMixPattern" | "setZoneMix";
 export type NumberTrigger = "setBlockDepth" | "setMaxRoadGrade" | "setSteepestBuildable" | "setLotWidth" | "setLotDepth"
     | "setEarthworkLimit" | "setBankGrade" | "setLotSpacing" | "setTreeDensity" | "setSeed";
-export type ToggleTrigger = "setLevelLots" | "setRetainingWalls" | "setTrees";
+export type ToggleTrigger = "setLevelLots" | "setRetainingWalls" | "setTrees" | "setSteepGround";
 export function act(name: Action): void;
 export function act(name: TextTrigger, value: string): void;
 export function act(name: NumberTrigger, value: number): void;

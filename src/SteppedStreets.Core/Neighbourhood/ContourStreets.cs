@@ -125,7 +125,9 @@ namespace SteppedStreets.Core.Neighbourhood
                         }
                         else
                         {
-                            heights = RoadProfile.Fit(shaped.Points, survey.GroundAt, RoadProfile.LandingGrade, null, null, 5);
+                            heights = shaped.Closed
+                                ? RoadProfile.FitRing(shaped.Points, survey.GroundAt, RoadProfile.LandingGrade, 5)
+                                : RoadProfile.Fit(shaped.Points, survey.GroundAt, RoadProfile.LandingGrade, null, null, 5);
                         }
                         var street = new Street(RoadKind.Contour, shaped.Points, heights) { Closed = shaped.Closed };
                         streets.Add(street);
@@ -202,6 +204,17 @@ namespace SteppedStreets.Core.Neighbourhood
             {
                 var resampled = stillRing ? piece : Geometry.Resample(piece, Spacing);
                 if (Geometry.Length(resampled) < ShortestStreet) continue;
+                if (stillRing && RingTightest(resampled, out int tight) < options.MinimumRadius * 0.98f)
+                {
+                    // A ring smoothing could not open (any ring shorter than 2πr): open it at the bend and keep the rest if it
+                    // fits, rather than keep a ring the validation would remove whole after it crowded out other streets.
+                    int count = resampled.Count, skip = (int)math.ceil(options.MinimumRadius / Spacing);
+                    var opened = new List<float2>();
+                    for (int offset = skip; offset <= count - skip; offset++) opened.Add(resampled[(tight + offset) % count]);
+                    if (opened.Count > 1 && Geometry.Length(opened) >= ShortestStreet && Geometry.TightestRadius(opened, 12f, out _) >= options.MinimumRadius * 0.98f)
+                        result.Add(new Shaped { Points = opened });
+                    continue;
+                }
                 if (!stillRing && Geometry.TightestRadius(resampled, 12f, out int at) < options.MinimumRadius * 0.98f)
                 {
                     // A bend that smoothing could not open: cut it out and keep both sides.
@@ -303,7 +316,8 @@ namespace SteppedStreets.Core.Neighbourhood
         }
 
         /// <summary>Lowers the distance-to-street field around new street points.</summary>
-        internal static void Stamp(SiteSurvey survey, List<float2> points, float reach, float[] nearest)
+        /// <summary>Each node's distance to the nearest of these points within reach; with heights, also that point's height.</summary>
+        internal static void Stamp(SiteSurvey survey, List<float2> points, float reach, float[] nearest, float[] pointHeights = null, float[] nearestHeight = null)
         {
             int cells = (int)math.ceil(reach / survey.Cell);
             // Every other point: the points are 4 m apart, so a node's distance is off by at most 4 m, well inside the margins.
@@ -317,7 +331,9 @@ namespace SteppedStreets.Core.Neighbourhood
                     {
                         int index = row * survey.Columns + column;
                         float distance = math.distance(survey.Position(index), position);
-                        if (distance < nearest[index]) nearest[index] = distance;
+                        if (distance >= nearest[index]) continue;
+                        nearest[index] = distance;
+                        if (nearestHeight != null) nearestHeight[index] = pointHeights[point];
                     }
             }
         }

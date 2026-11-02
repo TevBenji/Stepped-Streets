@@ -1,5 +1,9 @@
 // Stepped Streets, the hillside neighbourhood generator. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
 using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 using Unity.Mathematics;
 
 namespace SteppedStreets.Core.Neighbourhood
@@ -24,6 +28,42 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Any positive weight; the planner normalises the shares.</summary>
         public float Share = 1f;
+
+        // One {"zone":"..","share":n} object at a time; a regex always moves forward, so a typo can't loop.
+        private static readonly Regex ZoneObject = new Regex(@"\{[^{}]*\}", RegexOptions.CultureInvariant);
+        private static readonly Regex ZoneField = new Regex(@"""zone""\s*:\s*""((?:[^""\\]|\\.)*)""", RegexOptions.CultureInvariant);
+        private static readonly Regex ShareField = new Regex(@"""share""\s*:\s*(-?[0-9.]+(?:[eE][-+]?[0-9]+)?)", RegexOptions.CultureInvariant);
+        private static readonly Regex Escape = new Regex(@"\\(.)", RegexOptions.CultureInvariant);
+
+        /// <summary>Reads [{"zone":"..","share":n},..], the only shape the panel writes; entries it can't read are skipped.</summary>
+        public static List<ZoneShare> ParseList(string json)
+        {
+            var shares = new List<ZoneShare>();
+            foreach (Match entry in ZoneObject.Matches(json ?? ""))
+            {
+                var zone = ZoneField.Match(entry.Value);
+                if (!zone.Success) continue;
+                string name = Escape.Replace(zone.Groups[1].Value, "$1");
+                float share = 1f;
+                var shareMatch = ShareField.Match(entry.Value);
+                if (shareMatch.Success && !float.TryParse(shareMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out share)) continue;
+                if (name.Length > 0 && share > 0f && !float.IsInfinity(share)) shares.Add(new ZoneShare { Zone = name, Share = share });
+            }
+            if (shares.Count == 0) shares.Add(new ZoneShare { Zone = "Residential Low", Share = 100f });
+            return shares;
+        }
+
+        public static string WriteList(IEnumerable<ZoneShare> shares)
+        {
+            var json = new StringBuilder("[");
+            foreach (var share in shares)
+            {
+                if (json.Length > 1) json.Append(',');
+                json.Append("{\"zone\":\"").Append((share.Zone ?? "").Replace("\\", "\\\\").Replace("\"", "\\\""))
+                    .Append("\",\"share\":").Append(share.Share.ToString("0.##", CultureInfo.InvariantCulture)).Append('}');
+            }
+            return json.Append(']').ToString();
+        }
     }
 
     /// <summary>One existing road edge near the area, to connect to.</summary>
@@ -66,6 +106,12 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Smoothed ground steeper than this gets no roads or lots and is planted as forest.</summary>
         public float SteepestBuildable = 0.15f;
+
+        /// <summary>
+        /// Steep hills and mountains: buildable ground up to 60 % instead of 40 %, links that may switch back in hairpins with
+        /// a tighter radius, and banks that reach further to meet steeply rising ground. Off unless the player turns it on.
+        /// </summary>
+        public bool SteepGround;
 
         /// <summary>About how far apart links between two contour streets are, along them (hill towns keep connectors few).</summary>
         public float LinkSpacing = 300f;

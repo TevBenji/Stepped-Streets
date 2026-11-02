@@ -23,6 +23,18 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>Links and connections bend across the slope in every style, so they keep the small road's radius.</summary>
         public static float LinkRadius(NeighbourhoodStyle style) => style == NeighbourhoodStyle.MountainLane ? 25f : 30f;
 
+        /// <summary>
+        /// The steepest bank the grading makes. In steep mode banks use the steepest the game draws cleanly (50 %: more than
+        /// 1.75 m over one 3.5 m heightmap texel shows as a stretched sheet), so cuts and fills meet steep ground soonest.
+        /// </summary>
+        public const float SteepestCleanBank = 0.5f;
+
+        public static float EffectiveBankGrade(NeighbourhoodRequest request) =>
+            request.SteepGround ? math.max(request.BankGrade, SteepestCleanBank) : request.BankGrade;
+
+        /// <summary>On steep ground a link's hairpin has to fit between two streets, so it may turn tighter.</summary>
+        public static float LinkRadius(NeighbourhoodRequest request) => request.SteepGround ? 18f : LinkRadius(request.Style);
+
         /// <param name="roadsReady">Called on the planning thread with a copy holding only the roads, as soon as they are settled,
         /// so the preview can show them while the lots and the ground are still being planned.</param>
         public static NeighbourhoodPlan Plan(NeighbourhoodRequest request, CancellationToken cancellation = default,
@@ -49,6 +61,11 @@ namespace SteppedStreets.Core.Neighbourhood
                 plan.Messages.Add("The area is too small. Draw a larger one.");
                 return Finish(plan, clock);
             }
+            if (survey.BuildableShare < 0.05f && survey.BlockedShare > survey.WildShare)
+            {
+                plan.Messages.Add("Most of the area is buildings or water. Draw it over open ground.");
+                return Finish(plan, clock);
+            }
             if (survey.BuildableShare < 0.05f)
             {
                 plan.Messages.Add(string.Format(CultureInfo.InvariantCulture,
@@ -70,17 +87,21 @@ namespace SteppedStreets.Core.Neighbourhood
             Stage("connection");
             var owners = new List<int>();
             var notes = new List<string>();
-            bool connected = RoadNetwork.Prune(streets);
+            bool connected = RoadNetwork.Prune(streets, out int loose);
             RoadNetwork.Assemble(streets, plan, owners);
             for (int round = 0; round < 4; round++)
             {
-                var bad = RoadNetwork.Violations(plan, owners, streets, request, radius, LinkRadius(request.Style), notes);
+                var bad = RoadNetwork.Violations(plan, owners, streets, request, radius, LinkRadius(request), notes);
                 if (bad.Count == 0) break;
-                foreach (int street in bad) streets[street].Removed = true;
-                connected = RoadNetwork.Prune(streets);
+                foreach (int street in bad) streets[street].Broken = true;
+                connected = RoadNetwork.Prune(streets, out loose);
                 RoadNetwork.Assemble(streets, plan, owners);
             }
             plan.Connected = connected;
+            if (loose > 0)
+                plan.Messages.Add(loose == 1
+                    ? "One group of streets could not reach an existing road and is built on its own. Join it to the city with a road."
+                    : loose + " groups of streets could not reach an existing road and are built on their own. Join them to the city with a road.");
             if (plan.Roads.Count == 0)
             {
                 plan.Messages.Add("No street fits here. Draw a larger area, or lower the block depth.");
@@ -162,7 +183,7 @@ namespace SteppedStreets.Core.Neighbourhood
             ContourStreets.Infill(survey, best, cancellation);
             var result = best.Streets;
             stage("contours");
-            var links = new RoadLinks(survey, request, result, LinkRadius(request.Style));
+            var links = new RoadLinks(survey, request, result, LinkRadius(request));
             links.LinkNeighbours(cancellation);
             stage("links");
             if (request.Style == NeighbourhoodStyle.ContourSuburb) links.JoinEnds(request.BlockDepth * 0.8f, cancellation);
@@ -170,7 +191,9 @@ namespace SteppedStreets.Core.Neighbourhood
             // Connect the largest piece of network first, then any other piece big enough to be a neighbourhood of its own.
             var components = RoadNetwork.Components(result, out var lengths);
             var order = new List<int>();
-            for (int id = 0; id < lengths.Count; id++) if (id == 0 || lengths[id] >= 300f) order.Add(id);
+            int largest = 0;
+            for (int id = 1; id < lengths.Count; id++) if (lengths[id] > lengths[largest]) largest = id;
+            for (int id = 0; id < lengths.Count; id++) if (id == largest || lengths[id] >= 300f) order.Add(id);
             order.Sort((x, y) => lengths[y].CompareTo(lengths[x]));
             foreach (int id in order)
             {
@@ -218,7 +241,7 @@ namespace SteppedStreets.Core.Neighbourhood
             request.RoadHalfWidth = math.clamp(Finite(request.RoadHalfWidth, 6f), 2f, 20f);
             request.BlockDepth = math.clamp(Finite(request.BlockDepth, 90f), 50f, 250f);
             request.MaxRoadGrade = math.clamp(Finite(request.MaxRoadGrade, 0.08f), 0.03f, 0.12f);
-            request.SteepestBuildable = math.clamp(Finite(request.SteepestBuildable, 0.15f), 0.05f, 0.4f);
+            request.SteepestBuildable = math.clamp(Finite(request.SteepestBuildable, 0.15f), 0.05f, request.SteepGround ? 0.6f : 0.4f);
             request.LinkSpacing = math.clamp(Finite(request.LinkSpacing, 300f), 80f, 600f);
             request.LotWidthCells = math.clamp(request.LotWidthCells, StepPlanner.MinimumWidthCells, StepPlanner.MaximumRows);
             request.LotDepthCells = math.clamp(request.LotDepthCells, StepPlanner.MinimumRows, StepPlanner.MaximumRows);

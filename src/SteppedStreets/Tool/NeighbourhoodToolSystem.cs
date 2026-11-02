@@ -222,7 +222,8 @@ namespace SteppedStreets.Tool
             {
                 applyMode = ApplyMode.None;
                 AdoptFinishedPlan();
-                if (State.Stage == ToolStage.Building) { BuildUpdate(); return inputDependencies; }
+                // The build itself advances from BuildTick, which runs even when another tool is active.
+                if (State.Stage == ToolStage.Building) return inputDependencies;
                 if (!IsActive) return inputDependencies;
                 var input = InputManager.instance;
                 if (input == null || input.hasInputFieldFocus) return inputDependencies;
@@ -251,7 +252,8 @@ namespace SteppedStreets.Tool
                 reach = math.clamp(math.distance((float3)camera.transform.position, hit.Value) * 0.03f, 4f, 80f);
             Reach = reach;
             float2? snapped = hit.HasValue ? Snap(hit.Value.xz, reach) : (float2?)null;
-            if (!Nullable.Equals(snapped, Snapped)) { Snapped = snapped; Touch(); }
+            // The preview reads these directly and the panel shows neither, so no Touch (a full panel state rebuild).
+            Snapped = snapped;
             float2 point = snapped ?? (hit.HasValue ? hit.Value.xz : float2.zero);
             int hovered = -1;
             if (hit.HasValue && dragging < 0)
@@ -264,7 +266,7 @@ namespace SteppedStreets.Tool
                 }
             }
             else if (dragging >= 0) hovered = dragging;
-            if (hovered != HoveredCorner) { HoveredCorner = hovered; Touch(); }
+            HoveredCorner = hovered;
 
             bool rawRightDown = mouse != null && mouse.rightButton.wasPressedThisFrame;
             bool rightHeld = (mouse != null && mouse.rightButton.isPressed) || secondaryApplyAction.IsPressed();
@@ -338,7 +340,7 @@ namespace SteppedStreets.Tool
             if (roadSnap == null) return null;
             float best = reach;
             float2? nearest = null;
-            foreach (var (start, end) in roadSnap.Near(point))
+            foreach (var (start, end) in roadSnap.Within(point, reach))
             {
                 float2 direction = end - start;
                 float lengthSquared = math.lengthsq(direction);
@@ -370,8 +372,8 @@ namespace SteppedStreets.Tool
                         for (int piece = 1; piece <= pieces; piece++)
                         {
                             float2 next = Colossal.Mathematics.MathUtils.Position(curve.m_Bezier, piece / (float)pieces).xz;
-                            // Padded by the largest snapping reach, so a query finds every segment it could snap to.
-                            buckets.Add(math.min(previous, next) - 80f, math.max(previous, next) + 80f, (previous, next));
+                            // Unpadded: the snap query looks through every bucket within its reach instead.
+                            buckets.Add(math.min(previous, next), math.max(previous, next), (previous, next));
                             previous = next;
                         }
                     }
@@ -401,7 +403,6 @@ namespace SteppedStreets.Tool
             bool inserted = beforeDrag == null;
             if (!inserted && moved) history.Add((beforeDrag, areaClosed));
             beforeDrag = null;
-            if (areaClosed && CrossesItself(corners, true)) { Message("The outline crosses itself. Move a corner back."); State.Stage = ToolStage.Drawing; Touch(); return; }
             if (moved || inserted) Replan();
         }
 
@@ -446,6 +447,14 @@ namespace SteppedStreets.Tool
             State.AreaClosed = areaClosed;
             State.AreaSquareMetres = corners.Count >= 3 ? math.abs(SignedArea(corners)) : 0f;
             if (!areaClosed || corners.Count < 3) { RefreshStage(); return; }
+            // Every edit of a closed area comes through here (drags, removed corners, undo), so one check covers them all.
+            if (CrossesItself(corners, true))
+            {
+                State.Stage = ToolStage.Drawing;
+                Message("The outline crosses itself. Move a corner back.");
+                Touch();
+                return;
+            }
             Poly.Bounds(corners.ToArray(), out var low, out var high);
             if (math.any(high - low > LargestSide))
             {
@@ -465,10 +474,14 @@ namespace SteppedStreets.Tool
             taskVersion = ++requestedVersion;
             taskSnapshot = snapshot;
             taskRequest = request;
+            taskRoadName = settings.RoadName;
             int version = taskVersion;
             planTask = Task.Run(() => NeighbourhoodPlanner.Plan(request, cancel.Token, roads =>
+            {
                 // Handed across threads by one reference write; the main thread keeps it only if its request is still current.
-                Volatile.Write(ref earlyFromWorker, new EarlyRoadsHandOff { Version = version, Roads = roads })), cancel.Token);
+                // A superseded plan stays quiet, so it can't overwrite the current plan's roads in the one-slot hand-off.
+                if (!cancel.IsCancellationRequested) Volatile.Write(ref earlyFromWorker, new EarlyRoadsHandOff { Version = version, Roads = roads });
+            }), cancel.Token);
             State.Stage = ToolStage.Planning;
             Touch();
             Log(Invariant($"planning an area of {State.AreaSquareMetres / 10000f:0.0} ha with {boundary.Length} corners; snapshot {captureMilliseconds:0} ms, {snapshot.ExistingRoads.Length} existing road edges, {snapshot.BuildingCount} buildings"));
@@ -496,6 +509,8 @@ namespace SteppedStreets.Tool
                 var error = task.Exception?.GetBaseException();
                 if (error is OperationCanceledException) return;
                 Mod.Logger.Error(error, "Stepped Streets: planning the area failed");
+                EarlyRoads = null;
+                PlanVersion++;
                 State.Stage = ToolStage.Failed;
                 State.Summary = "The area could not be planned. The log has the details.";
                 State.Messages = new[] { State.Summary };
@@ -506,6 +521,7 @@ namespace SteppedStreets.Tool
             Plan = plan;
             EarlyRoads = null;
             PlannedRequest = taskRequest;
+            plannedRoadName = taskRoadName;
             plannedSnapshot = taskSnapshot;
             PlanVersion++;
             State.Summary = plan.SummaryLine;
@@ -539,14 +555,16 @@ namespace SteppedStreets.Tool
                 RoadHalfWidth = road?.HalfWidth ?? 6f,
                 BlockDepth = settings.BlockDepth,
                 MaxRoadGrade = settings.MaxRoadGradePercent / 100f,
-                SteepestBuildable = settings.SteepestBuildablePercent / 100f,
+                // The Options page can set these past the mode's limits; the panel can't.
+                SteepGround = settings.SteepGround,
+                SteepestBuildable = math.min(settings.SteepestBuildablePercent, settings.SteepestBuildableLimit()) / 100f,
                 Mix = settings.ZoneShares().ToArray(),
                 Pattern = settings.MixPattern,
                 LotWidthCells = settings.LotWidthCells,
                 NarrowestWidthCells = math.min(settings.NarrowestWidthCells, settings.LotWidthCells),
                 LotDepthCells = settings.DepthCells,
                 LevelLots = settings.LevelLots,
-                EarthworkLimit = settings.EarthworkLimit,
+                EarthworkLimit = math.min(settings.EarthworkLimit, settings.EarthworkCeiling()),
                 BankGrade = settings.BankGrade,
                 HighestStep = settings.HighestStep,
                 LotSpacingCells = settings.LotSpacing,
@@ -633,8 +651,11 @@ namespace SteppedStreets.Tool
                 areaClosed = false;
                 dragging = -1;
                 Plan = null;
+                EarlyRoads = null;
                 PlannedRequest = null;
                 plannedSnapshot = null;
+                PlanVersion++;
+                ResetBuild();
                 ClearPlanState();
                 State.Stage = ToolStage.Closed;
                 rightClick.Reset();

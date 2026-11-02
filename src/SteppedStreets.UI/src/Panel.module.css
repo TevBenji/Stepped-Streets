@@ -123,6 +123,13 @@
     color: #ffffff;
 }
 
+.statusDetail {
+    margin-top: 4rem;
+    font-size: 12rem;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.75);
+}
+
 .progressTrack {
     height: 4rem;
     margin-top: 7rem;

@@ -1,5 +1,5 @@
-<!-- Stepped Streets. Original artwork by Tevin Benjamin, 2026-11. GPL-3.0. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round">
+  <!-- Stepped Streets. Original artwork by Tevin Benjamin, 2026-11. GPL-3.0. -->
   <rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/>
   <circle cx="5.6" cy="5.6" r="1.1" fill="#fff" stroke="none"/>
   <circle cx="8" cy="8" r="1.1" fill="#fff" stroke="none"/>

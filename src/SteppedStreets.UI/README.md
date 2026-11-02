@@ -30,8 +30,9 @@ Group: `SteppedStreets`. Value: `state`, a `ValueBinding<string>` carrying JSON,
 and read defensively by `src/lib/state.ts` (`readState` never throws and clamps every field):
 `stage` (Closed, Drawing, Planning, Planned, Building, Built, Failed), `corners`, `areaClosed`, `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
-`connected`, `trees`), `zoneCounts` (`zone`/`lots`), `progress` (0–1), `settings` (below), and the catalogues `zones` and
-`roads` (`name`/`label`). The state is rebuilt only when ToolState.Version, a setting or a catalogue changes.
+`connected`, `trees`), `zoneCounts` (`zone`/`lots`), `progress` (0–1), `settings` (the trigger values below, plus `steepGround`),
+and the catalogues `zones` and `roads` (`name`/`label`). While Planning and Building, `summary` is the current step; once Built,
+it is the build report (the panel shows it under the status line). The state is rebuilt only when ToolState.Version, a setting or a catalogue changes.
 
 | Trigger | Argument | Action |
 |---|---|---|
@@ -44,13 +45,14 @@ and read defensively by `src/lib/state.ts` (`readState` never throws and clamps 
 | `setMixPattern` | string | Random / Clumps / Even |
 | `setZoneMix` | string | `[{"zone":"...","share":N},...]`; zones not in the catalogue are dropped |
 | `setBlockDepth` | double | 60–200 m, step 5 |
-| `setMaxRoadGrade`, `setSteepestBuildable` | double | 4–12 %, 8–30 % |
+| `setMaxRoadGrade`, `setSteepestBuildable` | double | 4–12 %, 8–60 % (C# caps the second at 30 % unless `steepGround`) |
 | `setLotWidth`, `setLotDepth` | double | 2–6 cells |
-| `setEarthworkLimit` | double | 1–8 m, step 0.5 |
+| `setEarthworkLimit` | double | 1–12 m, step 0.5 (C# caps it at 8 m unless `steepGround`) |
 | `setBankGrade` | double | 20–50 %, step 5 |
 | `setLotSpacing` | double | −1 (Auto) to 2 cells |
 | `setTreeDensity`, `setSeed` | double | 10–100 %, 1–99999 |
 | `setLevelLots`, `setRetainingWalls`, `setTrees` | bool | Switches |
+| `setSteepGround` | bool | Steep hills; on lifts `steepestBuildablePercent` to at least 50 and `earthworkLimit` to at least 8, off caps them at 30 and 8 |
 
 Numeric triggers reject NaN/infinity and clamp before saving. Valid writes call `Mod.Settings.ApplyAndSave()` and then
 `tool.SettingsChanged()`, which re-plans the area. All triggers catch exceptions and log through `Mod.Logger`. The zone and road

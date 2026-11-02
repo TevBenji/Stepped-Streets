@@ -31,6 +31,11 @@ namespace SteppedStreets.Tool
         private Queue<(string Zone, List<float2[]> Quads)> zoneQueue;
         private int zonedRuns, requestedRuns, levelCells;
         private EntityQuery blockQuery;
+        private int idleBuildFrames;
+        private string taskRoadName, plannedRoadName;
+
+        // Every stage calls back within its own frame limits, so a build with no stage running this long is stuck.
+        private const int MostIdleBuildFrames = 300;
 
         public void Build()
         {
@@ -46,10 +51,11 @@ namespace SteppedStreets.Tool
                     Replan();
                     return;
                 }
+                ResetBuild();
                 buildPlan = Plan;
                 buildRequest = PlannedRequest;
-                buildRoadName = Mod.Settings?.RoadName ?? Settings.SteppedStreetsSettings.DefaultRoad;
-                buildReport.Clear();
+                // The road the plan was laid out for (its half-width), even if the Options page changed it since.
+                buildRoadName = plannedRoadName ?? Mod.Settings?.RoadName ?? Settings.SteppedStreetsSettings.DefaultRoad;
                 State.Stage = ToolStage.Building;
                 State.Progress = 0.05f;
                 State.Summary = "Building the ground...";
@@ -115,10 +121,33 @@ namespace SteppedStreets.Tool
             catch (Exception exception) { BuildFailed(exception, "Zoning failed to start. The ground and roads remain."); }
         }
 
-        /// <summary>Runs every frame while building: waits for the game's zone blocks along the new roads.</summary>
-        private void BuildUpdate()
+        private void ResetBuild()
         {
-            if (!waitingForBlocks) return;
+            waitingForBlocks = false;
+            zoneQueue = null;
+            idleBuildFrames = 0;
+            buildReport.Clear();
+        }
+
+        /// <summary>
+        /// Called every frame by StepStreetHotkeySystem, which always runs: a ToolBaseSystem stops updating when the player picks
+        /// another tool, and the build must still wait for the zone blocks and finish.
+        /// </summary>
+        internal void BuildTick()
+        {
+            if (State.Stage != ToolStage.Building) return;
+            try
+            {
+                if (waitingForBlocks) { idleBuildFrames = 0; WaitForBlocks(); return; }
+                if (BuildSystemsBusy()) { idleBuildFrames = 0; return; }
+                if (++idleBuildFrames > MostIdleBuildFrames) Stop("The build stopped before it finished. What was built remains.");
+            }
+            catch (Exception exception) { BuildFailed(exception, "The build stopped. What was built remains."); }
+        }
+
+        /// <summary>Waits for the game's zone blocks along the new roads, then zones.</summary>
+        private void WaitForBlocks()
+        {
             int frame = UnityEngine.Time.frameCount;
             int count = blockQuery.CalculateEntityCount();
             if (count != blockCount) { blockCount = count; blocksStableSince = frame; }
@@ -274,6 +303,7 @@ namespace SteppedStreets.Tool
             Message(message);
             Log(message);
             waitingForBlocks = false;
+            zoneQueue = null;
             Touch();
         }
 

@@ -15,7 +15,8 @@ tested off-game on eight synthetic hillsides; the in-game test is next ([docs/IN
    to close it. Drag a corner to reshape; drag the middle of an edge to add a corner. **Right-click** removes the corner under
    the cursor (or the last one while drawing). **Ctrl+Z** undoes. **Esc** clears the area; Esc again closes the tool.
    The area does not have to touch a road: the mod connects to the nearest existing road within 400 m when it can, and
-   otherwise builds the streets on their own.
+   otherwise builds the streets on their own. A group of streets the connection can't reach (often the hilltop) is built
+   too, and the panel says so, so you can join it to the city with a road of your own.
 3. **Pick a style and settings.** The plan appears a moment after the area closes and refreshes after every change: roads
    coloured by grade (grey under 3 %, yellow under 6 %, orange up to the maximum), lots coloured by zone, cut shaded brown
    and fill tan, trees as dots. The panel sums it up: road length, lots, zoned cells, earth moved, steepest road.
@@ -41,12 +42,13 @@ One cell is **8 m**.
 | Road type | the game's ground roads that zone | Small Road | The road prefab for every new street. |
 | Block depth | 60–200 m | 90 m | Road spacing on the ground between neighbouring contour streets. |
 | Max road grade | 4–12 % | 8 % | No new road is steeper. Connectors bend across the slope to stay under it. |
-| Steepest buildable | 8–30 % | 15 % | Steeper ground (judged on the hill, not its bumps) gets no roads or lots and is planted as forest. |
+| Steep hills | on/off | off | Steep hills and mountains: buildable ground up to 60 % and earthwork up to 12 m; connectors may join at 35° and switch back. Turning it on lifts Steepest buildable to at least 50 % and Most earth to at least 8 m. |
+| Steepest buildable | 8–30 % (60 % with Steep hills) | 15 % | Steeper ground (judged on the hill, not its bumps) gets no roads or lots and is planted as forest. |
 | Zone mix | rows of zone and share | Residential Low | Each lot's zone; **Mix in another zone** adds a row. |
 | Mix mode | Random, Clumps, Even | Clumps | Random per lot, runs of 3–5 neighbouring lots, or an even split. |
 | Lot width, lot depth | 2–6 cells | 3, 3 | The lots along every road (a lot on steep ground may come out one cell shallower). |
 | Level the lots | on/off | on | Grade each lot into a level pad. Off: only the roads are graded. |
-| Most earth | 1–8 m | 4 m | A lot that needs more cut or fill is left out. |
+| Most earth | 1–8 m (12 m with Steep hills) | 4 m | A lot that needs more cut or fill is left out. |
 | Steepest bank | 20–50 % | 40 % | No slope the grading makes is steeper. |
 | Space between lots | Auto, 0, 1, 2 cells | Auto | Auto leaves gaps on steeper ground; gaps are planted. |
 | Retaining walls | on/off | off | The game's garden wall where a road runs in a cutting 0.8–3 m deep. |
@@ -68,6 +70,9 @@ steeper bank, the lot gives way. Details: [the PRD](docs/Stepped_Streets_PRD.md)
 
 - Terrain changes are permanent; nothing in the mod undoes a build.
 - An area is at most 2 km on a side.
+- On true mountain slopes (40–50 %), even with Steep hills on, the plan keeps the gentler streets and the lots that fit;
+  contour streets that no connector can reach without breaking the grade are left out rather than built as roads to nowhere.
+- Houses grow only where the game has demand for that zone; the panel says when a chosen zone has none yet.
 - Zoning verification checks one game cell per run of cells, so its count is runs, not cells. Tree and wall reports count the
   definitions handed to the game, not the objects that survived its checks.
 - The road build counts the pieces the game created; pieces it refuses are logged, not retried.

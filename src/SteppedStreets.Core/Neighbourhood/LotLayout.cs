@@ -96,7 +96,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         // Every stretch gets lots: contour streets are nearly level by design, and they are still graded.
                         MinimumGrade = 0f,
                         HighestStep = request.HighestStep,
-                        BankGrade = request.BankGrade,
+                        BankGrade = NeighbourhoodPlanner.EffectiveBankGrade(request),
                         // The pad may still move up to PadLift towards its ground below; the real check follows that.
                         EarthworkLimit = request.LevelLots ? request.EarthworkLimit + PadLift : 1000f,
                         GroundHeight = request.GroundHeight,

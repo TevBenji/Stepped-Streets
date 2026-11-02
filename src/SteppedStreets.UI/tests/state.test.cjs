@@ -13,7 +13,7 @@ async function stateModule() {
 
 const DEFAULT_SETTINGS = {
     style: "ContourSuburb", road: "Small Road", blockDepth: 90, maxRoadGradePercent: 8, steepestBuildablePercent: 15,
-    zoneMix: [{ zone: "Residential Low", share: 100 }], mixPattern: "Random", lotWidthCells: 3, lotDepthCells: 3,
+    steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 3,
     levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: true,
     treeDensityPercent: 50, seed: 1,
 };
@@ -90,7 +90,7 @@ test("every number is clamped to its range", async () => {
         [high.settings.blockDepth, high.settings.maxRoadGradePercent, high.settings.steepestBuildablePercent, high.settings.lotWidthCells,
             high.settings.lotDepthCells, high.settings.earthworkLimit, high.settings.bankGradePercent, high.settings.lotSpacing,
             high.settings.treeDensityPercent, high.settings.seed],
-        [200, 12, 30, 6, 6, 8, 50, 2, 100, 99999]);
+        [200, 12, 60, 6, 6, 12, 50, 2, 100, 99999]);
 });
 
 test("whole-number fields are rounded and in-range values pass through", async () => {
@@ -134,7 +134,8 @@ test("enums are validated, wrong types and non-finite numbers fall back to defau
     assert.equal(state.stats.connected, false);
     assert.equal(state.stats.wildPercent, 0);
     assert.deepEqual(state.settings, DEFAULT_SETTINGS);
-    assert.equal(readState({ settings: { mixPattern: "Clumps", style: "TerracedBlocks", trees: false } }).settings.mixPattern, "Clumps");
+    assert.equal(readState({ settings: { mixPattern: "Random", style: "TerracedBlocks", trees: false } }).settings.mixPattern, "Random");
+    assert.equal(readState({ settings: { steepGround: true } }).settings.steepGround, true);
     assert.equal(readState({ settings: { style: "TerracedBlocks" } }).settings.style, "TerracedBlocks");
     assert.equal(readState({ settings: { trees: false } }).settings.trees, false);
     assert.equal(readState({ stats: { connected: true } }).stats.connected, true);
@@ -196,6 +197,16 @@ test("status line follows the stage and the drawing progress", async () => {
     assert.equal(line({ stage: "Failed", summary: "The game refused the roads." }), "The game refused the roads.");
     assert.equal(line({ stage: "Failed" }), "Failed");
     assert.equal(line({ stage: "Closed" }), "");
+});
+
+test("the detail line shows the tool's step while it works and the build report after", async () => {
+    const { readState, statusDetail } = await stateModule();
+    const detail = value => statusDetail(readState(value));
+    assert.equal(detail({ stage: "Building", summary: "Zoning Residential Low..." }), "Zoning Residential Low...");
+    assert.equal(detail({ stage: "Built", summary: "Built 2.4 km of road" }), "Built 2.4 km of road");
+    assert.equal(detail({ stage: "Planning", summary: "2.1 km of road planned" }), "2.1 km of road planned");
+    assert.equal(detail({ stage: "Planned", summary: "86 lots" }), "");
+    assert.equal(detail({ stage: "Failed", summary: "The game refused the roads." }), "");
 });
 
 test("zone colours come from name keywords", async () => {

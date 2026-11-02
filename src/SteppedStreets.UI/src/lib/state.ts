@@ -13,6 +13,8 @@ export interface Settings {
     blockDepth: number;
     maxRoadGradePercent: number;
     steepestBuildablePercent: number;
+    /** Steep hills and mountains: buildable ground up to 60 % and earthwork up to 12 m. */
+    steepGround: boolean;
     zoneMix: ZoneShare[];
     mixPattern: MixPattern;
     lotWidthCells: number;
@@ -123,13 +125,14 @@ export function readState(raw: unknown): ToolState {
             road: text(settings.road) || "Small Road",
             blockDepth: number(settings.blockDepth, 90, 60, 200),
             maxRoadGradePercent: number(settings.maxRoadGradePercent, 8, 4, 12),
-            steepestBuildablePercent: number(settings.steepestBuildablePercent, 15, 8, 30),
+            steepestBuildablePercent: number(settings.steepestBuildablePercent, 15, 8, 60),
+            steepGround: flag(settings.steepGround, false),
             zoneMix: zoneMix.length > 0 ? zoneMix : DEFAULT_MIX.map(share => ({ ...share })),
-            mixPattern: choice(settings.mixPattern, ["Random", "Clumps", "Even"], "Random"),
+            mixPattern: choice(settings.mixPattern, ["Random", "Clumps", "Even"], "Clumps"),
             lotWidthCells: whole(settings.lotWidthCells, 3, 2, 6),
             lotDepthCells: whole(settings.lotDepthCells, 3, 2, 6),
             levelLots: flag(settings.levelLots, true),
-            earthworkLimit: number(settings.earthworkLimit, 4, 1, 8),
+            earthworkLimit: number(settings.earthworkLimit, 4, 1, 12),
             bankGradePercent: number(settings.bankGradePercent, 40, 20, 50),
             lotSpacing: whole(settings.lotSpacing, -1, -1, 2),
             retainingWalls: flag(settings.retainingWalls, false),
@@ -140,6 +143,14 @@ export function readState(raw: unknown): ToolState {
         zones: rows(state.zones, readOption, option => option.name),
         roads: rows(state.roads, readOption, option => option.name),
     };
+}
+
+/**
+ * The smaller line under the status: the tool's step while it works ("Zoning Residential Low...") and, once built, its build
+ * report (what was really built, zoned and planted).
+ */
+export function statusDetail(state: ToolState): string {
+    return state.stage === "Planning" || state.stage === "Building" || state.stage === "Built" ? state.summary : "";
 }
 
 export function statusLine(state: ToolState): string {

@@ -43,7 +43,7 @@ namespace SteppedStreets.Core.Neighbourhood
         public readonly float ReferenceSlope;
 
         public readonly float MedianSlope;
-        public readonly float BuildableShare, WildShare;
+        public readonly float BuildableShare, WildShare, BlockedShare;
         public readonly int InsideCount;
 
         public int Count => Columns * Rows;
@@ -89,7 +89,7 @@ namespace SteppedStreets.Core.Neighbourhood
             Slope = new float[count];
             Wild = new bool[count];
             var slopes = new List<float>();
-            int buildable = 0, wild = 0;
+            int buildable = 0, wild = 0, blockedNodes = 0;
             for (int row = 0; row < Rows; row++)
                 for (int column = 0; column < Columns; column++)
                 {
@@ -100,12 +100,14 @@ namespace SteppedStreets.Core.Neighbourhood
                     InsideCount++;
                     if (Wild[index]) wild++;
                     else if (!obstacle[index]) { buildable++; slopes.Add(Slope[index]); }
+                    else blockedNodes++;
                 }
             slopes.Sort();
             ReferenceSlope = slopes.Count == 0 ? 0f : slopes[(int)(slopes.Count * 0.6f)];
             MedianSlope = slopes.Count == 0 ? 0f : slopes[slopes.Count / 2];
             BuildableShare = InsideCount == 0 ? 0f : buildable / (float)InsideCount;
             WildShare = InsideCount == 0 ? 0f : wild / (float)InsideCount;
+            BlockedShare = InsideCount == 0 ? 0f : blockedNodes / (float)InsideCount;
 
             // Clearances from chamfer distance fields: a street keeps its whole corridor on buildable ground inside the area,
             // and keeps clear of buildings, water and existing roads by its half width plus a shoulder and a bank.
