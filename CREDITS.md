@@ -34,3 +34,21 @@ and reading the selection from `SelectedInfoUISystem` (`Game/Suite/SuiteSteps.Bu
 `src/SteppedStreets/Spike/*.cs`, `src/SteppedStreets.Core/Planning/StepPlanPatches.cs` and `StreetChain.cs`. The idea of a
 sloped strip that ramps between two levels comes from Placemaker's lot fillers (`Core/Layers/Types/Zoning/LotLevel.cs`),
 and the 1 m zoning-quad inset from its `Core/Build/ZoneGuard.cs` (`QuadShrink`).
+
+## Wave 4: toolbar, panel and bindings
+
+`src/SteppedStreets.UI/tools/check-panel-json.ps1` is an original managed-assembly self-check by Tevin Benjamin, 2026-11, GPL-3.0, for the compiled JSON writers; it does not create game systems.
+
+The UI integration is adapted from Placemaker by jackwrichards, GPL-3.0, commit `e654b32`. Original headers are retained in adapted files, followed by the adaptation note naming Tevin Benjamin and the changes.
+
+- `src/SteppedStreets.UI/src/components/ToolbarButton.tsx`: from `UI/src/components/ToolbarButton.tsx`. Kept the vanilla ToolbarButtonStrip extension and portal into the first group; replaced the icon and toggle binding, added observation of group redraws and used a React class host to avoid a sibling marker interfering with Placemaker.
+- `src/SteppedStreets.UI/src/lib/vanilla.ts`: trimmed `UI/src/lib/vanilla.ts` to the slider and focus key. Placemaker credits **Grid Road Generator by Ti4goc (GPL-3.0)** and the vanilla lookup pattern from **CS2-NetworkTools by Luca Rager (MIT, https://github.com/lucarager/CS2-NetworkTools)**; those credits are retained.
+- `src/SteppedStreets.UI/src/lib/errorBoundary.tsx` and `tips.tsx`: trimmed Placemaker's matching UI helpers to null crash fallbacks and the one native toolbar tooltip. Placemaker credits Grid Road Generator by Ti4goc for both patterns.
+- `src/SteppedStreets.UI/src/lib/bindings.ts`: from `UI/src/lib/bindings.ts`, trimmed to one late-safe JSON binding and guarded Stepped Streets triggers; state normalization is separate original code.
+- `src/SteppedStreets.UI/src/index.tsx`: trimmed `UI/src/index.tsx` registration to the Game panel and bottom toolbar extension. Its original registration credits are **Grid Road Generator by Ti4goc (GPL-3.0)** and **CS2-NetworkTools by Luca Rager (MIT)**.
+- `src/SteppedStreets.UI/types/{api,assets,bindings,cohtml,input,l10n,modding,react,ui,utils}.d.ts`: Placemaker's declarations of the game's modding API, copied with attribution and normalized whitespace; `validateTypes.ts` is excluded.
+- `src/SteppedStreets.UI/tools/css-lint.js`: Placemaker's Gameface CSS lint, unchanged apart from the adaptation header; used during webpack and available as a CLI check.
+- `src/SteppedStreets.UI/webpack.config.js`: from Placemaker's UI webpack setup: same window externals, module metadata banner and namespaced hashed image output; simplified to TypeScript and CSS modules, with no deployment or output cleanup. `package.json`, `mod.json` and `tsconfig.json` follow its project shape, with pinned minimal dependencies and our metadata.
+- `src/SteppedStreets/Panel/PanelSystem.cs`: from the safe JSON binding/trigger pattern in `Game/UI/PlacemakerUISystem.cs`; rewritten for one state value, validated settings and a one-time localized zone catalog. Prefab query and label lookup follow `Game/Overlay/ZoneGridOpacitySystem.cs` and `Game/Assets/AssetCatalogSystem.cs` as patterns. No code was copied from either zoning planner file.
+
+The panel (`src/SteppedStreets.UI/src/Panel.tsx`, `Panel.module.css`), defensive state reader (`src/lib/state.ts`), its tests (`tests/state.test.cjs`), the 48-unit stepped-lots SVG (`src/assets/stepped-streets.svg`) and UI README are original work by Tevin Benjamin, 2026-11, GPL-3.0. The slider API follows Placemaker's `UI/src/controls/Slider.tsx:64–88`; its drag state is implemented here for this panel. The Mod.cs registration block, optional csproj bundle target, .gitignore entries, shared Look/EarthworkLimit settings block and two explicitly marked Wave4Stubs.cs contract files are also original integration work.

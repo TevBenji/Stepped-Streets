@@ -1,0 +1,95 @@
+/* Stepped Streets. Original work by Tevin Benjamin, 2026-11. GPL-3.0. */
+.panel {
+    position: absolute;
+    top: 82rem;
+    left: 16rem;
+    width: 340rem;
+    max-height: calc(100vh - 180rem);
+    display: flex;
+    flex-direction: column;
+    color: #f1f5f8;
+    background-color: rgba(22, 31, 40, 0.96);
+    border: 1rem solid rgba(183, 211, 225, 0.2);
+    border-radius: 6rem;
+    font-size: 14rem;
+    pointer-events: auto;
+}
+.header {
+    padding: 14rem 16rem;
+    font-size: 18rem;
+    font-weight: bold;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-bottom: 1rem solid rgba(183, 211, 225, 0.15);
+}
+.content { padding: 12rem 16rem 16rem; overflow-y: auto; flex-shrink: 1; min-height: 0; }
+.status { color: #a6e6f4; line-height: 1.4; margin-bottom: 16rem; }
+.tooFlat { color: #929da6; }
+.control { margin-bottom: 12rem; }
+.controlHeading { display: flex; justify-content: space-between; margin-bottom: 6rem; }
+.value { color: #b7d3e1; margin-left: 8rem; }
+.choices, .actions, .numberRow { display: flex; align-items: center; }
+.button {
+    padding: 7rem 11rem;
+    margin-right: 5rem;
+    min-height: 32rem;
+    border: 1rem solid rgba(183, 211, 225, 0.25);
+    border-radius: 4rem;
+    color: #edf4f8;
+    background-color: #354451;
+    font-size: 14rem;
+}
+.button:hover { background-color: #455968; }
+.button:focus { outline: 2rem solid #a6e6f4; }
+.choices .button { flex-grow: 1; }
+.selected { background-color: #226a83; border-color: #80d1e9; }
+.primary { color: #102a36; background-color: #85d2e9; border-color: #bceffc; font-weight: bold; }
+.primary:hover { background-color: #bceffc; }
+.disabled { opacity: 0.45; pointer-events: none; }
+.slider { flex-grow: 1; margin: 0 10rem 0 5rem; }
+.track { height: 4rem; background-color: #526574; }
+.progress { height: 4rem; background-color: #85d2e9; }
+.dropdownToggle {
+    width: 100%;
+    padding: 9rem 10rem;
+    color: #edf4f8;
+    background-color: #354451;
+    border: 1rem solid rgba(183, 211, 225, 0.25);
+    border-radius: 4rem;
+    text-align: left;
+}
+.dropdownPopup { pointer-events: auto; }
+.dropdownMenu { max-height: 320rem; overflow-y: auto; background-color: #24323e; padding: 4rem; }
+.dropdownItem { padding: 8rem 10rem; color: #edf4f8; }
+.dropdownItem:hover { background-color: #455968; }
+.advanced { border-top: 1rem solid rgba(183, 211, 225, 0.18); margin-top: 14rem; padding-top: 8rem; }
+.foldout { padding: 6rem 0 10rem; color: #b7d3e1; font-size: 14rem; background-color: transparent; }
+.summary { margin-top: 12rem; line-height: 1.4; }
+.messages { margin: 10rem 0 0; padding-left: 17rem; color: #dfd3aa; line-height: 1.4; }
+.messages li { margin-bottom: 5rem; }
+.actions { margin-top: 16rem; }
+.scrim {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.6);
+    pointer-events: auto;
+}
+.confirmation {
+    width: 420rem;
+    padding: 24rem;
+    background-color: #1b2935;
+    color: #f1f5f8;
+    border: 1rem solid #658293;
+    border-radius: 6rem;
+    font-size: 16rem;
+}
+.confirmation p { line-height: 1.5; margin: 14rem 0 0; }
+.confirmTitle { font-size: 20rem; font-weight: bold; }
+.tip { max-width: 300rem; padding: 10rem 12rem; font-size: 14rem; line-height: 1.4; }
+.tip strong { font-size: 16rem; }
+.hotkey { margin-top: 8rem; color: #b7d3e1; }

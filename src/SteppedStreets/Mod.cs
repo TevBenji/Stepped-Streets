@@ -55,6 +55,15 @@ namespace SteppedStreets
             {
                 Logger.Error(exception, "Stepped Streets: the spike trigger failed to register");
             }
+
+            try
+            {
+                updateSystem.UpdateAt<Panel.PanelSystem>(SystemUpdatePhase.UIUpdate);
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "Stepped Streets: the panel bindings failed to register");
+            }
         }
 
         public void OnDispose()

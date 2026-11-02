@@ -29,11 +29,19 @@
       <HintPath>$(ManagedPath)\netstandard.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <GameReference Include="Game;Colossal.Logging;Colossal.Core;Colossal.Mathematics;Colossal.IO.AssetDatabase;Colossal.Localization;Unity.Entities;Unity.Collections;Unity.Mathematics;Unity.Burst;UnityEngine.CoreModule" />
+    <GameReference Include="Game;Colossal.Logging;Colossal.Core;Colossal.Mathematics;Colossal.IO.AssetDatabase;Colossal.Localization;Colossal.UI;Colossal.UI.Binding;Unity.Entities;Unity.Collections;Unity.Mathematics;Unity.Burst;UnityEngine.CoreModule" />
     <Reference Include="@(GameReference)">
       <HintPath>$(ManagedPath)\%(Identity).dll</HintPath>
       <Private>false</Private>
     </Reference>
     <ProjectReference Include="..\SteppedStreets.Core\SteppedStreets.Core.csproj" />
   </ItemGroup>
+  <Target Name="BuildUserInterface" BeforeTargets="Build">
+    <Warning Condition="'$(SkipUI)' == 'true' Or !Exists('$(MSBuildProjectDirectory)\..\SteppedStreets.UI\node_modules')"
+             Text="UI bundle skipped: run npm ci in src/SteppedStreets.UI" />
+    <Exec Condition="'$(SkipUI)' != 'true' And Exists('$(MSBuildProjectDirectory)\..\SteppedStreets.UI\node_modules')"
+          WorkingDirectory="$(MSBuildProjectDirectory)\..\SteppedStreets.UI"
+          EnvironmentVariables="STEPPED_STREETS_UI_OUT=$(TargetDir)"
+          Command="npm run build" />
+  </Target>
 </Project>
