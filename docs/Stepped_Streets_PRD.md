@@ -5,274 +5,235 @@
 | Item | Detail |
 |---|---|
 | Owner | Tevin Benjamin |
-| Status | Draft 3, 2 November 2026; wave 4 built, awaiting the in-game test (changes listed at the end) |
-| Purpose | A fun side project: my own standalone mod, open source |
+| Status | Draft 4, 2 November 2026: the hillside neighbourhood generator replaces the one-street tool (changes listed at the end) |
+| Purpose | A fun side project: my own standalone mod, open source, and a portfolio piece |
 | Working name | Stepped Streets (check Paradox Mods for a clash before publishing) |
 | Licence | GPL-3.0, because it reuses Placemaker code (section 9) |
 | Code studied | Placemaker by jackwrichards, commit `e654b32` (1 November 2026) |
 
 ## 1. Summary
 
-Stepped Streets lets a player click a steep street and get the classic hill-town frontage: every lot on its own flat pad, the lots stepping down the hill like San Francisco or Lisbon, a clean wall or planted bank at each step, and zoning on the pads so houses grow level. It does one thing, for one street at a time, and works alongside Placemaker rather than replacing it.
+Stepped Streets lays out a whole hillside neighbourhood from one drawn area. The player outlines a piece of hill that touches
+an existing road. The mod plans streets that run along the contour lines, gentle connectors that climb between them, a
+connection to the existing road, level lots stepped down the hill with soft banks, a mix of zones, forest on ground too steep
+to build, and trees on banks and in gaps. The result should look like a careful player built it by hand: no road up the fall
+line, no cliffs, no torn terrain, no houses half sunk.
 
-It reuses Placemaker's proven terrain plumbing (GPL-3.0, credited). The stepped-lot planner, the algorithm at its heart, is written from scratch.
+The layout generator is written from scratch. It reuses Placemaker's proven terrain plumbing and its road-emitting pattern
+(GPL-3.0, credited).
 
 ## 2. The problem
 
-**In the game:** on a sloped street every growable building flattens its own footprint at its own height. The frontage comes out lumpy: tilted yards, raw dirt steps between houses, buildings half sunk or floating. Players work round it by flattening whole hills by hand before they zone. That costs hours, and the hill disappears.
+On a hill, the game's grid and the player's quick roads go straight up the slope. Every growable building then flattens its
+own footprint at its own height, and the frontage comes out lumpy: tilted yards, raw dirt steps between houses, buildings
+half sunk or floating. Good builders avoid this by hand (two build videos the owner watched, summarised in section 5.2): they
+keep off steep ground, lay streets on the contours, grade each lot before zoning, leave gaps on steep ground, terrace whole
+blocks, and plant the banks. That takes hours per neighbourhood. Placemaker's Hillside terraces lay contour streets but grade
+whole terraces, not stepped lots, and leave zoning to a separate tool.
 
-**What Placemaker does today** (checked in its code):
-
-- **Hillside terraces** (added 15 October): new streets laid on the contour lines by construction, each on a level terrace.
-- **Terraced blocks** (added 19 October), the ground under every road pattern: a street that climbs steeper than **6%**, measured over 30 m of smoothed ground, gets no terrace of its own (`BlockField.ClimbGrade = 0.06` in `Core/Layers/Roads/Terraces/BlockField.cs`). Road plans no longer zone at all (since 26 October); all zoning lives in Placemaker's Zoning category.
-- **Zoning tool, "Level the lots"**: each lot is levelled **across** its depth but **follows the street's slope along** its width. Each column of a lot takes the ground's height 1 m inside the lot's front edge at that column, averaged with its neighbours (`fronts` in `Core/Layers/Types/Zoning/PolishLookLayer.cs`, `LotLevel.Lot.Front`). On a steep street the lots still slope sideways, so the houses still make their own steps.
-
-No tool gives a steep street level, stepped lots. That is the gap Stepped Streets fills.
+The first version of this mod stepped the lots along one street the player picked. The owner rejected it after the first
+in-game look: the street itself was still wrong for the hill. The generator fixes the layout, not only the lots.
 
 ## 3. Goals and non-goals
 
 **Goals**
 
-1. A player can turn one steep street (6% and up) into level, stepped lots in a few clicks.
-2. Every step looks built: a wall or a planted bank, never a torn terrain face.
-3. Houses that grow there sit level on their pads.
-4. Simple enough that anybody can use it: sensible defaults, three or four choices, a clear preview.
-5. The core planner is my own code, tested without the game.
+- Draw an area; get a buildable plan in about a second: contour streets, connectors, one or more connections, lots, zones,
+  banks, forest and trees.
+- Every road within the maximum road grade; contour streets average under 3 %.
+- Level lots on pads, banks no steeper than the steepest-bank setting, no curtains in the ground.
+- Three styles: Contour suburb (default), Terraced blocks, Mountain lane.
+- A zone mix chosen by the player (shares, Random / Clumps / Even), like Placemaker's Zoning card.
+- Deterministic: the same area, settings and seed give the same plan; Reroll gives another.
+- Build safely: the ground, then the roads, then zoning, then trees and walls, never freezing the game for more than 2 s.
 
-**Non-goals (version 1)**
+**Non-goals (this version)**
 
-- Laying out new roads or whole neighbourhoods (Placemaker's terraces already do that).
-- Gentle streets under the chosen minimum grade (6% by default): they keep the game's normal behaviour.
-- New 3D assets: walls use the game's own pieces.
-- Quay walls: out of v1, by the owner's decision. The two looks are Planted bank and Low wall.
-- Translations beyond English (later, if people use it).
+- Undo of a build. Terrain changes are permanent, like the game's own terrain tools.
+- Placing buildings directly; footpaths and stairs; flat-ground grids (a flat area gets a message instead).
+- Quay retaining walls (Placemaker found them unreliable). Garden walls only, off by default.
+- The old one-street mode: removed; the generator covers it.
 
 ## 4. Who it's for
 
-- **The detailer** who wants the San Francisco look on a steep street without terraforming lot by lot.
-- **The player who always flattens the hill** (me): keep the hill, click once, done.
-- **The Placemaker user** who built hillside terraces and wants houses on the steep link roads its terraces skip.
+Players who build on hilly maps and want a hill town that looks hand-made without hours of terraforming. The owner first:
+it must look good enough for screenshots and be explainable in an interview.
 
 ## 5. How it works
 
 ### 5.1 Player flow
 
-1. Click the Stepped Streets button in the bottom toolbar beside Zones, or press Ctrl+Shift+S to open the tool (rebindable in Options → Stepped Streets).
-2. Hover a street: it highlights and shows its grade ("12% climb"). Streets under the minimum grade show grey.
-3. Click to select it. Shift-click adds the next segment of the same street.
-4. Pick the side (both, left, right), the zone (for example Residential Low), lot width (2–6 cells) and step look (Planted bank or Low wall). Advanced settings hold Narrowest width, Depth, Minimum grade, Highest step, Bank grade and Earthwork limit (section 5.4).
-5. The preview draws each pad, its height, each step and wall, and any lot left empty with the reason. A summary line: "14 lots, steps 1.1–1.9 m, 2 lots left empty (too steep for this width)".
-6. Build. The panel says first that ground changes are permanent, like the game's own terrain tools.
+1. Click the Stepped Streets button beside Zones in the bottom toolbar, or press Ctrl+Shift+S. The panel opens on the right.
+2. Draw the area: left-click places corners on the ground; click the first corner (or press Enter, or the panel's Close
+   area button) to close it. Drag a corner to reshape. Right-click removes the corner under the cursor (or the last one while
+   drawing). Ctrl+Z undoes the last change. Esc clears the area; Esc with no area closes the tool. The panel shows the area
+   in ha or km². The area must touch, or come within 150 m of, an existing road.
+3. Pick a style and settings. The preview updates live: roads coloured by grade, lots coloured by zone, cut and fill shaded,
+   trees and forest as dots, and a summary: road length, lots, zoned cells, earth moved, steepest road.
+4. Reroll gives another layout from a new seed. Same seed and settings give the same layout.
+5. Build, after the prompt "Ground changes are permanent, like the game's terrain tools. Build?". The result line replaces
+   the summary.
 
-Clear clears the selection; Close closes the tool. Neither undoes a build. The hotkey opens or toggles the tool; it never builds by itself. Build runs terrain → zoning → walls (for Low wall).
-
-### 5.2 Rules
-
-Numbers marked \* are starting values; the first in-game test still needs to confirm them.
+### 5.2 Rules (from the two build videos)
 
 | # | Rule |
 |---|---|
-| R1 | Works where the selected street climbs at least the **Minimum grade** (6%\*, the same threshold Placemaker's Terraced blocks use; the planner measures it over each lot's stretch of street). Flatter stretches are left alone. |
-| R2 | Lots are laid along the street from the downhill end (the lower of its two endpoints), starting at the kerb (the planner takes the road's half width), each **Lot width** cells wide (8 m cells), with **Depth** set to 2–6 cells. Left and right follow the direction of the street's centreline as the game gives it. |
-| R3 | Each lot becomes **one level pad**: one height across its whole width and depth, the street's height at the middle of the lot's front\*. The planner keeps this in one function so it can change (section 14, question 1). |
-| R4 | The step to the next lot is grade × the distance between the two pads' middles: grade × lot width when both lots are the same width (section 5.3). A lower pad of W cells allows a step of at most **min(Highest step, (W − 2) × 8 m × Bank grade)**, keeping two columns level beside the bank. The planner enforces this for both looks. If the step is too tall, that lot alone is narrowed down to Narrowest width; if it still fails, it is left empty with a reason. A 2-cell lower pad has no bank allowance. After an empty lot the next pad starts a fresh run. |
-| R5 | Each step is a bank on one or more whole 8 m columns taken from the lower pad's uphill end. Low wall adds the game's garden-wall prop along the foot of that same bank; it does not increase the allowed step. This is original planner code: whole-column banks make a separate `TerraceField.LimitBanks` or `Resolve` limiter unnecessary. Nothing is copied from `LotLevel.cs` or `PolishLookLayer.cs`. |
-| R6 | The strip between the kerb and the pad (the driveway apron) is graded so the front meets the road, over 4–8 m. The mismatch at the lot's corners is up to grade × lot width ÷ 2. Low walls start 4 m behind the kerb, matching the narrowest apron; following a wider apron exactly is a later refinement. |
-| R7 | The back of each pad meets the hillside with a bank governed by Bank grade\*. Total cut or fill is capped by Earthwork limit; a lot needing too much is left empty with a reason. v1 emits no quay walls or other nets. Placemaker's quay experiments remain background research, not a release feature. |
-| R8 | Zone cells are only placed on pad cells that came out level (within 0.3 m, a planner parameter). 0.3 m is the terrain build's convergence tolerance, which lets 2% of texels stay off by up to 0.75 m, so a pad's levelness needs its own measurement after the build (section 6). Placemaker's own zone-cell levelness test is about 0.1 m. |
-| R9 | Never touches existing buildings, other roads or water; never goes deeper than the frontage. An obstacle may shorten a pad from the back; if the minimum usable depth cannot fit, leave it empty and say why. |
-| R10 | Same input, same plan. Planning a 500 m street takes under 250 ms (Placemaker's budget for a 5 ha area). |
+| G1 | **Don't build on steep ground.** Ground steeper than Steepest buildable (default 15 %, range 8–30 %) on the smoothed survey gets no roads and no lots; it is planted as forest. About 10 % is the sweet spot. |
+| G2 | **Roads follow the contours.** Contour streets are contour lines of the smoothed ground (σ 12 m), at heights ΔH = g × S apart, where S is Block depth (road spacing on the ground) and g the 60th-percentile slope of buildable ground. They are clipped to buildable land, smoothed (Chaikin), held to a minimum radius, and dropped when shorter than 80 m. A level that comes closer than 0.65 S to an accepted street is clipped there; where accepted streets are more than 1.7 S apart, an in-between level fills the gap. Their profile follows the ground with at most 3 % grade (Contour suburb) or stays level (Terraced blocks). |
+| G3 | **Connectors climb gently.** Neighbouring contour streets are linked about every Link spacing along their shared length (every street gets at least one link). A link leaves and meets its streets at right angles and bends across the slope (an S-curve) until its length L satisfies ΔH ÷ L ≤ Max road grade (default 8 %, at most 12 %); where no S-curve fits, it is dropped rather than made steep. Junctions are T-junctions at 60° or more and at least 40 m apart. |
+| G4 | **Connection.** At least one road joins the network to an existing road within 150 m of the area, within Max road grade, attached to that road's edge or node. Without one, Build stays off and the panel says so. |
+| G5 | **Validate and repair.** Every road is checked for grade, radius, junction angle and spacing, clearance from other roads, water, buildings, existing roads and wild ground. A failing road is dropped; roads cut off from the connection are dropped. |
+| G6 | **Grade the lots.** Lots go along both sides of every new road (StepPlanner R1–R10: chord rectangles, pads at the street height at the middle of the lot front, earthwork limit, obstacle trimming). The ground is one field: road corridors (road plus 1.5 m shoulders, level across), then pads, each held level; between and around them the ground eases back to the hillside no steeper than Steepest bank (default 40 %). Where a pad cannot keep its height without a steeper bank, the clashing part of the pad yields and becomes bank. |
+| G7 | **Give space.** On steeper ground lots get gaps: Auto leaves 1 cell where the ground across a lot is steeper than half the buildable limit and 2 cells above three quarters of it; the player can force 0, 1 or 2. Gaps are planted. |
+| G8 | **Terrace whole blocks.** In Terraced blocks the streets are straighter and level, so each block side is one level terrace; links are straight connectors with no lots. |
+| G9 | **Be deliberate on steep stretches.** Mountain lane lays one winding road that climbs at no more than Max road grade with hairpins at the edges of the area, sparse lots with 2-cell gaps, and forest everywhere else. |
+| G10 | **Retaining walls sparingly.** Optional, off by default: the game's garden wall (EU_Wall02) along road shoulders where the cut beside the road is 0.8 m or more and no lot fronts the road. |
+| G11 | **Landscape.** Trees on wild ground (dense), cut banks and lot gaps (medium), fill banks only beyond 12 m from a house (the view stays open), never on lots or roads. Density is a setting. |
+| G12 | **Zones.** Each lot gets one zone from the mix: Random (seeded per lot), Clumps (runs of 3–5 neighbouring lots), Even (weighted round robin within one lot of the target). Only cells that come out level (within 0.3 m) are zoned. |
+| G13 | **Budget.** 1 km² plans in under 2 s on a worker thread; the latest request wins. The same request and seed give the same plan. |
 
-### 5.3 The hard part: the step between two lots
+### 5.3 Build order
 
-Step height = street grade × lot width, for two lots of the same width. With lots 2 or 3 cells wide (Placemaker's Suburb zoning style uses Residential Low lots 2–3 cells wide):
+Placemaker grades the ground before it emits nets (`Game/Build/BuildService.cs`: Terraform → EmitNets → Apply → zone blocks →
+zoning), so the build follows it:
 
-| Grade | 2 cells (16 m) | 3 cells (24 m) | 3-cell pad's bank at grade 0.40 |
-|---|---|---|---|
-| 6% | 0.96 m | 1.44 m | One bank column fits |
-| 8% | 1.28 m | 1.92 m | One bank column fits |
-| 10% | 1.60 m | 2.40 m | One bank column fits |
-| 12% | 1.92 m | 2.88 m | One bank column fits |
-| 15% | 2.40 m | 3.60 m | Exceeds the 3.2 m allowance |
-
-These are geometric step heights before R4's limits. A 2-cell lower pad cannot keep two level columns plus a bank, so those steps cannot form a continuous run. The last pad of a run has no following bank and keeps its full width.
-
-Pad heights sit at the middle of each lot's front (R3), so between lots of different widths the step is grade × the distance between their middles: a 3-cell lot next to a 2-cell lot steps grade × 20 m (half of 24 m plus half of 16 m), not grade × 16 m. Narrowing one lot saves only half a cell of step.
-
-**Why this is hard.** The game's heightmap has texels about 3.5 m apart, so a sharp jump draws as a stretched vertical sheet (a "curtain"). Placemaker's notes treat a jump steeper than about 50% across one texel as a tear, and warn that curtains can show from smaller jumps too (`docs/RESEARCH-NOTES-ADDENDUM.md` note 85 at line 576, since the file numbers two notes 85; `TerraceOptions.cs`). Placemaker plans quays only from 2.6 m (`BlockField.MinWall`) and keeps them only above 2.2 m, but switched them off for road terraces on 19 October ("they never work"). The owner has ruled quays out of v1. Stepped Streets spreads the rise across whole bank columns, with an optional 0.9 m garden wall at their foot; the visual result still needs the in-game test.
-
-**The two v1 looks, and the earlier experiments:**
-
-- **A. Planted bank:** one or more whole 8 m columns from the lower pad's uphill end, unzoned and ramped to the next pad. A 3-cell pad keeps two level columns beside its one-column bank. Placemaker's nearest idea is `LotLevel.Lot.Filler`, a ramp in an incidental gap; this planner's geometry is original work.
-- **B. Low wall:** the same bank, with unscaled `EU_Wall02` garden-wall props along its foot, from 4 m behind the kerb to the lower pad's back edge. The wall is 0.2 m thick and 0.9 m tall, running along local Z (`Core/Layers/Parking/Kerbs.cs:34-45`). Piece length comes from `ObjectGeometryData.m_Size.z`, with a logged 3 m fallback. A final piece is dropped if less than half fits. Unlike Placemaker's car-park foot-wall profile, v1 does not subtract 0.8 m from the terrain rise: the wall is decoration and the bank allowance is unchanged.
-- **C. Paired pads and quays:** earlier research only. Quays are out of v1; wider pads remain available through the 2–6 cell Lot width setting.
-- **D. Let the house hide it:** earlier research only. v1 zones level cells after the terrain build; it does not place houses directly.
-
-**The second unknown: do houses use the pads?** The game picks which building grows and how wide its lot is. If one house spans two pads, the effect breaks. Options: zone each pad exactly and vary the depth or zone type between neighbours; leave a one-column gap; or place the houses directly. The Placemaker fork by Nimenta2707 places buildings itself and marks them historical so they keep their model, the way Plop the Growables does (its README says it isn't tested in the game yet).
+1. Re-capture the site and re-plan on the worker; if the plan changed, show it again instead of building.
+2. Ground: the field becomes one terraform raster, applied with calibrated Shift brush passes (TerrainBuildSystem) and
+   verified within 0.3 m. Buildings and water are protected.
+3. Roads: every road becomes net courses (short cubic pieces at the planned heights) emitted in one frame through the
+   invisible build tool, attached to the existing road at the connection. If the game refuses them, stop.
+4. Zoning: wait for the game's zone blocks along the new roads (at most 120 frames), then zone each zone's level cells.
+5. Trees in batches, then garden walls if chosen.
 
 ### 5.4 Settings
 
-| Setting | Choices | Default | Notes |
-|---|---|---|---|
-| Side | Both, Left, Right | Both | |
-| Zone | The game's zone types | Residential Low | Row houses suit steep streets best |
-| Lot width | 2–6 cells | 3 | Width along the kerb, including bank columns |
-| Step look | Planted bank, Low wall | Planted bank | Same bank allowance; Low wall adds garden-wall props |
-| Advanced: Narrowest width | 2–6 cells, at most Lot width | 3 | Width floor for narrowing; two cells leave no bank allowance |
-| Advanced: Depth | 2–6 cells | 3 | Cells back from the kerb; obstacles may shorten it |
-| Advanced: Minimum grade | 4–12% | 6%\* | |
-| Advanced: Highest step | 0.5–5.0 m | 3.2 m\* | Also capped by (lower pad width − 2) × 8 m × Bank grade |
-| Advanced: Bank grade | 0.20–0.50 | 0.40\* | Rise over run; whole columns hold the rise |
-| Advanced: Earthwork limit | 1–8 m | 4 m\* | Cut or fill per pad |
-| Opening hotkey | Rebindable in Options → Stepped Streets | Ctrl+Shift+S | Opens or toggles the tool, not Build |
+| Setting | Default | Range |
+|---|---|---|
+| Style | Contour suburb | Contour suburb, Terraced blocks, Mountain lane |
+| Road type | the game's small two-lane road | ground-level, non-highway road prefabs |
+| Block depth (road spacing) | 90 m | 60–200 m |
+| Max road grade | 8 % | 4–12 % |
+| Steepest buildable ground | 15 % | 8–30 % |
+| Link spacing | 200 m | 100–400 m |
+| Zone mix | Residential Low 100 % | rows of zone and share; "Mix in another zone" |
+| Mix mode | Clumps | Random, Clumps, Even |
+| Lot width, lot depth | 3 cells, 3 cells | 2–6 cells each |
+| Level the lots | on | |
+| Most earth | 4 m | 1–8 m |
+| Steepest bank | 40 % | 20–50 % |
+| Space between lots | Auto | Auto, 0, 1, 2 cells |
+| Retaining walls | off | |
+| Trees, density | on, 50 % | 10–100 % |
+| Seed | 1 | Reroll |
+
+Saved property names are save format: existing names (LotWidthCells, NarrowestWidthCells, DepthCells, MinimumGradePercent,
+HighestStep, BankGrade, Look, EarthworkLimit, StepStreetBinding) keep their meaning; the rest are new.
 
 ### 5.5 Messages
 
-- "This street is flatter than 6%: nothing to step here."
-- "2 lots left empty: too steep for lots this wide."
-- Empty lots also report too much earthwork, a blocked footprint, or an end too short for a lot. Changing lot width, Bank grade or Highest step may help; Low wall does not bypass the bank allowance.
-- "Ground changes are permanent, like the game's terrain tools. Build?"
+- "Draw the area on a hillside: click corners, then click the first corner to close it."
+- "This area is nearly flat. Draw it on a hillside." (median slope under 3 %)
+- "Too steep: under 5 % of the area is gentler than the steepest buildable ground." 
+- "No new road reaches an existing road. Draw the area so it touches a road."
+- "N lots left out: too much earthwork / blocked / lost to banks." and the share of the area left as forest.
 
 ## 6. Success criteria
 
-Measured on a test map with straight streets at 8%, 12% and 15%:
+Off-game, on synthetic terrain (uniform slopes of 8, 12 and 18 %, a cone hill, a ridge, a valley, a saddle and a noisy hill):
 
-- **No curtains** inside the build. Measure with a copy of Placemaker's curtain metric (`Core/Build/TerrainMetrics.cs`) plus a 45° screenshot.
-- **Every pad level** within 0.3 m, measured on the ground after the build (the build's own stop rule lets 2% of texels stay off by up to 0.75 m), and every step within Highest step and the lower pad's bank allowance.
-- **Houses sit on one pad each** in at least 9 of 10 lots after the street fills up.
-- **At least as much frontage zoned** as Placemaker's Zoning tool on the same street, measured in M1 as the baseline.
-- **Anybody can use it:** two friends who play CS2 get a stepped street built without help on their first try.
-- **No long freezes:** the build never stalls the game for more than 2 seconds.
-- **Safe to remove:** unsubscribing leaves the terrain and zoning as built, and the save loads without errors.
+- every road within Max road grade; contour streets averaging under 3 %;
+- radii, junction angles (≥ 60°) and junction spacing (≥ 40 m) respected; no road through water, buildings or existing roads
+  except its planned attachment;
+- lots only on buildable ground; pads level within 0.3 m on the planned ground; zero curtains through the raster; banks
+  never steeper than the setting where the ground was changed;
+- the same layout for the same seed; 1 km² planned in under 2 s;
+- the gallery PNGs look like a hillside suburb a good player would build.
 
-These are manual acceptance criteria, not claims that the first in-game test has passed. Zoning verification checks one game cell at each run's centre, so its count is runs, not every zoned cell. Wall reports count emitted definitions, without a verification pass. Count actual cells and wall pieces in the game.
+In game (manual, by the owner): a 0.5–1 km² area on an 8–20 % hillside builds without curtains, the roads follow the hill,
+houses grow on level pads, and no build stage stalls the game for more than 2 s.
 
 ## 7. Placemaker code study guide
 
-Read in this order. Placemaker is 978 C# files, so don't read it all: these files answer the questions this mod has. Get the code with `git clone https://github.com/jackwrichards/placemaker`.
-
-| # | File | What you learn | Copy or study? |
-|---|---|---|---|
-| 1 | `AGENTS.md`, `docs/ARCHITECTURE.md` | How the mod is split: pure `Core/` (no game code, unit-tested), `Game/` (ECS systems), `UI/` (React). Its code rules. The runtime flow: tool → site snapshot → plan → preview → build. | Study. Copy the Core / Game / UI split. |
-| 2 | `docs/RESEARCH-NOTES-ADDENDUM.md`: "Direct terraform", notes 77–79, 85–86 | Engine rules found by decompiling the game: how terrain changes, the 3.5 m heightmap, curtains, quay walls, roads flattening their own width. The file numbers notes 85–88 twice each: the heightmap note 85 is at line 576 and the nets note 86 at line 580. | Study. Your engine cheat sheet. |
-| 3 | `Mod.cs`, `Game/Tool/ToolRegistration.cs` | Mod entry point (`IMod.OnLoad`) and how systems are registered (`updateSystem.UpdateAt<…>(SystemUpdatePhase.ToolUpdate)`). | Study; write your own (small). |
-| 4 | `Game/Tool/PlacemakerToolSystem.cs` (+ `.Input.cs`, `.Points.cs`) | A custom tool built on the game's `ToolBaseSystem`: hover, click, raycast against roads. | Study; write your own street picker. |
-| 5 | `Game/Preview/SiteCapture.cs` | Snapshotting terrain heights and nearby roads on the main thread so planning can run on a worker. | Adapt the parts you need. |
-| 6 | `Core/Layers/Types/Zoning/LotLevel.cs`, `PolishLookLayer.cs` (around lines 300–430) | How Placemaker levels lots today: per-column fronts, banks, walls, earthwork limit, lots shortened or left empty. The closest thing to your feature. | Study closely. Your planner replaces per-column fronts with one height per lot. |
-| 7 | `Core/Layers/Roads/Terraces/BlockField.cs`, `TerraceField.cs`, `docs/proposals/s52.md` | Bank physics (spacing S = W·a ÷ (a − g)), clash resolution, quay retaining walls (switched off for road terraces since 19 October, "they never work"), and the 6% climb limit. | Study only. Whole-column banks make the `TerraceField.LimitBanks` and `Resolve` limiter unnecessary; neither is adapted. |
-| 8 | `Core/Layers/Parking/LotGrading.cs`, `LotHill.cs` | Level tiers on a hill with masonry foot walls: the closest model for step option B. | Study. |
-| 9 | `Core/Layers/Common/Sculpt.cs` | Turns a height field on a grid (4 m cells by default; callers pass 2 m) into sloped terrain patches. It does not prevent curtains by itself: the caller's bank limits do. | Copy with a cut: `Emit` no longer takes `LayerContext`, and the clip path is dropped. The port needed four small files, not a few helpers (ported into `Core/Terrain` in wave 2). |
-| 10 | `Core/Build/TerraformRaster.cs`, `TerraformSurface.cs` | Turns the patches into a desired-ground grid (1.75 m cells) and the raise and lower masks. Pure code, only `Unity.Mathematics`, but it also needs `ReservedSpace.PointInPolygon`, `TerraformDabs.DistanceToBoundary` and `PlannedTerraform`. | Copy as is, with those three (all ported into `Core/Terrain`). |
-| 11 | `Game/Build/BuildService.Terrain.cs`, `Game/Build/BuildToolSystem.cs` | Applies the ground with `TerrainSystem.ApplyBrush(TerraformingType.Shift, …)`, up to two mask textures per tile per pass (raise and lower); re-reads heights (`GetHeightData(true)`) after 6 frames; up to 4 passes within a 6 s cap to within 0.3 m (2% of texels may stay off); works out the texture orientation on the first pass. It also holds the zoning call (`ZoningFlags.Zone \| ZoningFlags.Marquee`). Zoning needs an active tool, because only the active tool's `applyMode` is honoured, so Placemaker applies it through its invisible `BuildToolSystem.cs`. | Adapt: extract the direct path (a few hundred lines) into your own small system, plus a cut-down `BuildToolSystem`. |
-| 12 | `Core/Build/ZoneGuard.cs` | Zone cell rules (8 m cells) and which cells may be zoned. | Copy the parts you need. |
-| 13 | `Game/Build/TerrainCullGuard.cs` | Guards a native game crash in the terrain's road-culling list after several builds (Placemaker notes the fix isn't fully proven). | Study only; not copied. This mod emits no nets, so the guard is unnecessary. |
-| 14 | `Core/Build/TerrainMetrics.cs` | Counts curtains in a height grid: your success check. | Copy (for tests). |
-| 15 | `Tests/Placemaker.Tests/RoadsTerraceTests.cs`, `RoadsBlockTerraceTests.cs` | How to unit-test a pure planner on synthetic slopes, with no game. | Study; copy the style. |
-| 16 | `UI/src/index.tsx`, `UI/src/contract.ts`, `Game/UI/` | How a React panel talks to C# (values and triggers). | Study; build a much smaller panel. |
-| 17 | `Placemaker.csproj` | Builds in two modes: standalone against the game's `Cities2_Data\Managed` DLLs, or the official toolchain (`CSII_TOOLPATH`), which is opt-in (`-p:UseToolchain=true`). Its default build also deploys to the game's Mods folder unless `-p:Deploy=false`, and runs npm unless `-p:SkipUI=true`. | Copy and trim; drop the deploy step (ours never deploys). |
-
-**Patterns worth copying:**
-
-- Keep the planner pure (no game types), so you can test it in seconds without launching the game.
-- Plan on a worker thread from a snapshot; let only the latest request win.
-- Change terrain with one `ApplyBrush` call per mask per tile (raise and lower), then measure and correct. Never fire hundreds of brush strokes (Placemaker's notes record that crawling at 2 FPS).
-- Treat setting ids as save format: never rename them.
-- Nothing is done until you have seen it in the game.
+`docs/STUDY-NOTES.md` maps the files with line references. For this scope the important ones are: `Core/Layers/Roads/Terraces/*`
+and `docs/proposals/s52.md` (contour streets, terrace spacing S = W·a ÷ (a − g); studied, not copied), `Game/Build/BuildService.cs`
+(build order), `Game/Build/BuildService.Emit.cs` (net courses, attaching to an existing edge; adapted),
+`Game/Build/TerrainCullGuard.cs` (the road-cull crash guard; copied now that the mod emits nets), `Core/Build/TerraformRaster.cs`
+and `TerrainMetrics.cs` (copied earlier), `Game/Preview/SiteCapture.cs` (snapshot; adapted earlier).
 
 ## 8. What's mine and what's reused
 
 | Piece | Source | Credit |
 |---|---|---|
-| Stepped-lot planner (R1–R10, whole-column banks and wall-segment geometry) | **Written from scratch** | Mine |
-| Bank rule (R4–R5) | **Written from scratch**; whole columns make the `TerraceField` limiter unnecessary | Mine; no `LimitBanks` or `Resolve` code adapted |
-| Street picker tool, preview overlay, UI panel | Written from scratch, Placemaker as a pattern | Mine |
-| Mod entry, registration, settings | Written from scratch, Placemaker as a pattern | Mine |
-| Height field → terrain patches (`Sculpt.cs` + helpers) | Adapted (copied with a cut) | Placemaker, Jack Richards |
-| Terraform raster (`TerraformRaster.cs`, `TerraformSurface.cs`) | Copied | Placemaker, Jack Richards |
-| Terraform apply and verify | Adapted from `BuildService.Terrain.cs` | Placemaker, Jack Richards. The fallback brush and lake water there came from ParkManager (tomkpunkt): credit too if you copy them |
-| Zoning call | Adapted from `BuildService.Terrain.cs` and `BuildToolSystem.cs` | Placemaker, Jack Richards; it follows Grid Road Generator's zoning (Ti4goc) |
-| Zone cell rules | Original level-cell checks, informed by `ZoneGuard`'s 8 m grid, two-row and lone-column rules | Mine; Placemaker studied |
-| Curtain metric | Copied from `TerrainMetrics.cs` | Placemaker, Jack Richards |
-| Crash guard | Not copied; the mod emits no nets | None |
-| Low-wall object definitions and named prefab lookup | Adapted from `BuildService.Emit.cs` and `SurfaceCloneSystem.cs`; build cadence follows this mod's `ZoneBuildSystem` | Placemaker, Jack Richards; object-definition pattern credits ParkingLotTool, KruemelGames |
+| Layout generator: survey, contour streets, connectors, connection, validation, lots, zone mix, grading field, landscaping | **Written from scratch** | Mine |
+| Stepped-lot planner (R1–R10), reused for every road's lots | Written from scratch (v1) | Mine |
+| Area tool, preview, panel, gallery renderer | Written from scratch, Placemaker as a pattern | Mine |
+| Net courses for the roads | Adapted from `BuildService.Emit.cs` (`EmitNets`, `MakeCoursePos`) | Placemaker (jackwrichards); its header credits ParkManager (tomkpunkt) and Grid Road Generator (Ti4goc) |
+| Road-cull crash guard | Copied from `TerrainCullGuard.cs` | Placemaker (jackwrichards) |
+| Terraform raster, apply and verify; curtain metric; zoning call; invisible build tool | Copied or adapted earlier (see CREDITS.md) | Placemaker (jackwrichards) |
 
-For a portfolio, this split matters: the planner is the part you explain in an interview, so it must be yours.
+The generator is the part explained in an interview, so it is original; `LotLevel.cs` and `PolishLookLayer.cs` were never read
+for code, and `TerraceField.LimitBanks` / `Resolve` were studied but not adapted (the field uses its own cone envelopes).
 
 ## 9. Credit and licence checklist (GPL-3.0)
 
-Placemaker is GPL-3.0. Copying or adapting its code makes your mod a derivative work, so:
-
-1. License the **whole mod** under GPL-3.0 and ship the `LICENSE` file.
-2. Keep the licence and credit lines at the top of every copied file, and add a line saying you changed it and when (GPL-3.0 section 5a). For example: `// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: direct terraform path only.`
-3. Publish the full source on GitHub and link it from the mod page.
-4. Add a **Credits** section to the README and the mod page: Placemaker by jackwrichards; ParkManager by tomkpunkt and Grid Road Generator by Ti4goc for any of their code inside what you copied; Harmony (MIT) if you use it.
-5. Don't use Placemaker's name, logo or mod ID. The fork by Nimenta2707 warns that `Properties/PublishConfiguration.xml` still holds the original mod's ID; give yours a new one.
-6. Courtesy, not required: open a GitHub issue telling the author what you're building and thanking them.
-
-*This is a plain-language summary, not legal advice.*
+1. The whole mod is GPL-3.0 and ships `LICENSE`.
+2. Every copied or adapted file keeps its header and gets "Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by
+   Tevin Benjamin, 2026-11: <what changed>."
+3. Full source on GitHub, linked from the mod page.
+4. CREDITS.md and the README name Placemaker, and ParkManager and Grid Road Generator for the code paths Placemaker took from
+   them.
+5. No Placemaker name, logo or mod ID.
 
 ## 10. Plan
 
 | Step | What | Done when |
 |---|---|---|
-| M0 Learn | The standalone mod and code study are built. Reference screenshots and the first load in the game remain to be checked. | Your mod loads in your game, and you have a folder of reference screenshots. |
-| M1 Spike (go/no-go) | The hotkey spike supplied terrain and zoning plumbing. Wave 4 replaces it with the picker and panel. Its 8%, 12% and 15% map checks and the Placemaker baseline still need to run; quays are out of v1. | You know (1) which v1 look works without curtains, and (2) whether houses stay on single pads. **If neither works, stop or switch scope.** |
-| M2 Planner | Done: R1–R10 implementation and pure tests, including bank allowance, aprons, earthwork and obstacles, completed in wave 4 (2 November 2026). | Tests pass; plan under 250 ms; deterministic. In-game terrain checks remain part of M1/M3. |
-| M3 Tool and build | Built in wave 4 (2 November 2026): street picker, preview, permanent-change prompt, terrain → zoning → optional walls. Awaiting the in-game test. | One street built end to end in your game from clicks alone. |
-| M4 Panel | Built in wave 4 (2 November 2026): React panel, settings, messages and toolbar button. Awaiting the in-game test. | A friend uses it without help. |
-| M5 Ship | README and credits done in wave 4. Screenshots, a one-minute video, manual acceptance and Paradox Mods publishing pending. | Published; success criteria in section 6 met. |
+| M1 Generator | Core generator, tests on synthetic terrain, PNG gallery | Section 6's off-game criteria pass and the gallery looks right |
+| M2 Area tool | Area drawing, live preview on a worker, the new panel | The plan appears in game within a second of closing an area |
+| M3 Build | Ground, roads, zoning | One neighbourhood built end to end in the game |
+| M4 Landscape and polish | Trees, walls, panel polish | Trees and walls appear; panel complete |
+| M5 Docs | README, CREDITS, in-game test checklist | The owner can test without asking |
 
-**Later, if people like it:** several streets at once; an area mode; placing the houses directly; row-house styles; translations.
+After each milestone: build, run all tests, install to the Mods folder, commit, report.
 
 ## 11. Testing
 
-- **Unit tests** (xUnit, .NET 9) on the pure planner: synthetic straight and curved streets at 4–20%, checking pad heights, step heights, lots left empty, and the same output for the same input.
-- **Plan pictures:** optional small renderer that saves the plan as a PNG (Placemaker's `Tests/Placemaker.Gallery` is the model).
-- **In game:** a saved test map with steep streets. For each build, check curtains, pad heights, house fit, zoned frontage and the longest freeze, and take a 45° screenshot.
-- **Alongside Placemaker:** build on a street next to Placemaker terraces and check neither breaks the other.
+- **Unit tests** (xUnit, .NET 9) on the pure generator over the synthetic sites in section 6, plus the existing planner and
+  terrain tests.
+- **Gallery:** a test renders each synthetic site to a PNG over a hillshade (roads by grade, lots by zone, cut and fill,
+  forest), written to `gallery/` (git-ignored).
+- **UI:** `npm test` (state parsing) and `npm run typecheck`; the CSS lint runs in the bundle build.
+- **In game:** the owner's checklist in `docs/IN-GAME-TEST.md`.
 
 ## 12. Risks
 
 | Risk | Why it matters | What to do |
 |---|---|---|
-| Houses ignore the pads | The game chooses building lot widths; one house over two pads ruins the look | Spike it first (M1). Fallback: place houses directly, as the Nimenta2707 fork does |
-| Steps look bad | The heightmap may smear the bank or bury a garden wall | Test Planted bank and Low wall on the 8%, 12% and 15% streets; check the whole-column allowance and wall ends beside aprons |
-| Game updates break it | `TerrainSystem.ApplyBrush` is public but undocumented; patches can change it | Log the game version; fail safely with a message, never a crash |
-| Copied code drags in more code | `Sculpt.cs` needs geometry helpers; the apply code sits in a large partial class | Copy pure files whole; rewrite the apply loop small |
-| Placemaker adds the same thing | It moves very fast: 1,827 commits from 13 October to 2 November | Keep scope tight and ship early. It's for fun, and it can live alongside |
-| Scope creep | Many other projects compete for time | M1 decides go/no-go; stop if both spikes fail |
-| Licence slip | A GPL breach is avoidable embarrassment | Follow the checklist in section 9 before the first public release |
+| Net courses misbehave (junctions not merging, refused pieces) | Roads are new to this mod | All pieces in one frame, ends at identical positions, log refused pieces before Apply; stop the build if roads fail |
+| The road-cull crash after several builds | Placemaker hit it once it emitted nets | Copy TerrainCullGuard and reserve room before emitting |
+| Houses ignore the pads | Buildings choose their lot widths | Zone only level cells; gaps on steep ground |
+| Heightmap smear makes cells miss 0.3 m | 3.5 m texels | Pads are held 1.5 m beyond the zoned cells; zoning re-checks the live ground |
+| Large areas are slow | Field and lots scale with area | Worker thread, latest request wins, grid coarsens past 1 km² |
+| Game updates break private APIs | ApplyBrush and the cull guard are undocumented | Every game path in try/catch, logged, never crashing |
 
 ## 13. Setup checklist
 
-- Windows PC with Cities: Skylines II.
-- Modding toolchain: not needed. The mod builds standalone against the game's DLLs, so `CSII_TOOLPATH` need not be set.
-- .NET SDK 9 or newer for the solution (SDK 10 works) and the .NET 9 runtime for tests; the .NET 9 SDK itself is not needed. The mod targets .NET Framework 4.8 with C# 9 against the game's framework DLLs; Core is netstandard2.0. NuGet restore needs network access on the first build.
-- Node.js 18+ and npm for the React panel. Run `npm ci` and `npm run build` in `src/SteppedStreets.UI` before the final mod build; the csproj picks up the built assets.
-- Visual Studio 2022 or Rider, Git and a GitHub account.
-- Optional: `ilspycmd` (a dotnet tool) to decompile `Game.dll` and read the engine's own code, which is how Placemaker's author worked out its engine notes. Community API reference: ps1ke's Cities Skylines 2 Modding Guide.
-
-The repo holds `src/SteppedStreets` (the mod), `src/SteppedStreets.Core` (the pure planner and terrain code), `src/SteppedStreets.UI` (the React panel) and `tests/SteppedStreets.Tests`. Build the panel first, then build and test the solution from the repo root. The game's DLL folder defaults to `ManagedPath` in `build/GameReferences.props`; if the game is somewhere else, override it with `-p:ManagedPath=...`:
-
-```
-cd src/SteppedStreets.UI
-npm ci
-npm run build
-cd ../..
-dotnet build SteppedStreets.sln -c Release
-dotnet test SteppedStreets.sln
-dotnet build SteppedStreets.sln -c Release -p:ManagedPath="D:\<Steam library>\steamapps\common\Cities Skylines II\Cities2_Data\Managed"
-```
-
-Mods load from `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Mods\SteppedStreets\`. Close the game, create that folder if needed, and copy **everything** in `src\SteppedStreets\bin\Release\` into it, keeping subfolders, Core DLL and panel assets. The log is `Logs\SteppedStreets.log` next to `Mods`. The build never deploys there: installing is done by hand. API references have been checked against game version 1.6.2f1; nothing has run in the game yet.
+- Windows PC with Cities: Skylines II (1.6.2f1 checked). No modding toolchain: the mod builds against the game's DLLs
+  (`ManagedPath` in `build/GameReferences.props`).
+- .NET SDK 9 or newer (SDK 10 works) and the .NET 9 runtime for tests; Node.js 18+.
+- Build: `npm ci` once in `src/SteppedStreets.UI`, then `dotnet build SteppedStreets.sln -c Release` (also builds the panel
+  bundle into `src/SteppedStreets/bin/Release`). Tests: `dotnet test SteppedStreets.sln`, `npm test`, `npm run typecheck`.
+- Install: with the game closed, copy everything in `src/SteppedStreets/bin/Release` to
+  `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Mods\SteppedStreets`. Logs: `Logs\SteppedStreets.log`
+  and `Logs\UI.log`.
 
 ## 14. Open questions
 
-1. Pad height: the middle of the lot's front, or the uphill corner so the downhill side gets a raised front like real hill houses? Answered for v0: the middle of the front (R3), kept in one function in the planner so it can change.
-2. Which step looks survive the in-game test? The owner chose Planted bank and Low wall for v1; quays are out. Check wall burial at the bank foot and the fixed 4 m setback beside wider aprons.
-3. Do houses stay on single pads? v1 zones the level cells; direct house placement remains a possible later fallback.
-4. Final name (check Paradox Mods for a clash).
-5. A donation link on the GitHub page and mod page: check Paradox Mods' rules first (later).
+1. Which road prefab names exist in the owner's game? The panel lists them from the game; the default matches "Small Road".
+2. Do zone blocks along curved contour streets line up with the pads well enough? The in-game test decides; the fallback is
+   narrower lots on tight curves.
+3. Which tree prefabs look right on banks? The build picks conifers for forest and banks and broadleaf trees for gaps, by name.
+4. Final name and publishing.
 
 ## Sources
 
@@ -289,6 +250,16 @@ Mods load from `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II
 - [two dollars twenty — YouTube](https://www.youtube.com/@twodollarstwenty)
 
 ## Changes
+
+Draft 4, 2 November 2026. The owner rejected the one-street tool after the first in-game look and asked for a generator that lays out a whole hillside neighbourhood from a drawn area (his v2 hand-off prompt, approved the same day; it supersedes the wave 5 spec in `docs/HILLSIDE-NEIGHBOURHOODS.md`).
+
+- §1–§4 rewritten for the neighbourhood generator; the non-goal "laying out new roads or whole neighbourhoods" is lifted; the street picker is removed.
+- §5.1: area drawing (corners, drag, right-click removes, Ctrl+Z, Esc), live preview, Reroll, the permanent-change prompt.
+- §5.2: rules G1–G13 from the two build videos (steep ground left wild, contour streets, gentle connectors, connection, validation, graded lots in one ground field, gaps, terraced blocks, mountain lane, sparse garden walls, landscaping, zone mix, budget). Defaults follow the owner's prompt: steepest buildable 15 %, max road grade 8 %.
+- §5.3: build order ground → roads → zone blocks → zoning → trees → walls, taken from Placemaker's BuildService.
+- §5.4: new settings (style, road type, block depth, max road grade, steepest buildable, link spacing, zone mix, mix mode, level the lots, lot spacing, trees and density, seed); existing property names keep their meaning.
+- §6, §10, §11: off-game criteria on eight synthetic sites, a PNG gallery, milestones M1–M5 with an install after each.
+- §7–§9: net courses adapted from `BuildService.Emit.cs` with its ParkManager and Grid Road Generator credits; TerrainCullGuard copied now that the mod emits nets; the generator and its grading field are original.
 
 Integration review, 2 November 2026: all four wave 4 branches are merged, and temporary contract stubs are removed. Zoning now checks the live built height instead of the target raster. The build rejects the entire operation before any brush if the outer blend or sampled brush margin reaches a building, another road or water. Narrow-lot advice was corrected because narrowing also reduces bank capacity. The Release output includes the GPL licence, credits, player guide, DLLs, panel and icon.
 

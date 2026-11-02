@@ -1,5 +1,7 @@
 # Hillside neighbourhoods (wave 5 spec)
 
+> **Superseded** by the PRD Draft 4 (`docs/Stepped_Streets_PRD.md`, 2 November 2026). Kept for history; the contract below was never built.
+
 *Lead's spec, 2 November 2026. It extends the PRD: the owner wants the mod to lay out a whole hillside neighbourhood, not
 only step one existing street. Section 3's non-goal "laying out new roads or whole neighbourhoods" is lifted by the owner.*
 
