@@ -212,8 +212,9 @@ namespace SteppedStreets.Tool
             State.Progress = 1f;
             State.Summary = Invariant($"Built {buildPlan.RoadLength / 1000f:0.0} km of road and {buildPlan.Lots.Count} lots: ") + string.Join(", ", buildReport) + ".";
             Log(State.Summary);
-            // The built area is history now: the next area starts fresh, and its plan cannot be built twice.
+            // The built area is history now: its plan cannot be built twice, and the preview stops drawing it over the real thing.
             Plan = null;
+            PlanVersion++;
             Touch();
         }
 
