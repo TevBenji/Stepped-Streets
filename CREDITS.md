@@ -48,3 +48,28 @@ Wave 4 planner completion is original work by Tevin Benjamin, 2026-11, GPL-3.0:
 
 - `src/SteppedStreets.Core/Planning/StepPlanRequest.cs`, `StepPlan.cs`, `StepPlanner.cs` and `StepPlanPatches.cs`: bank capacity per lot width, road-height aprons, sampled earthwork and obstacle checks, hillside-aware smoothstep blend sizing, and preview summaries and messages. No additional Placemaker code was copied or adapted; the existing terrain raster and surface interpolation retain their credits above.
 - `tests/SteppedStreets.Tests/Planning/StepPlannerTests.cs`, `StepPlannerSiteTests.cs` and `StepPlanPatchesTests.cs`: synthetic planner rules, apron continuity, preview wording, deterministic results, and off-game raster checks at 8%, 12% and 15%.
+## Wave 4: street picker, preview and build flow (W2)
+
+- `src/SteppedStreets/Tool/SiteSnapshot.cs` adapts the height and water grids from Placemaker
+  `Game/Preview/SiteCapture.cs:153-204` and the road composition/ground-level checks at `:217-250`
+  (same GPL-3.0 commit `e654b32`). It keeps fixed 4 m terrain and 8 m water grids, captures building
+  lots and sampled road corridors, and fails capture rather than treating missing water data as dry.
+  Building lot corners follow the API usage studied in `Game/Selection/BuildingFootprints.cs:27-38`.
+  Placemaker credits Grid Road Generator's HeightSnapshot as the height-grid idea; that credit is retained.
+- `Tool/StepStreetToolSystem.cs`, `Tool/StepStreetHotkeySystem.cs`, `Tool/RightClickGesture.cs` and
+  `Tool/StepPreviewSystem.cs` are original work, informed by Placemaker's tool lifecycle/raycast
+  (`Game/Tool/PlacemakerToolSystem.cs:165-304`), modifier/cancel input
+  (`Game/Tool/PlacemakerToolSystem.Input.cs:37-155`) and overlay buffer usage
+  (`Game/Overlay/PlacemakerOverlaySystem.cs:82-134`, `:625`). No code was copied from those files.
+- `Tool/StreetCapture.cs` moves and extends this project's original `Spike/SelectedStreet.cs`.
+  The original three failure logs and street summary remain. Shift-add validates a single unbranched
+  chain, node identifiers include their version, and mixed-width chains use their widest road.
+  The street-name call was studied in Placemaker's `Game/Suite/SuiteLab.FenceMap.cs:95-107`.
+- `Tool/StepStreetToolSystem.Build.cs` moves this project's original spike flow into the picker,
+  with settings fixed to its preview, guarded callbacks and the W4 low-wall completion step.
+  The existing terrain and zoning systems retain their earlier Placemaker credits above.
+- `Tool/ToolState.cs`, `Tool/SiteGeometry.cs`, `tests/SteppedStreets.Tests/Tool/*.cs`, and the
+  Wave 4 contract stubs are original work. The test project links the pure geometry and gesture
+  source files so those exact helpers are tested without game assemblies.
+- The settings, registration and game-reference changes are original work. Options group and
+  binding identifiers are preserved. The historical `Spike/*.cs` paths above now live under `Tool/`.

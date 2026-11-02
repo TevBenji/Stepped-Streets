@@ -1,4 +1,5 @@
 // Stepped Streets. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+using System;
 using System.Collections.Generic;
 using Colossal.Mathematics;
 using Game.Common;
@@ -9,15 +10,17 @@ using Unity.Entities;
 using Unity.Mathematics;
 using static System.FormattableString;
 
-namespace SteppedStreets.Spike
+namespace SteppedStreets.Tool
 {
-    /// <summary>The street selected with the game's own select tool, as one centreline the planner can read.</summary>
-    internal sealed class SelectedStreet
+    /// <summary>A named street, captured as one centreline the planner can read.</summary>
+    internal sealed class StreetCapture
     {
         // One centreline point about every 4 m follows a curve closely and keeps the line short enough to plan quickly.
         private const float SampleSpacing = 4f;
 
         public List<float3> Centreline { get; } = new List<float3>();
+        public List<Entity> Edges { get; } = new List<Entity>();
+        public Entity Aggregate { get; private set; }
 
         /// <summary>Metres from the centreline to the kerb.</summary>
         public float HalfWidth { get; private set; }
@@ -26,7 +29,7 @@ namespace SteppedStreets.Spike
         /// Every edge of the selected street, end to end, whether the selection is one of its road edges or the street (its
         /// aggregate) itself. Null, after one log line naming what was wrong, when nothing usable is selected.
         /// </summary>
-        public static SelectedStreet Capture(EntityManager entities, Entity selected)
+        public static StreetCapture Capture(EntityManager entities, Entity selected)
         {
             if (selected == Entity.Null || !entities.Exists(selected))
             {
@@ -64,18 +67,50 @@ namespace SteppedStreets.Spike
                 return null;
             }
 
+            return CaptureEdges(entities, edges, aggregate);
+        }
+
+        public StreetCapture Add(EntityManager entities, StreetCapture addition)
+        {
+            var edges = new List<Entity>(Edges);
+            foreach (var edge in addition.Edges)
+                if (!edges.Contains(edge)) edges.Add(edge);
+            var nodes = Nodes(entities, edges);
+            if (!SiteGeometry.SingleChain(nodes)) return null;
+            return CaptureEdges(entities, edges, Aggregate);
+        }
+
+        public StreetCapture Refresh(EntityManager entities)
+        {
+            foreach (var edge in Edges)
+                if (!IsUsableEdge(entities, edge))
+                    throw new InvalidOperationException("The selected road changed. Select the street again.");
+            return CaptureEdges(entities, Edges, Aggregate);
+        }
+
+        private static List<(long Start, long End)> Nodes(EntityManager entities, List<Entity> edges)
+        {
             var nodes = new List<(long Start, long End)>();
             foreach (var edge in edges)
             {
                 var ends = entities.GetComponentData<Edge>(edge);
-                nodes.Add((ends.m_Start.Index, ends.m_End.Index));
+                nodes.Add((Pack(ends.m_Start), Pack(ends.m_End)));
             }
+            return nodes;
+        }
 
-            var order = StreetChain.Order(nodes);
-            Entity composition = entities.GetComponentData<Composition>(isRoadEdge ? selected : edges[0]).m_Edge;
-            var street = new SelectedStreet { HalfWidth = entities.GetComponentData<NetCompositionData>(composition).m_Width * 0.5f };
+        private static long Pack(Entity entity) => ((long)entity.Version << 32) | (uint)entity.Index;
+
+        private static StreetCapture CaptureEdges(EntityManager entities, List<Entity> edges, Entity aggregate)
+        {
+            var order = StreetChain.Order(Nodes(entities, edges));
+            var street = new StreetCapture { Aggregate = aggregate };
             foreach (var (edgeIndex, reversed) in order)
             {
+                street.Edges.Add(edges[edgeIndex]);
+                Entity composition = entities.GetComponentData<Composition>(edges[edgeIndex]).m_Edge;
+                // ponytail: one width per chain; use its widest road to keep pads outside it, upgrade the planner to per-edge widths for mixed streets.
+                street.HalfWidth = math.max(street.HalfWidth, entities.GetComponentData<NetCompositionData>(composition).m_Width * 0.5f);
                 var curve = entities.GetComponentData<Curve>(edges[edgeIndex]);
                 var bezier = curve.m_Bezier;
                 if (reversed)
@@ -95,8 +130,9 @@ namespace SteppedStreets.Spike
             return street;
         }
 
-        private static bool IsUsableEdge(EntityManager entities, Entity edge) =>
+        internal static bool IsUsableEdge(EntityManager entities, Entity edge) =>
             entities.HasComponent<Road>(edge) && entities.HasComponent<Edge>(edge) && entities.HasComponent<Curve>(edge)
-            && entities.HasComponent<Composition>(edge) && !entities.HasComponent<Deleted>(edge);
+            && entities.HasComponent<Composition>(edge) && !entities.HasComponent<Deleted>(edge)
+            && !entities.HasComponent<Game.Tools.Temp>(edge);
     }
 }
