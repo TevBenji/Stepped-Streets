@@ -113,7 +113,6 @@
 
 .toneIdle { border-left-color: var(--accentColorNormal); }
 .toneGood { border-left-color: #6fdc8c; }
-.toneFlat { border-left-color: rgba(234, 242, 246, 0.35); }
 .toneBusy { border-left-color: #ffb547; }
 .toneBad { border-left-color: #ff6b5b; }
 
@@ -124,13 +123,45 @@
     color: #ffffff;
 }
 
-.toneFlat .statusText { color: rgba(234, 242, 246, 0.6); }
+.progressTrack {
+    height: 4rem;
+    margin-top: 7rem;
+    border-radius: 2rem;
+    background-color: rgba(255, 255, 255, 0.15);
+}
 
-.statusHint {
-    margin-top: 3rem;
+.area {
+    margin-top: 4rem;
+    font-size: 13rem;
+    color: rgba(234, 242, 246, 0.85);
+}
+
+.hints {
+    margin-top: 6rem;
     font-size: 12rem;
-    line-height: 1.35;
-    color: rgba(234, 242, 246, 0.6);
+    line-height: 1.4;
+    color: rgba(234, 242, 246, 0.5);
+}
+
+.statusButtons {
+    display: flex;
+    flex-direction: row;
+    margin-top: 8rem;
+}
+
+.statusButton { margin-right: 6rem; }
+
+/* No superscript glyphs in the game's font: a smaller digit, top-aligned beside its unit. */
+.measure {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.power {
+    margin-left: 1rem;
+    font-size: 9rem;
+    line-height: 1;
 }
 
 /* ── sections and rows ── */
@@ -172,7 +203,7 @@
 }
 
 .label {
-    width: 116rem;
+    width: 132rem;
     flex-shrink: 0;
     padding-right: 8rem;
     font-size: 13rem;
@@ -239,6 +270,7 @@
     flex: 1 1 0;
     height: 24rem;
     padding: 0 6rem;
+    font-size: 12rem;
     background-color: transparent;
     color: rgba(234, 242, 246, 0.72);
 }
@@ -318,14 +350,13 @@
 
 .picker .chevron { margin-left: 8rem; }
 .chevronOpen { transform: rotate(180deg); }
-.chevronClosed { transform: rotate(-90deg); }
 
 .list {
     display: flex;
     flex-direction: column;
     max-height: 220rem;
     overflow-y: auto;
-    margin: 0 0 6rem 116rem;
+    margin: 0 0 6rem 132rem;
     padding: 3rem;
     border-radius: 4rem;
     border: 1rem solid rgba(255, 255, 255, 0.1);
@@ -340,56 +371,165 @@
 
 .listItem.selected { background-color: rgba(255, 255, 255, 0.16); }
 
-/* ── advanced foldout ── */
-.fold {
+/* A picker without a row label spans the full width, and so does its list. */
+.listFull { margin-left: 0; }
+
+/* ── zone mix ── */
+.mixEntry {
     display: flex;
     flex-direction: column;
-    margin-top: 12rem;
-    padding-top: 6rem;
-    border-top: 1rem solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 6rem;
+    padding: 2rem 8rem;
+    border-radius: 4rem;
+    border: 1rem solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.03);
 }
 
-.foldHead {
-    justify-content: flex-start;
+.remove {
+    width: 28rem;
     height: 28rem;
+    padding: 0;
+    margin-left: 6rem;
+    flex-shrink: 0;
+}
+
+.shareOfTotal {
+    width: 44rem;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 12rem;
+    color: rgba(234, 242, 246, 0.6);
+    white-space: nowrap;
+}
+
+.addZone {
+    align-self: flex-start;
+    height: 28rem;
+    margin-bottom: 6rem;
+    background-color: transparent;
+    color: var(--accentColorNormal);
+}
+
+.buttonIcon {
+    width: 12rem;
+    height: 12rem;
+    margin-right: 6rem;
+    flex-shrink: 0;
+}
+
+/* ── toggle ── */
+.toggle {
     padding: 0 4rem;
     background-color: transparent;
 }
 
-.foldTitle {
-    margin-left: 6rem;
-    flex-shrink: 0;
-    font-size: 11rem;
-    font-weight: bold;
-    color: rgba(234, 242, 246, 0.6);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+.toggle.selected { background-color: transparent; }
+.toggle:hover { background-color: rgba(255, 255, 255, 0.08); }
+.toggle.disabled:hover { background-color: transparent; }
+
+.toggleTrack {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    width: 32rem;
+    height: 18rem;
+    border-radius: 9rem;
+    background-color: rgba(255, 255, 255, 0.18);
 }
 
-.foldSummary {
+.toggleOn {
+    justify-content: flex-end;
+    background-color: var(--accentColorNormal);
+}
+
+.toggleKnob {
+    width: 14rem;
+    height: 14rem;
+    margin: 0 2rem;
+    border-radius: 7rem;
+    background-color: #ffffff;
+}
+
+.toggleText {
+    margin-left: 8rem;
+    font-size: 13rem;
+    color: rgba(234, 242, 246, 0.78);
+}
+
+/* ── seed ── */
+.seed { margin-top: 10rem; }
+
+.seedValue {
     flex: 1 1 auto;
-    min-width: 0;
-    margin-left: 10rem;
-    font-size: 12rem;
-    text-align: right;
-    color: rgba(234, 242, 246, 0.55);
-    overflow: hidden;
+    font-size: 13rem;
+    font-weight: bold;
+    color: var(--accentColorNormal);
 }
 
-.foldBody {
+/* ── plan stats, zone counts and messages ── */
+.card {
     display: flex;
     flex-direction: column;
-    padding-top: 4rem;
+    margin-bottom: 6rem;
+    padding: 5rem 10rem;
+    border-radius: 4rem;
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
-/* ── plan summary and messages ── */
-.summary {
+.stat {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    min-height: 22rem;
+}
+
+.statLabel {
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 13rem;
-    line-height: 1.45;
+    color: rgba(234, 242, 246, 0.7);
+}
+
+.statValue {
+    flex-shrink: 0;
+    justify-content: flex-end;
+    margin-left: 8rem;
+    font-size: 13rem;
+    font-weight: bold;
     color: #ffffff;
 }
 
-.summaryBad { color: #ffb3a8; }
+.zoneCount {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    min-height: 22rem;
+    padding: 0 2rem;
+}
+
+.zoneDot {
+    width: 10rem;
+    height: 10rem;
+    margin-right: 8rem;
+    border-radius: 5rem;
+    flex-shrink: 0;
+}
+
+.zoneName {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 13rem;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.zoneLots {
+    flex-shrink: 0;
+    margin-left: 8rem;
+    font-size: 13rem;
+    color: rgba(234, 242, 246, 0.7);
+}
 
 .message {
     display: flex;
