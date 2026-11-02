@@ -1,6 +1,7 @@
 // Stepped Streets. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Game;
 using Game.Input;
 using Game.UI.InGame;
@@ -77,22 +78,32 @@ namespace SteppedStreets.Spike
                 return;
 
             var settings = Mod.Settings;
+            // The planner refuses a narrowest width above the lot width; the two sliders can cross.
+            int narrowest = math.min(settings.NarrowestWidthCells, settings.LotWidthCells);
+            // ponytail: the planner's R4 does not yet know that banks take columns, so the spike caps the step it may plan;
+            // v1 moves this rule into StepPlanner.
+            float bankStep = StepPlanPatches.HighestStepFor(narrowest, settings.BankGrade);
+            if (bankStep <= 0f)
+            {
+                Log(Invariant($"the narrowest width ({narrowest} cells) leaves no room for a bank column plus two zoned columns; set the lot width and narrowest width to 3 or more."));
+                return;
+            }
+
             var request = new StepPlanRequest
             {
                 Centreline = street.Centreline,
                 RoadHalfWidth = street.HalfWidth,
                 Side = settings.Side,
                 LotWidthCells = settings.LotWidthCells,
-                // The planner refuses a narrowest width above the lot width; the two sliders can cross.
-                NarrowestWidthCells = math.min(settings.NarrowestWidthCells, settings.LotWidthCells),
+                NarrowestWidthCells = narrowest,
                 DepthCells = settings.DepthCells,
                 MinimumGrade = settings.MinimumGradePercent / 100f,
-                HighestStep = settings.HighestStep,
+                HighestStep = math.min(settings.HighestStep, bankStep),
             };
             var plan = StepPlanner.Plan(request);
             var summary = plan.Summary;
             Log(Invariant(
-                $"plan: {summary.LotCount} pads, {plan.Steps.Count} steps of {summary.LowestStep:0.00}-{summary.TallestStep:0.00} m, {summary.EmptyCount} lots left empty (too steep), {plan.FlatStretches.Count} flat stretches; settings: side {request.Side}, lots {request.LotWidthCells} cells (narrowest {request.NarrowestWidthCells}) by {request.DepthCells}, minimum grade {settings.MinimumGradePercent}%, highest step {request.HighestStep:0.0} m, bank grade {settings.BankGrade:0.00}"));
+                $"plan: {summary.LotCount} pads, {plan.Steps.Count} steps of {summary.LowestStep:0.00}-{summary.TallestStep:0.00} m, {summary.EmptyCount} lots left empty (too steep), {plan.FlatStretches.Count} flat stretches; settings: side {request.Side}, lots {request.LotWidthCells} cells (narrowest {request.NarrowestWidthCells}) by {request.DepthCells}, minimum grade {settings.MinimumGradePercent}%, highest step {request.HighestStep:0.0} m (setting {settings.HighestStep:0.0} m, banks allow {bankStep:0.0} m), bank grade {settings.BankGrade:0.00}"));
             if (plan.Message != null)
                 Log(plan.Message);
             if (plan.Pads.Count == 0)
@@ -100,22 +111,30 @@ namespace SteppedStreets.Spike
 
             var patches = StepPlanPatches.ToPatches(plan, settings.BankGrade);
             float bankWidth = StepPlanPatches.BankWidth(plan, terrainBuild.HeightAt, settings.BankGrade);
-            Log(Invariant($"terrain: {patches.Count} patches ({plan.Pads.Count} level pads, {plan.Steps.Count} sloped banks), bank width {bankWidth:0.0} m"));
+            Log(Invariant($"terrain: {patches.Count} patches ({patches.Count - plan.Steps.Count} level pads, {plan.Steps.Count} sloped banks), bank width {bankWidth:0.0} m"));
             string zoneName = settings.ZoneName;
-            terrainBuild.Begin(patches, bankWidth, report => ZoneLevelCells(plan, zoneName, report));
+            float bankGrade = settings.BankGrade;
+            terrainBuild.Begin(patches, bankWidth, report => ZoneLevelCells(plan, zoneName, bankGrade, report));
         }
 
-        private void ZoneLevelCells(StepPlan plan, string zoneName, TerrainBuildReport report)
+        private void ZoneLevelCells(StepPlan plan, string zoneName, float bankGrade, TerrainBuildReport report)
         {
             try
             {
                 Log("terrain: " + report.Summary);
                 var quads = new List<float2[]>();
+                int levelCells = 0;
                 foreach (var pad in plan.Pads)
                 {
                     var cells = StepPlanner.LevelCells(pad, terrainBuild.HeightAt, LevelTolerance);
+                    var stepAfter = plan.Steps.FirstOrDefault(step => step.Earlier == pad);
+                    int kept = pad.WidthCells - (stepAfter == null ? 0 : StepPlanPatches.BankColumns(stepAfter, bankGrade));
+                    string warning = kept < StepPlanner.MinimumWidthCells
+                        ? "; under two columns, so the game will wipe this pad's zoning"
+                        : "";
                     Log(Invariant(
-                        $"pad {pad.Side} {pad.Start:0}-{pad.End:0} m along, height {pad.Height:0.00} m: {cells.Count} of {pad.WidthCells * pad.DepthCells} cells level"));
+                        $"pad {pad.Side} {pad.Start:0}-{pad.End:0} m along, height {pad.Height:0.00} m: {cells.Count} of {pad.WidthCells * pad.DepthCells} cells level, keeps {kept} of {pad.WidthCells} columns for zoning{warning}"));
+                    levelCells += cells.Count;
                     quads.AddRange(StepPlanPatches.CellQuads(pad, cells));
                 }
 
@@ -125,7 +144,7 @@ namespace SteppedStreets.Spike
                     return;
                 }
 
-                Log(Invariant($"zoning: {quads.Count} level cells as {zoneName}"));
+                Log(Invariant($"zoning: {levelCells} level cells in {quads.Count} runs as {zoneName}"));
                 zoneBuild.Begin(quads, zoneName, zoneReport => Log("zoning: " + zoneReport.Summary));
             }
             catch (Exception exception)

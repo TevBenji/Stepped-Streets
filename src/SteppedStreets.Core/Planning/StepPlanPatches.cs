@@ -14,55 +14,44 @@ namespace SteppedStreets.Core.Planning
 
         public const float WidestBank = 24f;
 
-        // The game's marquee takes a cell by its centre, so each quad is pulled in from its cell's edges and never reaches
+        // The game's marquee takes a cell by its centre, so each quad is pulled in from its cells' edges and never reaches
         // the centre of a neighbour (Placemaker's ZoneGuard.QuadShrink).
         private const float QuadShrink = 1f;
 
         /// <summary>
-        /// One level patch per pad and one sloped patch per step. A step's bank takes Rise ÷ <paramref name="bankGrade"/> metres
-        /// of street, half from each pad, and ramps between the two pad heights, so the ground climbs instead of jumping.
+        /// One level patch per pad and one sloped patch per step. Each bank takes <see cref="BankColumns"/> whole columns
+        /// from the uphill end of the pad before the step and ramps from that pad's height to the next pad's, so every pad
+        /// keeps whole cells level and meets its bank along a whole edge. A pad whose columns all went to its bank gets no
+        /// level patch.
         /// </summary>
         public static List<PlannedTerraform> ToPatches(StepPlan plan, float bankGrade)
         {
-            // ponytail: trims are not clamped to the pad; the settings' ranges (steps up to 3 m, bank grade from 0.2, pads at
-            // least 16 m) keep two trims shorter than any pad. Clamp here if those ranges grow.
-            var startTrims = new Dictionary<Pad, float>();
-            var endTrims = new Dictionary<Pad, float>();
+            var keptColumns = new Dictionary<Pad, int>();
             foreach (var step in plan.Steps)
-            {
-                float half = math.abs(step.Rise) / bankGrade * 0.5f;
-                endTrims[step.Earlier] = half;
-                startTrims[step.Later] = half;
-            }
+                keptColumns[step.Earlier] = step.Earlier.WidthCells - BankColumns(step, bankGrade);
 
             var patches = new List<PlannedTerraform>();
-            var rings = new Dictionary<Pad, float3[]>();
             foreach (var pad in plan.Pads)
             {
-                startTrims.TryGetValue(pad, out float startTrim);
-                endTrims.TryGetValue(pad, out float endTrim);
+                int kept = keptColumns.TryGetValue(pad, out int columns) ? columns : pad.WidthCells;
+                if (kept == 0)
+                    continue;
                 var corners = pad.Corners;
-                float3 along = math.normalize(corners[1] - corners[0]);
-                var ring = new[]
-                {
-                    corners[0] + along * startTrim,
-                    corners[1] - along * endTrim,
-                    corners[2] - along * endTrim,
-                    corners[3] + along * startTrim,
-                };
-                rings[pad] = ring;
+                var ring = new[] { corners[0], corners[1], corners[2], corners[3] };
+                if (kept < pad.WidthCells)
+                    (ring[1], ring[2]) = Across(pad, kept);
                 patches.Add(new PlannedTerraform { Ring = ring, TargetHeight = pad.Height, Permanent = true });
             }
 
             foreach (var step in plan.Steps)
             {
-                var earlier = rings[step.Earlier];
-                var later = rings[step.Later];
-                // Same winding as the pads: the earlier pad's end edge at its height, then the later pad's start edge at its
-                // height, so the bank meets each pad exactly along their shared edges.
+                var (front, back) = Across(step.Earlier, keptColumns[step.Earlier]);
+                var later = step.Later.Corners;
+                // Same winding as the pads. The later pad's start edge, not the earlier pad's end edge, closes the bank, so
+                // on a bend the bank also fills the wedge between the two pads.
                 patches.Add(new PlannedTerraform
                 {
-                    Ring = new[] { earlier[1], later[0], later[3], earlier[2] },
+                    Ring = new[] { front, later[0], later[3], back },
                     TargetHeight = (step.Earlier.Height + step.Later.Height) * 0.5f,
                     Permanent = true,
                     Sloped = true,
@@ -70,6 +59,31 @@ namespace SteppedStreets.Core.Planning
             }
 
             return patches;
+        }
+
+        /// <summary>
+        /// How many whole 8 m columns a step's bank takes from the uphill end of the pad before it: enough to be no steeper
+        /// than <paramref name="bankGrade"/>, at least one, at most the whole pad.
+        /// </summary>
+        public static int BankColumns(Step step, float bankGrade)
+        {
+            // Less the planner's step tolerance, so a step it allows at exactly the highest step does not round up a column.
+            float columns = (math.abs(step.Rise) - StepPlanner.StepTolerance) / (StepPlanner.CellSize * bankGrade);
+            return math.clamp((int)math.ceil(columns), 1, step.Earlier.WidthCells);
+        }
+
+        /// <summary>
+        /// The tallest step after which a pad <paramref name="narrowestWidthCells"/> wide still keeps the two zoned columns
+        /// the game's lone-column rule needs beside its bank; 0 when no step leaves it that.
+        /// </summary>
+        public static float HighestStepFor(int narrowestWidthCells, float bankGrade) =>
+            math.max(0f, (narrowestWidthCells - StepPlanner.MinimumWidthCells) * StepPlanner.CellSize * bankGrade);
+
+        // The line across the pad at a column boundary, front then back, at the pad's height.
+        private static (float3 Front, float3 Back) Across(Pad pad, int column)
+        {
+            float fraction = column / (float)pad.WidthCells;
+            return (math.lerp(pad.Corners[0], pad.Corners[1], fraction), math.lerp(pad.Corners[3], pad.Corners[2], fraction));
         }
 
         /// <summary>
@@ -93,22 +107,34 @@ namespace SteppedStreets.Core.Planning
         private const float SmoothstepPeak = 1.5f;
 
         /// <summary>
-        /// One zoning quad in world (x, z) per cell, given as (column, row) the way <see cref="StepPlanner.LevelCells"/> returns
-        /// them: the 8 m cell pulled in 1 m on every side.
+        /// One zoning quad in world (x, z) per run of neighbouring cells within a row, given as (column, row) the way
+        /// <see cref="StepPlanner.LevelCells"/> returns them: the run pulled in 1 m on every side. The game's zone cells sit
+        /// on each road edge's own 8 m grid, not the pad's, and its marquee takes every one of them whose centre lies inside
+        /// the quad. A quad per run takes every game cell centred on the run however the two grids line up; a quad per pad
+        /// cell could miss its game cell or catch the neighbour's.
         /// </summary>
         public static List<float2[]> CellQuads(Pad pad, IEnumerable<int2> cells)
         {
             const float inset = QuadShrink / StepPlanner.CellSize;
+            var level = new HashSet<int2>(cells);
             var quads = new List<float2[]>();
-            foreach (var cell in cells)
+            for (int row = 0; row < pad.DepthCells; row++)
             {
-                quads.Add(new[]
+                for (int column = 0; column < pad.WidthCells; column++)
                 {
-                    pad.PointAt(cell.x + inset, cell.y + inset),
-                    pad.PointAt(cell.x + 1f - inset, cell.y + inset),
-                    pad.PointAt(cell.x + 1f - inset, cell.y + 1f - inset),
-                    pad.PointAt(cell.x + inset, cell.y + 1f - inset),
-                });
+                    if (!level.Contains(new int2(column, row)))
+                        continue;
+                    int first = column;
+                    while (level.Contains(new int2(column + 1, row)))
+                        column++;
+                    quads.Add(new[]
+                    {
+                        pad.PointAt(first + inset, row + inset),
+                        pad.PointAt(column + 1f - inset, row + inset),
+                        pad.PointAt(column + 1f - inset, row + 1f - inset),
+                        pad.PointAt(first + inset, row + 1f - inset),
+                    });
+                }
             }
 
             return quads;

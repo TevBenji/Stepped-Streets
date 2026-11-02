@@ -22,33 +22,47 @@ namespace SteppedStreets.Spike
         /// <summary>Metres from the centreline to the kerb.</summary>
         public float HalfWidth { get; private set; }
 
-        /// <summary>Every edge of the selected edge's street, end to end. Null, after one log line, when the selection is not a road edge.</summary>
+        /// <summary>
+        /// Every edge of the selected street, end to end, whether the selection is one of its road edges or the street (its
+        /// aggregate) itself. Null, after one log line naming what was wrong, when nothing usable is selected.
+        /// </summary>
         public static SelectedStreet Capture(EntityManager entities, Entity selected)
         {
-            if (selected == Entity.Null || !entities.Exists(selected) || !entities.HasComponent<Road>(selected)
-                || !entities.HasComponent<Edge>(selected) || !entities.HasComponent<Curve>(selected)
-                || !entities.HasComponent<Aggregated>(selected))
+            if (selected == Entity.Null || !entities.Exists(selected))
             {
-                Mod.Logger.Info($"Stepped Streets: the selection ({selected}) is not a road edge. Click a street with the select tool first.");
+                Mod.Logger.Info("Stepped Streets: nothing is selected. Click a street with the select tool first.");
                 return null;
             }
 
-            // The aggregate is the named street the edge belongs to; its element buffer lists every edge of that street.
+            // The aggregate is the named street; its element buffer lists every edge of that street.
+            bool isStreet = entities.HasBuffer<AggregateElement>(selected);
+            bool isRoadEdge = IsUsableEdge(entities, selected) && entities.HasComponent<Aggregated>(selected);
+            if (!isStreet && !isRoadEdge)
+            {
+                Mod.Logger.Info($"Stepped Streets: the selection ({selected}) is neither a road edge nor a street. Click the road itself with the select tool.");
+                return null;
+            }
+
             var edges = new List<Entity>();
-            Entity aggregate = entities.GetComponentData<Aggregated>(selected).m_Aggregate;
+            Entity aggregate = isStreet ? selected : entities.GetComponentData<Aggregated>(selected).m_Aggregate;
             if (aggregate != Entity.Null && entities.HasBuffer<AggregateElement>(aggregate))
             {
                 var elements = entities.GetBuffer<AggregateElement>(aggregate, true);
                 for (int index = 0; index < elements.Length; index++)
                 {
                     Entity edge = elements[index].m_Edge;
-                    if (entities.HasComponent<Edge>(edge) && entities.HasComponent<Curve>(edge) && !entities.HasComponent<Deleted>(edge))
+                    if (IsUsableEdge(entities, edge))
                         edges.Add(edge);
                 }
             }
 
-            if (!edges.Contains(selected))
+            if (isRoadEdge && !edges.Contains(selected))
                 edges.Add(selected);
+            if (edges.Count == 0)
+            {
+                Mod.Logger.Info($"Stepped Streets: the selected street ({selected}) has no road edges to step.");
+                return null;
+            }
 
             var nodes = new List<(long Start, long End)>();
             foreach (var edge in edges)
@@ -58,7 +72,7 @@ namespace SteppedStreets.Spike
             }
 
             var order = StreetChain.Order(nodes);
-            Entity composition = entities.GetComponentData<Composition>(selected).m_Edge;
+            Entity composition = entities.GetComponentData<Composition>(isRoadEdge ? selected : edges[0]).m_Edge;
             var street = new SelectedStreet { HalfWidth = entities.GetComponentData<NetCompositionData>(composition).m_Width * 0.5f };
             foreach (var (edgeIndex, reversed) in order)
             {
@@ -80,5 +94,9 @@ namespace SteppedStreets.Spike
                 $"Stepped Streets: street of {order.Count} edges ({edges.Count} in its aggregate), {run:0.0} m long, {rise:0.00} m rise, grade {(run > 0f ? rise / run * 100f : 0f):0.0}%, half width {street.HalfWidth:0.0} m, {street.Centreline.Count} points"));
             return street;
         }
+
+        private static bool IsUsableEdge(EntityManager entities, Entity edge) =>
+            entities.HasComponent<Road>(edge) && entities.HasComponent<Edge>(edge) && entities.HasComponent<Curve>(edge)
+            && entities.HasComponent<Composition>(edge) && !entities.HasComponent<Deleted>(edge);
     }
 }
