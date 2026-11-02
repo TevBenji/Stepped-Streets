@@ -14,3 +14,5 @@ TestResults/
 .dotnet/
 .nuget/
 .tmp/
+node_modules/
+src/SteppedStreets.UI/build/

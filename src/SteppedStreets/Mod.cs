@@ -69,6 +69,15 @@ namespace SteppedStreets
 
             try { updateSystem.UpdateAt<StepPreviewSystem>(SystemUpdatePhase.Rendering); }
             catch (Exception exception) { Logger.Error(exception, "Stepped Streets: the street preview failed to register"); }
+
+            try
+            {
+                updateSystem.UpdateAt<Panel.PanelSystem>(SystemUpdatePhase.UIUpdate);
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "Stepped Streets: the panel bindings failed to register");
+            }
         }
 
         public void OnDispose()
