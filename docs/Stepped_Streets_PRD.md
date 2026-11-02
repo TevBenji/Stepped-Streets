@@ -38,7 +38,10 @@ in-game look: the street itself was still wrong for the hill. The generator fixe
 
 **Goals**
 
-- Draw an area; get a buildable plan in about a second: contour streets, connectors, one or more connections, lots, zones,
+- **It looks like a professional player designed it** (the owner's bar): smooth streets that hug the contours, tidy level
+  lots, even soft banks, forest on the steep ground. Nothing lumpy: no tilted yards, no raw dirt steps, no torn ground, no
+  houses half sunk or floating. Section 2 describes the lumpy result the game gives without the mod.
+- Draw an area; get a buildable plan in about a second: contour streets, connectors, a connection when a road is in reach, lots, zones,
   banks, forest and trees.
 - Every road within the maximum road grade; contour streets average under 3 %.
 - Level lots on pads, banks no steeper than the steepest-bank setting, no curtains in the ground.
@@ -67,7 +70,7 @@ it must look good enough for screenshots and be explainable in an interview.
 2. Draw the area: left-click places corners on the ground; click the first corner (or press Enter, or the panel's Close
    area button) to close it. Drag a corner to reshape. Right-click removes the corner under the cursor (or the last one while
    drawing). Ctrl+Z undoes the last change. Esc clears the area; Esc with no area closes the tool. The panel shows the area
-   in ha or km². The area must touch, or come within 150 m of, an existing road.
+   in ha or km². The area does not have to touch a road: the generator connects to the nearest existing road within 400 m when it can, and otherwise builds a standalone network.
 3. Pick a style and settings. The preview updates live: roads coloured by grade, lots coloured by zone, cut and fill shaded,
    trees and forest as dots, and a summary: road length, lots, zoned cells, earth moved, steepest road.
 4. Reroll gives another layout from a new seed. Same seed and settings give the same layout.
@@ -81,7 +84,7 @@ it must look good enough for screenshots and be explainable in an interview.
 | G1 | **Don't build on steep ground.** Ground steeper than Steepest buildable (default 15 %, range 8–30 %) on the smoothed survey gets no roads and no lots; it is planted as forest. About 10 % is the sweet spot. |
 | G2 | **Roads follow the contours.** Contour streets are contour lines of the smoothed ground (σ 12 m), at heights ΔH = g × S apart, where S is Block depth (road spacing on the ground) and g the 60th-percentile slope of buildable ground. They are clipped to buildable land, smoothed (Chaikin), held to a minimum radius, and dropped when shorter than 80 m. A level that comes closer than 0.65 S to an accepted street is clipped there; where accepted streets are more than 1.7 S apart, an in-between level fills the gap. Their profile follows the ground with at most 3 % grade (Contour suburb) or stays level (Terraced blocks). |
 | G3 | **Connectors climb gently.** Neighbouring contour streets are linked about every Link spacing along their shared length (every street gets at least one link). A link leaves and meets its streets at right angles and bends across the slope (an S-curve) until its length L satisfies ΔH ÷ L ≤ Max road grade (default 8 %, at most 12 %); where no S-curve fits, it is dropped rather than made steep. Junctions are T-junctions at 60° or more and at least 40 m apart. |
-| G4 | **Connection.** At least one road joins the network to an existing road within 150 m of the area, within Max road grade, attached to that road's edge or node. Without one, Build stays off and the panel says so. |
+| G4 | **Connection.** When an existing road lies within 400 m of the area, one road joins the network to it, within Max road grade, attached to that road's edge or node (it may run outside the area). The area need not touch a road (owner, 2 November 2026): without a reachable road the network is built standalone and the panel says it is not connected. |
 | G5 | **Validate and repair.** Every road is checked for grade, radius, junction angle and spacing, clearance from other roads, water, buildings, existing roads and wild ground. A failing road is dropped; roads cut off from the connection are dropped. |
 | G6 | **Grade the lots.** Lots go along both sides of every new road (StepPlanner R1–R10: chord rectangles, pads at the street height at the middle of the lot front, earthwork limit, obstacle trimming). The ground is one field: road corridors (road plus 1.5 m shoulders, level across), then pads, each held level; between and around them the ground eases back to the hillside no steeper than Steepest bank (default 40 %). Where a pad cannot keep its height without a steeper bank, the clashing part of the pad yields and becomes bank. |
 | G7 | **Give space.** On steeper ground lots get gaps: Auto leaves 1 cell where the ground across a lot is steeper than half the buildable limit and 2 cells above three quarters of it; the player can force 0, 1 or 2. Gaps are planted. |
@@ -134,7 +137,7 @@ HighestStep, BankGrade, Look, EarthworkLimit, StepStreetBinding) keep their mean
 - "Draw the area on a hillside: click corners, then click the first corner to close it."
 - "This area is nearly flat. Draw it on a hillside." (median slope under 3 %)
 - "Too steep: under 5 % of the area is gentler than the steepest buildable ground." 
-- "No new road reaches an existing road. Draw the area so it touches a road."
+- "Not connected: no existing road within reach. The new streets are built on their own."
 - "N lots left out: too much earthwork / blocked / lost to banks." and the share of the area left as forest.
 
 ## 6. Success criteria
@@ -254,7 +257,7 @@ After each milestone: build, run all tests, install to the Mods folder, commit, 
 Draft 4, 2 November 2026. The owner rejected the one-street tool after the first in-game look and asked for a generator that lays out a whole hillside neighbourhood from a drawn area (his v2 hand-off prompt, approved the same day; it supersedes the wave 5 spec in `docs/HILLSIDE-NEIGHBOURHOODS.md`).
 
 - §1–§4 rewritten for the neighbourhood generator; the non-goal "laying out new roads or whole neighbourhoods" is lifted; the street picker is removed.
-- §5.1: area drawing (corners, drag, right-click removes, Ctrl+Z, Esc), live preview, Reroll, the permanent-change prompt.
+- §5.1: area drawing (corners, drag, right-click removes, Ctrl+Z, Esc), live preview, Reroll, the permanent-change prompt. The area need not touch a road (owner's follow-up the same day); the connection is best effort within 400 m.
 - §5.2: rules G1–G13 from the two build videos (steep ground left wild, contour streets, gentle connectors, connection, validation, graded lots in one ground field, gaps, terraced blocks, mountain lane, sparse garden walls, landscaping, zone mix, budget). Defaults follow the owner's prompt: steepest buildable 15 %, max road grade 8 %.
 - §5.3: build order ground → roads → zone blocks → zoning → trees → walls, taken from Placemaker's BuildService.
 - §5.4: new settings (style, road type, block depth, max road grade, steepest buildable, link spacing, zone mix, mix mode, level the lots, lot spacing, trees and density, seed); existing property names keep their meaning.

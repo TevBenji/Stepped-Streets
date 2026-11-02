@@ -1,0 +1,219 @@
+// Stepped Streets, the hillside neighbourhood generator. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+using System;
+using System.Collections.Generic;
+using Unity.Mathematics;
+
+namespace SteppedStreets.Core.Neighbourhood
+{
+    /// <summary>Small plan-view helpers: polylines, distances, curves and a stable hash for seeded choices.</summary>
+    internal static class Geometry
+    {
+        public static float DistanceToSegment(float2 point, float2 start, float2 end)
+        {
+            float2 direction = end - start;
+            float lengthSquared = math.lengthsq(direction);
+            float fraction = lengthSquared > 1e-9f ? math.saturate(math.dot(point - start, direction) / lengthSquared) : 0f;
+            return math.distance(point, start + direction * fraction);
+        }
+
+        public static float Length(IReadOnlyList<float2> line)
+        {
+            float length = 0f;
+            for (int index = 1; index < line.Count; index++) length += math.distance(line[index - 1], line[index]);
+            return length;
+        }
+
+        /// <summary>Distance along the line at every point, starting at 0.</summary>
+        public static float[] Stations(IReadOnlyList<float2> line)
+        {
+            var stations = new float[line.Count];
+            for (int index = 1; index < line.Count; index++) stations[index] = stations[index - 1] + math.distance(line[index - 1], line[index]);
+            return stations;
+        }
+
+        /// <summary>Points every <paramref name="spacing"/> metres along the line (the last spacing stretched to end exactly).</summary>
+        public static List<float2> Resample(IReadOnlyList<float2> line, float spacing)
+        {
+            var result = new List<float2>();
+            if (line.Count == 0) return result;
+            float length = Length(line);
+            int segments = math.max(1, (int)math.round(length / spacing));
+            float step = length / segments;
+            result.Add(line[0]);
+            int index = 1;
+            float travelled = 0f;
+            float2 previous = line[0];
+            for (int segment = 1; segment < segments; segment++)
+            {
+                float target = segment * step;
+                while (index < line.Count)
+                {
+                    float piece = math.distance(previous, line[index]);
+                    if (travelled + piece >= target)
+                    {
+                        float fraction = piece > 1e-6f ? (target - travelled) / piece : 0f;
+                        previous = math.lerp(previous, line[index], fraction);
+                        travelled = target;
+                        break;
+                    }
+                    travelled += piece;
+                    previous = line[index];
+                    index++;
+                }
+                result.Add(previous);
+            }
+            result.Add(line[line.Count - 1]);
+            return result;
+        }
+
+        /// <summary>Chaikin corner cutting; the two ends stay where they are.</summary>
+        public static List<float2> Chaikin(IReadOnlyList<float2> line, int rounds)
+        {
+            var current = new List<float2>(line);
+            for (int round = 0; round < rounds && current.Count >= 3; round++)
+            {
+                var next = new List<float2> { current[0] };
+                for (int index = 0; index < current.Count - 1; index++)
+                {
+                    float2 a = current[index], b = current[index + 1];
+                    if (index > 0) next.Add(math.lerp(a, b, 0.25f));
+                    if (index < current.Count - 2) next.Add(math.lerp(a, b, 0.75f));
+                }
+                next.Add(current[current.Count - 1]);
+                current = next;
+            }
+            return current;
+        }
+
+        /// <summary>Radius of the circle through three points; infinite when they are in line.</summary>
+        public static float Radius(float2 a, float2 b, float2 c)
+        {
+            float cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+            if (math.abs(cross) < 1e-6f) return float.PositiveInfinity;
+            return math.distance(a, b) * math.distance(b, c) * math.distance(c, a) / (2f * math.abs(cross));
+        }
+
+        /// <summary>The tightest radius along a line, measured over points about <paramref name="span"/> metres either side.</summary>
+        public static float TightestRadius(IReadOnlyList<float2> line, float span, out int at)
+        {
+            at = -1;
+            float tightest = float.PositiveInfinity;
+            if (line.Count < 3) return tightest;
+            // Lines here are resampled evenly, so a fixed index offset spans the same distance everywhere.
+            float spacing = Length(line) / (line.Count - 1);
+            int offset = math.max(1, (int)math.round(span / math.max(0.01f, spacing)));
+            for (int index = offset; index < line.Count - offset; index++)
+            {
+                float radius = Radius(line[index - offset], line[index], line[index + offset]);
+                if (radius < tightest) { tightest = radius; at = index; }
+            }
+            return tightest;
+        }
+
+        /// <summary>Cubic Hermite curve from p0 (unit tangent t0) to p1 (unit tangent t1), resampled every spacing metres.</summary>
+        public static List<float2> Hermite(float2 p0, float2 t0, float2 p1, float2 t1, float tangentScale, float spacing)
+        {
+            float chord = math.distance(p0, p1);
+            float2 m0 = t0 * chord * tangentScale, m1 = t1 * chord * tangentScale;
+            int steps = math.max(8, (int)(chord / 2f));
+            var dense = new List<float2>(steps + 1);
+            for (int step = 0; step <= steps; step++)
+            {
+                float t = step / (float)steps, t2 = t * t, t3 = t2 * t;
+                dense.Add((2f * t3 - 3f * t2 + 1f) * p0 + (t3 - 2f * t2 + t) * m0 + (-2f * t3 + 3f * t2) * p1 + (t3 - t2) * m1);
+            }
+            return Resample(dense, spacing);
+        }
+
+        /// <summary>Unit tangent of a line at a point index, from its neighbours.</summary>
+        public static float2 Tangent(IReadOnlyList<float2> line, int index)
+        {
+            int before = math.max(0, index - 1), after = math.min(line.Count - 1, index + 1);
+            float2 direction = line[after] - line[before];
+            return math.lengthsq(direction) > 1e-9f ? math.normalize(direction) : new float2(1f, 0f);
+        }
+
+        /// <summary>The left of a direction in the game's plan (x right, z forward).</summary>
+        public static float2 Left(float2 direction) => new float2(-direction.y, direction.x);
+
+        /// <summary>Two-pass chamfer distance transform (metres): 0 at seeds, growing away from them.</summary>
+        public static float[] Chamfer(bool[] seeds, int columns, int rows, float cell)
+        {
+            const float Far = 1e9f;
+            var distance = new float[seeds.Length];
+            for (int index = 0; index < seeds.Length; index++) distance[index] = seeds[index] ? 0f : Far;
+            float straight = cell, diagonal = cell * 1.41421356f;
+            for (int row = 0; row < rows; row++)
+                for (int column = 0; column < columns; column++)
+                {
+                    int index = row * columns + column;
+                    float best = distance[index];
+                    if (column > 0) best = math.min(best, distance[index - 1] + straight);
+                    if (row > 0)
+                    {
+                        best = math.min(best, distance[index - columns] + straight);
+                        if (column > 0) best = math.min(best, distance[index - columns - 1] + diagonal);
+                        if (column < columns - 1) best = math.min(best, distance[index - columns + 1] + diagonal);
+                    }
+                    distance[index] = best;
+                }
+            for (int row = rows - 1; row >= 0; row--)
+                for (int column = columns - 1; column >= 0; column--)
+                {
+                    int index = row * columns + column;
+                    float best = distance[index];
+                    if (column < columns - 1) best = math.min(best, distance[index + 1] + straight);
+                    if (row < rows - 1)
+                    {
+                        best = math.min(best, distance[index + columns] + straight);
+                        if (column < columns - 1) best = math.min(best, distance[index + columns + 1] + diagonal);
+                        if (column > 0) best = math.min(best, distance[index + columns - 1] + diagonal);
+                    }
+                    distance[index] = best;
+                }
+            return distance;
+        }
+
+        /// <summary>A stable 0..1 number from a seed and two integers, for seeded choices that do not depend on call order.</summary>
+        public static float Hash01(uint seed, int a, int b)
+        {
+            uint hash = math.hash(new uint3(seed, (uint)a, (uint)b));
+            return (hash & 0xFFFFFF) / 16777216f;
+        }
+
+        public static uint Hash(uint seed, int a, int b) => math.hash(new uint3(seed, (uint)a, (uint)b));
+    }
+
+    /// <summary>A uniform grid of buckets over the plan, for "what is near this point" queries.</summary>
+    internal sealed class SpatialBuckets<T>
+    {
+        private readonly float bucketSize;
+        private readonly Dictionary<long, List<T>> buckets = new Dictionary<long, List<T>>();
+
+        public SpatialBuckets(float bucketSize) { this.bucketSize = bucketSize; }
+
+        private long Key(int x, int y) => ((long)x << 32) ^ (uint)y;
+
+        public void Add(float2 minimum, float2 maximum, T item)
+        {
+            int x0 = (int)math.floor(minimum.x / bucketSize), x1 = (int)math.floor(maximum.x / bucketSize);
+            int y0 = (int)math.floor(minimum.y / bucketSize), y1 = (int)math.floor(maximum.y / bucketSize);
+            for (int y = y0; y <= y1; y++)
+                for (int x = x0; x <= x1; x++)
+                {
+                    long key = Key(x, y);
+                    if (!buckets.TryGetValue(key, out var list)) buckets[key] = list = new List<T>();
+                    list.Add(item);
+                }
+        }
+
+        /// <summary>Items whose box touches the bucket holding the point (callers pad their boxes by the reach they query with).</summary>
+        public List<T> Near(float2 point)
+        {
+            return buckets.TryGetValue(Key((int)math.floor(point.x / bucketSize), (int)math.floor(point.y / bucketSize)), out var list)
+                ? list : Empty;
+        }
+
+        private static readonly List<T> Empty = new List<T>();
+    }
+}

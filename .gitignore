@@ -16,3 +16,4 @@ TestResults/
 .tmp/
 node_modules/
 src/SteppedStreets.UI/build/
+gallery/

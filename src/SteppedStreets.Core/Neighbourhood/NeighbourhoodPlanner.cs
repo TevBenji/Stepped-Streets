@@ -1,0 +1,222 @@
+// Stepped Streets, the hillside neighbourhood generator. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.Threading;
+using SteppedStreets.Core.Planning;
+using SteppedStreets.Core.Terrain;
+using Unity.Mathematics;
+
+namespace SteppedStreets.Core.Neighbourhood
+{
+    /// <summary>
+    /// Lays out a hillside neighbourhood in a drawn area: survey → contour streets → links → connection → validation →
+    /// lots → ground → zones → trees and walls. Pure and deterministic: the same request and seed give the same plan.
+    /// </summary>
+    public static class NeighbourhoodPlanner
+    {
+        /// <summary>Tighter bends than this look wrong on a small road; Terraced blocks are straighter, lanes may hairpin.</summary>
+        public static float MinimumRadius(NeighbourhoodStyle style) =>
+            style == NeighbourhoodStyle.TerracedBlocks ? 60f : style == NeighbourhoodStyle.MountainLane ? 25f : 30f;
+
+        /// <summary>Links and connections bend across the slope in every style, so they keep the small road's radius.</summary>
+        public static float LinkRadius(NeighbourhoodStyle style) => style == NeighbourhoodStyle.MountainLane ? 25f : 30f;
+
+        public static NeighbourhoodPlan Plan(NeighbourhoodRequest request, CancellationToken cancellation = default)
+        {
+            var clock = Stopwatch.StartNew();
+            Validate(request);
+            var plan = new NeighbourhoodPlan();
+            var survey = new SiteSurvey(request);
+            plan.AreaSquareMetres = survey.AreaSquareMetres;
+            plan.WildShare = survey.WildShare;
+            if (survey.InsideCount == 0)
+            {
+                plan.Messages.Add("The area is too small. Draw a larger one.");
+                return Finish(plan, clock);
+            }
+            if (survey.BuildableShare < 0.05f)
+            {
+                plan.Messages.Add(string.Format(CultureInfo.InvariantCulture,
+                    "Too steep: under 5% of the area is gentler than {0:0}%. Raise the steepest buildable ground or draw on gentler ground.",
+                    request.SteepestBuildable * 100f));
+                return Finish(plan, clock);
+            }
+            if (survey.MedianSlope < 0.03f)
+            {
+                plan.Messages.Add("This area is nearly flat. Draw it on a hillside.");
+                return Finish(plan, clock);
+            }
+
+            float radius = MinimumRadius(request.Style);
+            var streets = request.Style == NeighbourhoodStyle.MountainLane
+                ? Lane(survey, request, radius, cancellation)
+                : Contours(survey, request, radius, cancellation);
+
+            var owners = new List<int>();
+            var notes = new List<string>();
+            bool connected = RoadNetwork.Prune(streets);
+            RoadNetwork.Assemble(streets, plan, owners);
+            for (int round = 0; round < 4; round++)
+            {
+                var bad = RoadNetwork.Violations(plan, owners, streets, request, radius, LinkRadius(request.Style), notes);
+                if (bad.Count == 0) break;
+                foreach (int street in bad) streets[street].Removed = true;
+                connected = RoadNetwork.Prune(streets);
+                RoadNetwork.Assemble(streets, plan, owners);
+            }
+            plan.Connected = connected;
+            if (plan.Roads.Count == 0)
+            {
+                plan.Messages.Add("No street fits here. Draw a larger area, or lower the block depth.");
+                return Finish(plan, clock);
+            }
+
+            var lots = LotLayout.Plan(plan, owners, survey, request, plan.Messages, cancellation);
+            plan.Ground = GroundField.Build(request, plan, lots, cancellation);
+            int lostToBanks = 0;
+            foreach (var lot in lots)
+            {
+                lot.LevelCells = request.LevelLots ? StepPlanner.LevelCells(lot.Pad, plan.Ground.HeightAt, 0.3f) : AllCells(lot.Pad);
+                if (lot.LevelCells.Count == 0) { lostToBanks++; continue; }
+                plan.Lots.Add(lot);
+                plan.ZonedCells += lot.LevelCells.Count;
+            }
+            if (lostToBanks > 0)
+                plan.Messages.Add(lostToBanks + (lostToBanks == 1 ? " lot was" : " lots were") + " left out: the banks between levels needed the room.");
+            plan.Trees = Landscaping.Trees(plan, plan.Lots, survey, request);
+            plan.Walls = Landscaping.Walls(plan, plan.Lots, request);
+            return Finish(plan, clock, request);
+        }
+
+        private static List<Street> Lane(SiteSurvey survey, NeighbourhoodRequest request, float radius, CancellationToken cancellation)
+        {
+            var lane = MountainLane.Trace(survey, request, radius, cancellation);
+            return lane == null ? new List<Street>() : new List<Street> { lane };
+        }
+
+        private static List<Street> Contours(SiteSurvey survey, NeighbourhoodRequest request, float radius, CancellationToken cancellation)
+        {
+            float entry = EntryHeight(survey, request);
+            float seedPhase = Geometry.Hash01(request.Seed, 0, 0);
+            List<Street> best = null;
+            float bestScore = float.MinValue;
+            // A few phases of the level grid: the one that gives the longest, least broken streets wins. The seed shifts the
+            // grid, so Reroll gives another layout.
+            for (int phase = 0; phase < 4; phase++)
+            {
+                var options = new ContourStreets.Options
+                {
+                    BlockDepth = request.BlockDepth,
+                    MinimumRadius = radius,
+                    Straighten = request.Style == NeighbourhoodStyle.TerracedBlocks,
+                    Level = request.Style == NeighbourhoodStyle.TerracedBlocks,
+                    Phase = (seedPhase + phase * 0.25f) % 1f,
+                    EntryHeight = entry,
+                };
+                var streets = ContourStreets.Plan(survey, options, cancellation);
+                float score = 0f;
+                foreach (var street in streets) score += street.Length - 60f;
+                if (score > bestScore + 1e-3f) { bestScore = score; best = streets; }
+            }
+            var result = best ?? new List<Street>();
+            var links = new RoadLinks(survey, request, result, LinkRadius(request.Style));
+            links.LinkNeighbours(cancellation);
+            if (request.Style == NeighbourhoodStyle.ContourSuburb) links.JoinEnds(request.BlockDepth * 0.8f, cancellation);
+            // Connect the largest piece of network first, then any other piece big enough to be a neighbourhood of its own.
+            var components = RoadNetwork.Components(result, out var lengths);
+            var order = new List<int>();
+            for (int id = 0; id < lengths.Count; id++) if (id == 0 || lengths[id] >= 300f) order.Add(id);
+            order.Sort((x, y) => lengths[y].CompareTo(lengths[x]));
+            foreach (int id in order)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                links.Connect(street => street < components.Length && components[street] == id, cancellation);
+            }
+            return result;
+        }
+
+        /// <summary>The smoothed height inside the area nearest an existing road: the street through it gets a short connection.</summary>
+        private static float EntryHeight(SiteSurvey survey, NeighbourhoodRequest request)
+        {
+            float best = float.MaxValue, height = float.NaN;
+            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
+                foreach (var point in road?.Points ?? new float3[0])
+                {
+                    float distance = Poly.Contains(survey.Boundary, point.xz) ? 0f : Poly.DistanceToBoundary(survey.Boundary, point.xz);
+                    if (distance >= best) continue;
+                    best = distance;
+                    // A point a little inside the area, towards its middle.
+                    float2 centre = (survey.BoundaryMinimum + survey.BoundaryMaximum) * 0.5f;
+                    float2 inward = point.xz + math.normalizesafe(centre - point.xz) * (distance + request.BlockDepth * 0.5f);
+                    height = survey.SmoothAt(inward);
+                }
+            if (math.isfinite(height)) return height;
+            var heights = new List<float>();
+            for (int index = 0; index < survey.Count; index++) if (survey.Inside[index]) heights.Add(survey.Smooth[index]);
+            heights.Sort();
+            return heights.Count == 0 ? 0f : heights[heights.Count / 2];
+        }
+
+        private static List<int2> AllCells(Pad pad)
+        {
+            var cells = new List<int2>();
+            for (int column = 0; column < pad.WidthCells; column++)
+                for (int row = 0; row < pad.DepthCells; row++) cells.Add(new int2(column, row));
+            return cells;
+        }
+
+        private static void Validate(NeighbourhoodRequest request)
+        {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            if (request.Boundary == null || request.Boundary.Length < 3) throw new ArgumentException("The area needs at least three corners.", nameof(request));
+            if (request.GroundHeight == null) throw new ArgumentException("The request needs a ground height sampler.", nameof(request));
+            request.RoadHalfWidth = math.clamp(Finite(request.RoadHalfWidth, 6f), 2f, 20f);
+            request.BlockDepth = math.clamp(Finite(request.BlockDepth, 90f), 50f, 250f);
+            request.MaxRoadGrade = math.clamp(Finite(request.MaxRoadGrade, 0.08f), 0.03f, 0.12f);
+            request.SteepestBuildable = math.clamp(Finite(request.SteepestBuildable, 0.15f), 0.05f, 0.4f);
+            request.LinkSpacing = math.clamp(Finite(request.LinkSpacing, 300f), 80f, 600f);
+            request.LotWidthCells = math.clamp(request.LotWidthCells, StepPlanner.MinimumWidthCells, StepPlanner.MaximumRows);
+            request.LotDepthCells = math.clamp(request.LotDepthCells, StepPlanner.MinimumRows, StepPlanner.MaximumRows);
+            request.NarrowestWidthCells = math.clamp(request.NarrowestWidthCells, StepPlanner.MinimumWidthCells, request.LotWidthCells);
+            request.EarthworkLimit = math.clamp(Finite(request.EarthworkLimit, 4f), 0.5f, 12f);
+            request.BankGrade = math.clamp(Finite(request.BankGrade, 0.4f), 0.15f, 0.5f);
+            request.HighestStep = math.clamp(Finite(request.HighestStep, 3.2f), 0.5f, 6f);
+            request.LotSpacingCells = math.clamp(request.LotSpacingCells, -1, 3);
+            request.TreeDensity = math.clamp(Finite(request.TreeDensity, 0.5f), 0.1f, 1f);
+        }
+
+        private static float Finite(float value, float fallback) => math.isfinite(value) ? value : fallback;
+
+        private static NeighbourhoodPlan Finish(NeighbourhoodPlan plan, Stopwatch clock, NeighbourhoodRequest request = null)
+        {
+            foreach (var road in plan.Roads)
+            {
+                plan.RoadLength += road.Length;
+                plan.SteepestRoadGrade = math.max(plan.SteepestRoadGrade, road.SteepestGrade);
+            }
+            if (plan.Ground != null) plan.Ground.Measure(out plan.CutVolume, out plan.FillVolume, out plan.MostEarthwork);
+            if (request != null)
+            {
+                var counts = new Dictionary<string, int>();
+                foreach (var lot in plan.Lots) counts[lot.Zone] = (counts.TryGetValue(lot.Zone, out int count) ? count : 0) + 1;
+                foreach (var share in request.Mix ?? new ZoneShare[0])
+                    if (share != null && counts.TryGetValue(share.Zone ?? "", out int count) && !plan.ZoneCounts.Exists(entry => entry.Key == share.Zone))
+                        plan.ZoneCounts.Add(new KeyValuePair<string, int>(share.Zone, count));
+                if (!plan.Connected && plan.Roads.Count > 0)
+                    plan.Messages.Insert(0, "Not connected: no existing road within reach. The new streets are built on their own.");
+                if (plan.WildShare >= 0.05f)
+                    plan.Messages.Add(string.Format(CultureInfo.InvariantCulture, "{0:0}% of the area is too steep to build and is left as forest.", plan.WildShare * 100f));
+            }
+            if (plan.Roads.Count > 0)
+            {
+                plan.SummaryLine = string.Format(CultureInfo.InvariantCulture,
+                    "{0:0.0} km of road, {1} lots ({2} cells zoned), {3:N0} m³ of earth moved, steepest road {4:0.#}%",
+                    plan.RoadLength / 1000f, plan.Lots.Count, plan.ZonedCells, plan.CutVolume + plan.FillVolume, plan.SteepestRoadGrade * 100f);
+            }
+            plan.Milliseconds = clock.Elapsed.TotalMilliseconds;
+            return plan;
+        }
+    }
+}

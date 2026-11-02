@@ -7,6 +7,10 @@
     <RootNamespace>SteppedStreets.Core</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <!-- The generator's survey and street stages are internal; the off-game tests check them directly. -->
+    <InternalsVisibleTo Include="SteppedStreets.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="Unity.Mathematics">
       <HintPath>$(ManagedPath)\Unity.Mathematics.dll</HintPath>
       <Private>false</Private>
