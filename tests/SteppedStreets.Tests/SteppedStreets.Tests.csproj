@@ -9,6 +9,8 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\src\SteppedStreets\Tool\SiteGeometry.cs" Link="Tool\SiteGeometry.cs" />
+    <Compile Include="..\..\src\SteppedStreets\Tool\RightClickGesture.cs" Link="Tool\RightClickGesture.cs" />
     <ProjectReference Include="..\..\src\SteppedStreets.Core\SteppedStreets.Core.csproj" />
     <Reference Include="Unity.Mathematics">
       <HintPath>$(ManagedPath)\Unity.Mathematics.dll</HintPath>

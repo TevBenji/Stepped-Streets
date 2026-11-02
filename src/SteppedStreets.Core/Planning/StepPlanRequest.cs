@@ -1,4 +1,5 @@
 // Stepped Streets, the stepped-lot planner. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+using System;
 using System.Collections.Generic;
 using Unity.Mathematics;
 
@@ -37,6 +38,13 @@ namespace SteppedStreets.Core.Planning
 
         /// <summary>The tallest step, in metres, allowed between two neighbouring pads.</summary>
         public float HighestStep { get; set; }
+
+        // WAVE 4 STUB: the lead takes W1's version of this file at merge.
+        public float BankGrade { get; set; } = 0.4f;
+        public StepLook Look { get; set; } = StepLook.PlantedBank;
+        public float EarthworkLimit { get; set; } = 4f;
+        public Func<float2, float> GroundHeight { get; set; }
+        public Func<float2, bool> Blocked { get; set; }
 
         /// <summary>How far, in metres, the ground as built may sit off a pad's height and still count as level (R8).</summary>
         public float LevelTolerance { get; set; } = 0.3f;

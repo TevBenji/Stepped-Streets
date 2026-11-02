@@ -5,7 +5,7 @@ using Game;
 using Game.Modding;
 using Game.SceneFlow;
 using SteppedStreets.Settings;
-using SteppedStreets.Spike;
+using SteppedStreets.Tool;
 
 namespace SteppedStreets
 {
@@ -49,12 +49,18 @@ namespace SteppedStreets
 
             try
             {
-                updateSystem.UpdateAt<StepSelectedStreetSystem>(SystemUpdatePhase.ToolUpdate);
+                updateSystem.UpdateAt<StepStreetToolSystem>(SystemUpdatePhase.ToolUpdate);
             }
             catch (Exception exception)
             {
-                Logger.Error(exception, "Stepped Streets: the spike trigger failed to register");
+                Logger.Error(exception, "Stepped Streets: the street picker failed to register");
             }
+
+            try { updateSystem.UpdateAt<StepStreetHotkeySystem>(SystemUpdatePhase.ToolUpdate); }
+            catch (Exception exception) { Logger.Error(exception, "Stepped Streets: the street picker hotkey failed to register"); }
+
+            try { updateSystem.UpdateAt<StepPreviewSystem>(SystemUpdatePhase.Rendering); }
+            catch (Exception exception) { Logger.Error(exception, "Stepped Streets: the street preview failed to register"); }
         }
 
         public void OnDispose()

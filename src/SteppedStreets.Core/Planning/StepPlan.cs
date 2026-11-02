@@ -24,6 +24,11 @@ namespace SteppedStreets.Core.Planning
 
         public StepPlanSummary Summary { get; internal set; }
 
+        // WAVE 4 STUB: the lead takes W1's version of this file at merge.
+        public string SummaryLine => System.FormattableString.Invariant(
+            $"{Summary.LotCount} lots, steps {Summary.LowestStep:0.0}-{Summary.TallestStep:0.0} m, {Summary.EmptyCount} lots left empty");
+        public IReadOnlyList<string> Messages => Message == null ? new string[0] : new[] { Message };
+
         /// <summary>PRD 5.5's "flatter than" message when the whole street is too gentle to step; otherwise null.</summary>
         public string Message { get; internal set; }
     }
@@ -86,6 +91,10 @@ namespace SteppedStreets.Core.Planning
 
         /// <summary>The end of the street, shorter than the narrowest lot.</summary>
         LeftOver,
+
+        // WAVE 4 STUB: the lead takes W1's version of this file at merge.
+        TooMuchEarthwork,
+        Blocked,
     }
 
     /// <summary>Land beside the street that gets no pad, and why.</summary>

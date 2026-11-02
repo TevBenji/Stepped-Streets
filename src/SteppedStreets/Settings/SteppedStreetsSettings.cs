@@ -9,7 +9,7 @@ using SteppedStreets.Core.Planning;
 
 namespace SteppedStreets.Settings
 {
-    /// <summary>The spike's settings, under Stepped Streets in the game's Options. Property names are save format: never rename them.</summary>
+    /// <summary>Options for the tool. Property names are save format: never rename them.</summary>
     [FileLocation("ModsSettings/SteppedStreets/SteppedStreets")]
     [SettingsUIKeyboardAction(StepStreetAction, ActionType.Button)]
     public sealed class SteppedStreetsSettings : ModSetting
@@ -57,6 +57,14 @@ namespace SteppedStreets.Settings
         [SettingsUISection(Section, Group)]
         public string ZoneName { get; set; }
 
+        [SettingsUISection(Section, Group)]
+        public StepLook Look { get; set; }
+
+        [SettingsUISlider(min = 1f, max = 8f, step = 0.5f, scalarMultiplier = 1)]
+        [SettingsUICustomFormat(fractionDigits = 1)]
+        [SettingsUISection(Section, Group)]
+        public float EarthworkLimit { get; set; }
+
         [SettingsUIKeyboardBinding(BindingKeyboard.S, StepStreetAction, ctrl: true, shift: true)]
         [SettingsUISection(Section, Group)]
         public ProxyBinding StepStreetBinding { get; set; }
@@ -74,6 +82,8 @@ namespace SteppedStreets.Settings
             // Placemaker's sloped car parks settled on 0.4 after curtains at 0.46.
             BankGrade = 0.4f;
             ZoneName = "Residential Low";
+            Look = StepLook.PlantedBank;
+            EarthworkLimit = 4f;
         }
 
         /// <summary>
@@ -86,8 +96,11 @@ namespace SteppedStreets.Settings
             {
                 [GetSettingsLocaleID()] = "Stepped Streets",
                 [GetOptionTabLocaleID(Section)] = "Stepped Streets",
+                [GetOptionGroupLocaleID(Group)] = "Settings",
                 [GetBindingMapLocaleID()] = "Stepped Streets",
-                [GetBindingKeyLocaleID(StepStreetAction)] = "Step the selected street",
+                [GetBindingKeyLocaleID(StepStreetAction)] = "Open Stepped Streets",
+                [GetEnumValueLocaleID(StepLook.PlantedBank)] = "Planted bank",
+                [GetEnumValueLocaleID(StepLook.LowWall)] = "Low wall",
                 [GetEnumValueLocaleID(StreetSide.Both)] = "Both",
                 [GetEnumValueLocaleID(StreetSide.Left)] = "Left",
                 [GetEnumValueLocaleID(StreetSide.Right)] = "Right",
@@ -103,10 +116,12 @@ namespace SteppedStreets.Settings
             Label(nameof(NarrowestWidthCells), "Narrowest width (cells)", "How far a pad may narrow to keep its step under the highest step.");
             Label(nameof(DepthCells), "Depth (cells)", "Cells back from the road.");
             Label(nameof(MinimumGradePercent), "Minimum grade", "Stretches flatter than this are left alone.");
-            Label(nameof(HighestStep), "Highest step (m)", "The tallest step allowed between two neighbouring pads. Capped so the narrowest pad keeps two zoned columns beside its bank.");
+            Label(nameof(HighestStep), "Highest step (m)", "The tallest step allowed between two neighbouring pads. Each pad keeps two zoned columns beside its bank.");
             Label(nameof(BankGrade), "Bank grade", "Rise over run of the bank between two pads, which takes whole 8 m columns from the lower pad; Placemaker saw curtains at 0.46.");
             Label(nameof(ZoneName), "Zone", "The zone to paint on level cells, by name (for example Residential Low).");
-            Label(nameof(StepStreetBinding), "Step the selected street", "Steps the street selected with the game's select tool.");
+            Label(nameof(Look), "Step look", "A planted bank, or a planted bank with the game's low garden wall at its foot.");
+            Label(nameof(EarthworkLimit), "Earthwork limit (m)", "A lot that needs more cut or fill than this is left empty.");
+            Label(nameof(StepStreetBinding), "Open Stepped Streets", "Opens or closes the Stepped Streets street picker.");
             return new MemorySource(labels);
         }
     }
