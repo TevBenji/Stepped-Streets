@@ -157,7 +157,7 @@ namespace SteppedStreets.Tests.Planning
         }
 
         // A straight street climbing at the given grade along a diagonal, so nothing depends on the axes.
-        private static StepPlanRequest Straight(float grade, int lotWidth = 2, int narrowest = 2, float highestStep = 10f)
+        internal static StepPlanRequest Straight(float grade, int lotWidth = 2, int narrowest = 2, float highestStep = 10f)
         {
             const float length = 200f;
             return new StepPlanRequest

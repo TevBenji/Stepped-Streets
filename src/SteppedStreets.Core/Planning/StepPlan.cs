@@ -72,6 +72,11 @@ namespace SteppedStreets.Core.Planning
 
         /// <summary>The back end of the shared edge; y is the earlier pad's height.</summary>
         public float3 EdgeBack { get; internal set; }
+
+        /// <summary>The pad before the step, nearer the downhill end.</summary>
+        public Pad Earlier { get; internal set; }
+
+        public Pad Later { get; internal set; }
     }
 
     public enum EmptyLotReason
