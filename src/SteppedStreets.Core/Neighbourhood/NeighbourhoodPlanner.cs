@@ -23,12 +23,25 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>Links and connections bend across the slope in every style, so they keep the small road's radius.</summary>
         public static float LinkRadius(NeighbourhoodStyle style) => style == NeighbourhoodStyle.MountainLane ? 25f : 30f;
 
-        public static NeighbourhoodPlan Plan(NeighbourhoodRequest request, CancellationToken cancellation = default)
+        /// <param name="roadsReady">Called on the planning thread with a copy holding only the roads, as soon as they are settled,
+        /// so the preview can show them while the lots and the ground are still being planned.</param>
+        public static NeighbourhoodPlan Plan(NeighbourhoodRequest request, CancellationToken cancellation = default,
+            Action<NeighbourhoodPlan> roadsReady = null)
         {
             var clock = Stopwatch.StartNew();
             Validate(request);
             var plan = new NeighbourhoodPlan();
+            var stages = new System.Text.StringBuilder();
+            double mark = 0;
+            void Stage(string name)
+            {
+                double now = clock.Elapsed.TotalMilliseconds;
+                stages.Append(name).Append(' ').Append((now - mark).ToString("0", CultureInfo.InvariantCulture)).Append(" ms, ");
+                mark = now;
+                plan.Timings = stages.ToString().TrimEnd(',', ' ');
+            }
             var survey = new SiteSurvey(request);
+            Stage("survey");
             plan.AreaSquareMetres = survey.AreaSquareMetres;
             plan.WildShare = survey.WildShare;
             if (survey.InsideCount == 0)
@@ -52,8 +65,9 @@ namespace SteppedStreets.Core.Neighbourhood
             float radius = MinimumRadius(request.Style);
             var streets = request.Style == NeighbourhoodStyle.MountainLane
                 ? Lane(survey, request, radius, cancellation)
-                : Contours(survey, request, radius, cancellation);
+                : Contours(survey, request, radius, cancellation, Stage);
 
+            Stage("connection");
             var owners = new List<int>();
             var notes = new List<string>();
             bool connected = RoadNetwork.Prune(streets);
@@ -73,8 +87,24 @@ namespace SteppedStreets.Core.Neighbourhood
                 return Finish(plan, clock);
             }
 
+            Stage("network");
+            if (roadsReady != null)
+            {
+                var roads = new NeighbourhoodPlan
+                {
+                    Nodes = new List<PlannedNode>(plan.Nodes),
+                    Roads = new List<PlannedRoad>(plan.Roads),
+                    Connected = plan.Connected,
+                    AreaSquareMetres = plan.AreaSquareMetres,
+                    WildShare = plan.WildShare,
+                };
+                foreach (var road in roads.Roads) roads.RoadLength += road.Length;
+                roadsReady(roads);
+            }
             var lots = LotLayout.Plan(plan, owners, survey, request, plan.Messages, cancellation);
+            Stage("lots");
             plan.Ground = GroundField.Build(request, plan, lots, cancellation);
+            Stage("ground");
             int lostToBanks = 0;
             foreach (var lot in lots)
             {
@@ -85,8 +115,10 @@ namespace SteppedStreets.Core.Neighbourhood
             }
             if (lostToBanks > 0)
                 plan.Messages.Add(lostToBanks + (lostToBanks == 1 ? " lot was" : " lots were") + " left out: the banks between levels needed the room.");
-            plan.Trees = Landscaping.Trees(plan, plan.Lots, survey, request);
+            Stage("level cells");
+            plan.Trees = Landscaping.Trees(plan, plan.Lots, survey, request, cancellation);
             plan.Walls = Landscaping.Walls(plan, plan.Lots, request);
+            Stage("landscape");
             return Finish(plan, clock, request);
         }
 
@@ -96,34 +128,45 @@ namespace SteppedStreets.Core.Neighbourhood
             return lane == null ? new List<Street>() : new List<Street> { lane };
         }
 
-        private static List<Street> Contours(SiteSurvey survey, NeighbourhoodRequest request, float radius, CancellationToken cancellation)
+        private static List<Street> Contours(SiteSurvey survey, NeighbourhoodRequest request, float radius, CancellationToken cancellation,
+            Action<string> stage)
         {
             float entry = EntryHeight(survey, request);
             float seedPhase = Geometry.Hash01(request.Seed, 0, 0);
-            List<Street> best = null;
-            float bestScore = float.MinValue;
-            // A few phases of the level grid: the one that gives the longest, least broken streets wins. The seed shifts the
+            // A few phases of the level grid, compared on their regular levels (in parallel: they share only the read-only
+            // survey): the one with the longest, least broken streets wins and gets its in-between levels. The seed shifts the
             // grid, so Reroll gives another layout.
-            for (int phase = 0; phase < 4; phase++)
+            var phases = new ContourStreets.Layout[4];
+            try
             {
-                var options = new ContourStreets.Options
+                System.Threading.Tasks.Parallel.For(0, phases.Length, new System.Threading.Tasks.ParallelOptions { CancellationToken = cancellation }, phase =>
                 {
-                    BlockDepth = request.BlockDepth,
-                    MinimumRadius = radius,
-                    Straighten = request.Style == NeighbourhoodStyle.TerracedBlocks,
-                    Level = request.Style == NeighbourhoodStyle.TerracedBlocks,
-                    Phase = (seedPhase + phase * 0.25f) % 1f,
-                    EntryHeight = entry,
-                };
-                var streets = ContourStreets.Plan(survey, options, cancellation);
-                float score = 0f;
-                foreach (var street in streets) score += street.Length - 60f;
-                if (score > bestScore + 1e-3f) { bestScore = score; best = streets; }
+                    phases[phase] = ContourStreets.Regular(survey, new ContourStreets.Options
+                    {
+                        BlockDepth = request.BlockDepth,
+                        MinimumRadius = radius,
+                        Straighten = request.Style == NeighbourhoodStyle.TerracedBlocks,
+                        Level = request.Style == NeighbourhoodStyle.TerracedBlocks,
+                        Phase = (seedPhase + phase * 0.25f) % 1f,
+                        EntryHeight = entry,
+                    }, cancellation);
+                });
             }
-            var result = best ?? new List<Street>();
+            catch (AggregateException exception) when (exception.InnerException is OperationCanceledException)
+            {
+                throw exception.InnerException;
+            }
+            ContourStreets.Layout best = null;
+            foreach (var phase in phases)
+                if (best == null || phase.Score > best.Score + 1e-3f) best = phase;
+            ContourStreets.Infill(survey, best, cancellation);
+            var result = best.Streets;
+            stage("contours");
             var links = new RoadLinks(survey, request, result, LinkRadius(request.Style));
             links.LinkNeighbours(cancellation);
+            stage("links");
             if (request.Style == NeighbourhoodStyle.ContourSuburb) links.JoinEnds(request.BlockDepth * 0.8f, cancellation);
+            stage("joins");
             // Connect the largest piece of network first, then any other piece big enough to be a neighbourhood of its own.
             var components = RoadNetwork.Components(result, out var lengths);
             var order = new List<int>();

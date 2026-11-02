@@ -47,7 +47,12 @@ namespace SteppedStreets.Core.Neighbourhood
             Heights = heights;
         }
 
-        public float Length => Geometry.Length(Points) + (Closed ? math.distance(Points[Points.Count - 1], Points[0]) : 0f);
+        private float[] stations;
+
+        /// <summary>Distance along the street at each point, worked out once: a street's points never change after it is made.</summary>
+        public float[] Stations => stations ?? (stations = Geometry.Stations(Points));
+
+        public float Length => Stations[Stations.Length - 1] + (Closed ? math.distance(Points[Points.Count - 1], Points[0]) : 0f);
 
         public float3 Point3(int index) => new float3(Points[index].x, Heights[index], Points[index].y);
 
@@ -62,8 +67,7 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>Distance along the street between two points (the shorter way round on a ring).</summary>
         public float Between(int first, int second)
         {
-            var stations = Geometry.Stations(Points);
-            float along = math.abs(stations[second] - stations[first]);
+            float along = math.abs(Stations[second] - Stations[first]);
             return Closed ? math.min(along, Length - along) : along;
         }
     }

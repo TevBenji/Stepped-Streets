@@ -48,8 +48,7 @@ namespace SteppedStreets.Tests.Neighbourhood
                 var request = site.Request(adjust);
                 var plan = NeighbourhoodPlanner.Plan(request);
                 Gallery.Render(request, plan, Path.Combine(Folder(), name + ".png"));
-                output.WriteLine($"{name}: {plan.Milliseconds:0} ms, {plan.Roads.Count} roads, {plan.SummaryLine}; connected {plan.Connected}; "
-                    + string.Join(" | ", plan.Messages));
+                output.WriteLine($"{name}: {plan.Milliseconds:0} ms ({plan.Timings}), {plan.Roads.Count} roads, {plan.Lots.Count} lots, {plan.Trees.Count} trees");
             }
         }
     }

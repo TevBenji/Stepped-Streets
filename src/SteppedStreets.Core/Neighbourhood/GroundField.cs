@@ -188,23 +188,33 @@ namespace SteppedStreets.Core.Neighbourhood
                 foreach (var lot in lots)
                     field.ForPad(lot.Pad, PadMargin, index => built[index] = true);
             var reach = Geometry.Chamfer(built, field.Columns, field.Rows, field.Cell);
-            var existing = new List<(float2 Start, float2 End, float Clearance)>();
+            // Existing road corridors, stamped segment by segment (a node-by-segment test was the slowest part of the plan).
+            var nearExisting = new bool[count];
             foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
                 for (int point = 1; point < (road?.Points?.Length ?? 0); point++)
-                    existing.Add((road.Points[point - 1].xz, road.Points[point].xz, road.HalfWidth + 0.5f));
+                {
+                    float2 start = road.Points[point - 1].xz, end = road.Points[point].xz;
+                    float clearance = road.HalfWidth + 0.5f;
+                    field.ForBox(math.min(start, end) - clearance, math.max(start, end) + clearance, index =>
+                    {
+                        if (!nearExisting[index] && Geometry.DistanceToSegment(field.Position(index), start, end) < clearance) nearExisting[index] = true;
+                    });
+                }
 
             for (int index = 0; index < count; index++)
             {
-                cancellation.ThrowIfCancellationRequested();
-                float2 position = field.Position(index);
-                bool locked = reach[index] > bankReach || (request.Blocked != null && request.Blocked(position));
-                if (!locked && reach[index] <= bankReach)
-                    foreach (var (start, end, clearance) in existing)
-                        if (Geometry.DistanceToSegment(position, start, end) < clearance) { locked = true; break; }
+                if ((index & 4095) == 0) cancellation.ThrowIfCancellationRequested();
+                if (reach[index] > bankReach)
+                {
+                    // Too far from anything built to change, even under a new road's corridor end.
+                    if (roadDistance[index] <= corridor) field.Hold(index, Road, roadHeight[index]);
+                    else field.Hold(index, Locked, field.Original[index]);
+                    continue;
+                }
                 // An existing road's own corridor keeps its ground even under a new road's end: the game joins the two there.
-                if (locked && !(reach[index] > bankReach)) field.Hold(index, Locked, field.Original[index]);
+                bool locked = nearExisting[index] || (request.Blocked != null && request.Blocked(field.Position(index)));
+                if (locked) field.Hold(index, Locked, field.Original[index]);
                 else if (roadDistance[index] <= corridor) field.Hold(index, Road, roadHeight[index]);
-                else if (locked) field.Hold(index, Locked, field.Original[index]);
                 else { field.upper[index] = float.MaxValue; field.lower[index] = float.MinValue; }
             }
             field.ReleaseClashingShoulders(roadDistance, halfWidth);
@@ -213,6 +223,7 @@ namespace SteppedStreets.Core.Neighbourhood
             if (request.LevelLots)
             {
                 var queue = new List<int>();
+                var heap = new MinHeap();
                 foreach (var lot in lots)
                 {
                     cancellation.ThrowIfCancellationRequested();
@@ -226,7 +237,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         field.Hold(index, Held, height);
                         queue.Add(index);
                     });
-                    field.Grow(queue);
+                    field.Grow(queue, heap);
                 }
             }
 
@@ -264,10 +275,15 @@ namespace SteppedStreets.Core.Neighbourhood
                 {
                     if (state[index] != Road || roadDistance[index] <= halfWidth) continue;
                     bool clash = false;
-                    ForNeighbours(index, (other, step) =>
+                    int column = index % Columns, row = index / Columns;
+                    for (int neighbour = 0; neighbour < 8 && !clash; neighbour++)
                     {
+                        int x = column + OffsetX[neighbour], y = row + OffsetY[neighbour];
+                        if (x < 0 || y < 0 || x >= Columns || y >= Rows) continue;
+                        int other = y * Columns + x;
+                        float step = neighbour < 4 ? straightStep : diagonalStep;
                         if (state[other] != Free && math.abs(Height[other] - Height[index]) > step + 0.01f) clash = true;
-                    });
+                    }
                     if (!clash) continue;
                     state[index] = Free;
                     upper[index] = float.MaxValue;
@@ -278,18 +294,34 @@ namespace SteppedStreets.Core.Neighbourhood
             }
         }
 
+        // The 8 neighbours: the 4 straight ones first, then the diagonals.
+        private static readonly int[] OffsetX = { 1, -1, 0, 0, 1, -1, 1, -1 };
+        private static readonly int[] OffsetY = { 0, 0, 1, -1, 1, 1, -1, -1 };
+
         /// <summary>Grows every cone from the held nodes until nothing changes (raster sweeps both ways).</summary>
         private void Sweep(CancellationToken cancellation)
         {
+            // Only the box holding free nodes can change.
+            int firstColumn = Columns, lastColumn = -1, firstRow = Rows, lastRow = -1;
+            for (int index = 0; index < Count; index++)
+            {
+                if (state[index] != Free) continue;
+                int column = index % Columns, row = index / Columns;
+                if (column < firstColumn) firstColumn = column;
+                if (column > lastColumn) lastColumn = column;
+                if (row < firstRow) firstRow = row;
+                if (row > lastRow) lastRow = row;
+            }
+            if (lastColumn < 0) return;
             for (int iteration = 0; iteration < 16; iteration++)
             {
                 cancellation.ThrowIfCancellationRequested();
                 bool changed = false;
-                for (int row = 0; row < Rows; row++)
-                    for (int column = 0; column < Columns; column++)
+                for (int row = firstRow; row <= lastRow; row++)
+                    for (int column = firstColumn; column <= lastColumn; column++)
                         changed |= Relax(row * Columns + column, column, row, -1);
-                for (int row = Rows - 1; row >= 0; row--)
-                    for (int column = Columns - 1; column >= 0; column--)
+                for (int row = lastRow; row >= firstRow; row--)
+                    for (int column = lastColumn; column >= firstColumn; column--)
                         changed |= Relax(row * Columns + column, column, row, 1);
                 if (!changed) break;
             }
@@ -300,40 +332,44 @@ namespace SteppedStreets.Core.Neighbourhood
         {
             if (state[index] != Free) return false;
             float high = upper[index], low = lower[index];
-            void From(int dx, int dy, float step)
-            {
-                int x = column + dx, y = row + dy;
-                if (x < 0 || y < 0 || x >= Columns || y >= Rows) return;
-                int other = y * Columns + x;
-                if (upper[other] < float.MaxValue) high = math.min(high, upper[other] + step);
-                if (lower[other] > float.MinValue) low = math.max(low, lower[other] - step);
-            }
-            From(direction, 0, straightStep);
-            From(0, direction, straightStep);
-            From(direction, direction, diagonalStep);
-            From(-direction, direction, diagonalStep);
+            int x = column + direction, y = row + direction, back = column - direction;
+            bool insideX = x >= 0 && x < Columns, insideY = y >= 0 && y < Rows, insideBack = back >= 0 && back < Columns;
+            if (insideX) Pull(row * Columns + x, straightStep, ref high, ref low);
+            if (insideY) Pull(y * Columns + column, straightStep, ref high, ref low);
+            if (insideX && insideY) Pull(y * Columns + x, diagonalStep, ref high, ref low);
+            if (insideBack && insideY) Pull(y * Columns + back, diagonalStep, ref high, ref low);
             bool changed = false;
             if (high < upper[index] && high <= Original[index] + cap) { upper[index] = high; changed = true; }
             if (low > lower[index] && low >= Original[index] - cap) { lower[index] = low; changed = true; }
             return changed;
         }
 
+        private void Pull(int other, float step, ref float high, ref float low)
+        {
+            float otherUpper = upper[other], otherLower = lower[other];
+            if (otherUpper < float.MaxValue && otherUpper + step < high) high = otherUpper + step;
+            if (otherLower > float.MinValue && otherLower - step > low) low = otherLower - step;
+        }
+
         /// <summary>Grows the cones of newly held nodes outwards, shortest paths first (one heap per bound).</summary>
-        private void Grow(List<int> seeds)
+        private void Grow(List<int> seeds, MinHeap heap)
         {
             if (seeds.Count == 0) return;
-            var heap = new MinHeap();
             foreach (int seed in seeds) heap.Push(upper[seed], seed);
             while (heap.Count > 0)
             {
                 heap.Pop(out float value, out int index);
                 if (value > upper[index]) continue;
-                ForNeighbours(index, (other, step) =>
+                int column = index % Columns, row = index / Columns;
+                for (int neighbour = 0; neighbour < 8; neighbour++)
                 {
-                    if (state[other] != Free) return;
-                    float candidate = value + step;
+                    int x = column + OffsetX[neighbour], y = row + OffsetY[neighbour];
+                    if (x < 0 || y < 0 || x >= Columns || y >= Rows) continue;
+                    int other = y * Columns + x;
+                    if (state[other] != Free) continue;
+                    float candidate = value + (neighbour < 4 ? straightStep : diagonalStep);
                     if (candidate < upper[other] && candidate <= Original[other] + cap) { upper[other] = candidate; heap.Push(candidate, other); }
-                });
+                }
             }
             foreach (int seed in seeds) heap.Push(-lower[seed], seed);
             while (heap.Count > 0)
@@ -341,26 +377,17 @@ namespace SteppedStreets.Core.Neighbourhood
                 heap.Pop(out float negative, out int index);
                 float value = -negative;
                 if (value < lower[index]) continue;
-                ForNeighbours(index, (other, step) =>
+                int column = index % Columns, row = index / Columns;
+                for (int neighbour = 0; neighbour < 8; neighbour++)
                 {
-                    if (state[other] != Free) return;
-                    float candidate = value - step;
-                    if (candidate > lower[other] && candidate >= Original[other] - cap) { lower[other] = candidate; heap.Push(-candidate, other); }
-                });
-            }
-        }
-
-        private void ForNeighbours(int index, Action<int, float> visit)
-        {
-            int column = index % Columns, row = index / Columns;
-            for (int dy = -1; dy <= 1; dy++)
-                for (int dx = -1; dx <= 1; dx++)
-                {
-                    if (dx == 0 && dy == 0) continue;
-                    int x = column + dx, y = row + dy;
+                    int x = column + OffsetX[neighbour], y = row + OffsetY[neighbour];
                     if (x < 0 || y < 0 || x >= Columns || y >= Rows) continue;
-                    visit(y * Columns + x, dx != 0 && dy != 0 ? diagonalStep : straightStep);
+                    int other = y * Columns + x;
+                    if (state[other] != Free) continue;
+                    float candidate = value - (neighbour < 4 ? straightStep : diagonalStep);
+                    if (candidate > lower[other] && candidate >= Original[other] - cap) { lower[other] = candidate; heap.Push(-candidate, other); }
                 }
+            }
         }
 
         private void ForBox(float2 minimum, float2 maximum, Action<int> visit)

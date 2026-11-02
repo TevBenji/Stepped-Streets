@@ -58,7 +58,8 @@ namespace SteppedStreets.Core.Neighbourhood
             foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
                 foreach (var point in road?.Points ?? new float3[0])
                     nearestRoad = math.min(nearestRoad, Poly.Contains(Boundary, point.xz) ? 0f : Poly.DistanceToBoundary(Boundary, point.xz));
-            float margin = math.clamp(nearestRoad + 48f, MinimumMargin, MaximumMargin);
+            // No road in reach: only the banks need room past the area.
+            float margin = nearestRoad == float.MaxValue ? MinimumMargin : math.clamp(nearestRoad + 48f, MinimumMargin, MaximumMargin);
             float2 minimum = BoundaryMinimum - margin, maximum = BoundaryMaximum + margin;
             float cell = 4f;
             while ((math.ceil((maximum.x - minimum.x) / cell) + 1) * (math.ceil((maximum.y - minimum.y) / cell) + 1) > MaximumNodes)

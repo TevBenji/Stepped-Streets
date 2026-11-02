@@ -32,6 +32,7 @@ namespace SteppedStreets.Core.Neighbourhood
         private readonly float minimumRadius;
         private readonly float halfWidth;
         private readonly float[] roadDistance;
+        private CancellationToken cancellation;
 
         public RoadLinks(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, float minimumRadius)
         {
@@ -65,6 +66,7 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>Links each contour street to the next one up, about every link spacing along what they share.</summary>
         public void LinkNeighbours(CancellationToken cancellation)
         {
+            this.cancellation = cancellation;
             var buckets = PointBuckets();
             int contourCount = streets.Count;
             for (int lower = 0; lower < contourCount; lower++)
@@ -84,7 +86,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 foreach (var run in runs)
                 {
                     if (run.Upper < 0) continue;
-                    var stations = Geometry.Stations(street.Points);
+                    var stations = street.Stations;
                     float runLength = stations[run.Last] - stations[run.First];
                     int count = math.max(1, (int)math.round(runLength / request.LinkSpacing));
                     for (int link = 0; link < count; link++)
@@ -101,6 +103,8 @@ namespace SteppedStreets.Core.Neighbourhood
 
         private void TryLinkNear(int lower, int upper, float[] stations, float target, float runStart, float runEnd)
         {
+            // A plan the player has already replaced stops here rather than finishing its link search.
+            cancellation.ThrowIfCancellationRequested();
             var street = streets[lower];
             // Built upwards first; then downwards from the upper street, which suits a ramp onto a small, tightly curved ring.
             foreach (bool downwards in new[] { false, true })
@@ -138,6 +142,7 @@ namespace SteppedStreets.Core.Neighbourhood
             float needed = rise / (request.MaxRoadGrade * 0.9f) + 2f * RoadProfile.LandingLength;
             float lateral = math.sqrt(math.max(0f, needed * needed - direct * direct)) * 1.4f + 60f;
             int window = (int)(lateral / ContourStreets.Spacing);
+            float shortest = ShortestFor(rise);
             Candidate best = null;
             int bestOffset = 0;
             Candidate Try(int offset, (float Tilt, float Scale) shape)
@@ -147,6 +152,8 @@ namespace SteppedStreets.Core.Neighbourhood
                 else if (point < 0 || point >= b.Points.Count) return null;
                 if (!JunctionAllowed(b, point)) return null;
                 float2 q = b.Points[point];
+                // A curve this shape is at most about 1.7 times its chord: too short a chord can never climb the rise.
+                if (math.distance(p, q) * 1.7f < shortest) return null;
                 float2 arrive = Geometry.Left(b.Tangent(point));
                 if (math.dot(arrive, q - p) < 0f) arrive = -arrive;
                 var path = Curve(p, normal, a.Tangent(fromPoint), q, arrive, b.Tangent(point), shape.Tilt, shape.Scale);
@@ -157,7 +164,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 return candidate;
             }
             // Coarse over the window, then every shape around the best point.
-            for (int offset = -window; offset <= window; offset += 4)
+            for (int offset = -window; offset <= window; offset += 5)
                 foreach (var shape in CoarseShapes)
                 {
                     var candidate = Try(offset, shape);
@@ -173,7 +180,7 @@ namespace SteppedStreets.Core.Neighbourhood
             if (best == null) return null;
             if (best.Traced) return best;
             int centre = bestOffset;
-            for (int offset = centre - 3; offset <= centre + 3; offset++)
+            for (int offset = centre - 2; offset <= centre + 2; offset++)
                 foreach (var shape in FineShapes)
                 {
                     var candidate = Try(offset, shape);
@@ -467,6 +474,8 @@ namespace SteppedStreets.Core.Neighbourhood
             if (path.Count < 3) return null;
             float length = Geometry.Length(path);
             if (length < 16f) { Failures[0]++; return null; }
+            // Cheapest first: a road too short for its rise fails whatever its shape.
+            if (length < ShortestFor(math.abs(endHeight - startHeight))) { Failures[4]++; return null; }
             // T-junctions of 60° or more, measured as the validation measures them: the road's direction at the node.
             if (!SquareEnough(path, true, startAxis) || !SquareEnough(path, false, endAxis)) { Failures[7]++; return null; }
             if (Geometry.TightestRadius(path, 12f, out _) < minimumRadius * 0.98f) { Failures[1]++; return null; }
@@ -509,7 +518,7 @@ namespace SteppedStreets.Core.Neighbourhood
         {
             if (!street.Closed)
             {
-                var stations = Geometry.Stations(street.Points);
+                var stations = street.Stations;
                 float along = stations[point];
                 if (along < EndClearance || stations[stations.Length - 1] - along < EndClearance) return false;
             }
@@ -518,10 +527,34 @@ namespace SteppedStreets.Core.Neighbourhood
             return true;
         }
 
-        private static int NearestPoint(Street street, float2 position)
+        /// <summary>The shortest road that can climb a rise: its landings at the landing grade, the rest at the maximum.</summary>
+        private float ShortestFor(float rise)
         {
-            int nearest = 0;
+            float landings = 2f * RoadProfile.LandingLength;
+            float landingRise = landings * math.min(RoadProfile.LandingGrade, request.MaxRoadGrade);
+            return rise <= landingRise ? rise / math.max(0.001f, request.MaxRoadGrade) : landings + (rise - landingRise) / request.MaxRoadGrade;
+        }
+
+        // Each street's points in 16 m buckets, built once, for nearest-point queries while ramps are traced.
+        private readonly Dictionary<Street, SpatialBuckets<int>> pointBuckets = new Dictionary<Street, SpatialBuckets<int>>();
+
+        private int NearestPoint(Street street, float2 position)
+        {
+            if (!pointBuckets.TryGetValue(street, out var buckets))
+            {
+                buckets = new SpatialBuckets<int>(16f);
+                for (int index = 0; index < street.Points.Count; index++) buckets.Add(street.Points[index] - 24f, street.Points[index] + 24f, index);
+                pointBuckets[street] = buckets;
+            }
+            int nearest = -1;
             float best = float.MaxValue;
+            foreach (int index in buckets.Near(position))
+            {
+                float distance = math.distancesq(street.Points[index], position);
+                if (distance < best || (distance == best && index < nearest)) { best = distance; nearest = index; }
+            }
+            if (nearest >= 0) return nearest;
+            // Further than the buckets reach: a full scan, which is rare (only the first look from far away).
             for (int index = 0; index < street.Points.Count; index++)
             {
                 float distance = math.distancesq(street.Points[index], position);

@@ -87,19 +87,29 @@ namespace SteppedStreets.Tool
                 float height = TerrainUtils.SampleHeight(ref heights, new float3(point.x, 0f, point.y));
                 return new float3(point.x, math.isfinite(height) ? height : 0f, point.y);
             }
+            // Sized from the picking reach, which follows the camera: the outline stays a clear line when zoomed out.
+            float width = math.clamp(tool.Reach * 0.22f, 2f, 16f);
             int edges = tool.AreaClosed ? corners.Count : corners.Count - 1;
             for (int index = 0; index < edges; index++)
-                Line(buffer, Ground(corners[index]), Ground(corners[(index + 1) % corners.Count]), Outline, 1.6f);
+                Line(buffer, Ground(corners[index]), Ground(corners[(index + 1) % corners.Count]), Outline, width);
+            var snapped = tool.Snapped;
             if (!tool.AreaClosed && corners.Count > 0 && tool.Cursor.HasValue)
-                Line(buffer, Ground(corners[corners.Count - 1]), tool.Cursor.Value, new Color(Outline.r, Outline.g, Outline.b, 0.5f), 1f);
+            {
+                float3 end = snapped.HasValue ? Ground(snapped.Value) : tool.Cursor.Value;
+                Line(buffer, Ground(corners[corners.Count - 1]), end, new Color(Outline.r, Outline.g, Outline.b, 0.6f), width * 0.75f);
+            }
             // A light fill until the plan arrives, so the drawn area reads as one shape.
-            if (tool.AreaClosed && tool.Plan == null && corners.Count >= 3) FillArea(buffer, corners, Ground);
+            if (tool.AreaClosed && tool.Plan == null && tool.EarlyRoads == null && corners.Count >= 3) FillArea(buffer, corners, Ground);
             for (int index = 0; index < corners.Count; index++)
             {
                 bool hovered = index == tool.HoveredCorner;
                 bool closesArea = !tool.AreaClosed && index == 0 && corners.Count >= 3;
-                buffer.DrawCircle(hovered || closesArea ? HoverColour : CornerColour, Ground(corners[index]), hovered ? 7f : 5f);
+                buffer.DrawCircle(hovered || closesArea ? HoverColour : CornerColour, Ground(corners[index]), width * (hovered ? 5f : 3.5f));
             }
+            // A ring where the cursor has snapped: the first corner (closing), another corner or a road.
+            if (snapped.HasValue)
+                buffer.DrawCircle(HoverColour, new Color(1f, 1f, 1f, 0f), width * 0.6f, OverlayRenderSystem.StyleFlags.Projected,
+                    new float2(0f, 1f), Ground(snapped.Value), width * 7f);
         }
 
         private static void FillArea(OverlayRenderSystem.Buffer buffer, IReadOnlyList<float2> corners, Func<float2, float3> ground)
@@ -129,7 +139,7 @@ namespace SteppedStreets.Tool
             drawnPlanVersion = tool.PlanVersion;
             lines.Clear();
             dots.Clear();
-            var plan = tool.Plan;
+            var plan = tool.Plan ?? tool.EarlyRoads;
             var request = tool.PlannedRequest;
             if (plan == null || request == null) return;
 
@@ -162,7 +172,7 @@ namespace SteppedStreets.Tool
                 lines.Add(((corners[0] + corners[1]) * 0.5f, (corners[3] + corners[2]) * 0.5f, math.distance(corners[0].xz, corners[1].xz),
                     new Color(colour.r, colour.g, colour.b, 0.4f)));
                 for (int index = 0; index < 4; index++)
-                    lines.Add((corners[index], corners[(index + 1) % 4], 0.4f, new Color(colour.r * 0.6f, colour.g * 0.6f, colour.b * 0.6f, 0.9f)));
+                    lines.Add((corners[index], corners[(index + 1) % 4], 0.8f, new Color(colour.r * 0.6f, colour.g * 0.6f, colour.b * 0.6f, 0.9f)));
             }
 
             int stride = math.max(1, plan.Trees.Count / MostTrees);

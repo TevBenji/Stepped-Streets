@@ -185,7 +185,7 @@ namespace SteppedStreets.Core.Neighbourhood
     }
 
     /// <summary>A uniform grid of buckets over the plan, for "what is near this point" queries.</summary>
-    internal sealed class SpatialBuckets<T>
+    public sealed class SpatialBuckets<T>
     {
         private readonly float bucketSize;
         private readonly Dictionary<long, List<T>> buckets = new Dictionary<long, List<T>>();

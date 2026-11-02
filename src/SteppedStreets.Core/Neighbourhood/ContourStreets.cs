@@ -29,41 +29,78 @@ namespace SteppedStreets.Core.Neighbourhood
             public float EntryHeight;
         }
 
+        /// <summary>The streets of one phase of the level grid, and what the in-between levels need to carry on.</summary>
+        internal sealed class Layout
+        {
+            public readonly List<Street> Streets = new List<Street>();
+            public float[] Nearest;
+            public float Lowest, Highest, Interval;
+            public Options Options;
+
+            /// <summary>How good the phase is: long streets, few pieces.</summary>
+            public float Score
+            {
+                get
+                {
+                    float score = 0f;
+                    foreach (var street in Streets) score += street.Length - 60f;
+                    return score;
+                }
+            }
+        }
+
         public static List<Street> Plan(SiteSurvey survey, Options options, CancellationToken cancellation)
         {
-            var streets = new List<Street>();
+            var layout = Regular(survey, options, cancellation);
+            Infill(survey, layout, cancellation);
+            return layout.Streets;
+        }
+
+        /// <summary>The regular levels only: enough to compare phases cheaply.</summary>
+        internal static Layout Regular(SiteSurvey survey, Options options, CancellationToken cancellation)
+        {
+            var layout = new Layout { Options = options };
             float spacing = options.BlockDepth;
             float slope = math.max(0.03f, survey.ReferenceSlope);
-            float interval = slope * spacing;
+            layout.Interval = slope * spacing;
 
             float lowest = float.MaxValue, highest = float.MinValue;
             for (int index = 0; index < survey.Count; index++)
             {
                 if (survey.StreetRoom[index] < 0f) continue;
-                lowest = math.min(lowest, survey.Smooth[index]);
-                highest = math.max(highest, survey.Smooth[index]);
+                if (survey.Smooth[index] < lowest) lowest = survey.Smooth[index];
+                if (survey.Smooth[index] > highest) highest = survey.Smooth[index];
             }
-            if (lowest > highest) return streets;
+            layout.Lowest = lowest;
+            layout.Highest = highest;
+            if (lowest > highest) return layout;
 
-            var nearest = new float[survey.Count];
-            for (int index = 0; index < nearest.Length; index++) nearest[index] = float.MaxValue;
+            layout.Nearest = new float[survey.Count];
+            for (int index = 0; index < layout.Nearest.Length; index++) layout.Nearest[index] = float.MaxValue;
 
             var levels = new List<float>();
-            for (float level = lowest + options.Phase * interval; level <= highest; level += interval) levels.Add(level);
+            for (float level = lowest + options.Phase * layout.Interval; level <= highest; level += layout.Interval) levels.Add(level);
             // Streets near the entry height keep their whole length; later levels give way where they crowd them.
             levels.Sort((a, b) => math.abs(a - options.EntryHeight).CompareTo(math.abs(b - options.EntryHeight)));
             foreach (float level in levels)
             {
                 cancellation.ThrowIfCancellationRequested();
-                AddLevel(survey, options, level, spacing * CrowdedShare, nearest, streets);
+                AddLevel(survey, options, level, spacing * CrowdedShare, layout.Nearest, layout.Streets);
             }
+            return layout;
+        }
+
+        /// <summary>Levels in between the regular ones, where the ground is gentle enough to leave a wide gap.</summary>
+        internal static void Infill(SiteSurvey survey, Layout layout, CancellationToken cancellation)
+        {
+            if (layout.Nearest == null) return;
+            var options = layout.Options;
             foreach (float share in new[] { 0.5f, 0.25f, 0.75f })
-                for (float level = lowest + (options.Phase + share) * interval; level <= highest; level += interval)
+                for (float level = layout.Lowest + (options.Phase + share) * layout.Interval; level <= layout.Highest; level += layout.Interval)
                 {
                     cancellation.ThrowIfCancellationRequested();
-                    AddLevel(survey, options, level, spacing * InfillShare, nearest, streets);
+                    AddLevel(survey, options, level, options.BlockDepth * InfillShare, layout.Nearest, layout.Streets);
                 }
-            return streets;
         }
 
         private static void AddLevel(SiteSurvey survey, Options options, float level, float clearance, float[] nearest, List<Street> streets)
@@ -92,7 +129,8 @@ namespace SteppedStreets.Core.Neighbourhood
                         }
                         var street = new Street(RoadKind.Contour, shaped.Points, heights) { Closed = shaped.Closed };
                         streets.Add(street);
-                        Stamp(survey, street.Points, options.BlockDepth * 1.2f, nearest);
+                        // Only distances up to the widest clearance asked for (the in-between levels') are ever compared.
+                        Stamp(survey, street.Points, options.BlockDepth * InfillShare + Spacing * 2f, nearest);
                     }
                 }
             }
@@ -268,7 +306,8 @@ namespace SteppedStreets.Core.Neighbourhood
         internal static void Stamp(SiteSurvey survey, List<float2> points, float reach, float[] nearest)
         {
             int cells = (int)math.ceil(reach / survey.Cell);
-            for (int point = 0; point < points.Count; point += 1)
+            // Every other point: the points are 4 m apart, so a node's distance is off by at most 4 m, well inside the margins.
+            for (int point = 0; point < points.Count; point += point + 2 < points.Count ? 2 : 1)
             {
                 float2 position = points[point];
                 int centreColumn = (int)math.round((position.x - survey.Origin.x) / survey.Cell);

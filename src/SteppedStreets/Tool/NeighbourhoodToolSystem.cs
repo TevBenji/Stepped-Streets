@@ -56,7 +56,27 @@ namespace SteppedStreets.Tool
         internal bool AreaClosed => areaClosed;
         internal int HoveredCorner { get; private set; } = -1;
         internal float3? Cursor { get; private set; }
+
+        /// <summary>What the cursor has snapped to, for the preview's ring; null when it is free.</summary>
+        internal float2? Snapped { get; private set; }
+
+        /// <summary>World metres the picking and snapping reach this frame; the preview sizes its lines from it.</summary>
+        internal float Reach { get; private set; } = 6f;
+
+        // Existing roads near the camera, for snapping corners onto them; rebuilt when the tool opens and after a build.
+        private SpatialBuckets<(float2 Start, float2 End)> roadSnap;
         internal NeighbourhoodPlan Plan { get; private set; }
+
+        /// <summary>The roads of the plan still being worked out, shown while its lots and ground are planned.</summary>
+        internal NeighbourhoodPlan EarlyRoads { get; private set; }
+
+        private sealed class EarlyRoadsHandOff
+        {
+            public int Version;
+            public NeighbourhoodPlan Roads;
+        }
+
+        private EarlyRoadsHandOff earlyFromWorker;
         internal NeighbourhoodRequest PlannedRequest { get; private set; }
         internal int PlanVersion { get; private set; }
 
@@ -160,6 +180,7 @@ namespace SteppedStreets.Tool
             {
                 base.OnStartRunning();
                 EnableActions(true);
+                RefreshRoadSnap();
                 if (State.Stage == ToolStage.Closed) RefreshStage();
             }
             catch (Exception exception) { Fail(exception, "The neighbourhood tool could not start."); }
@@ -227,7 +248,11 @@ namespace SteppedStreets.Tool
             float reach = 6f;
             var camera = UnityEngine.Camera.main;
             if (hit.HasValue && camera != null)
-                reach = math.clamp(math.distance((float3)camera.transform.position, hit.Value) * 0.025f, 4f, 60f);
+                reach = math.clamp(math.distance((float3)camera.transform.position, hit.Value) * 0.03f, 4f, 80f);
+            Reach = reach;
+            float2? snapped = hit.HasValue ? Snap(hit.Value.xz, reach) : (float2?)null;
+            if (!Nullable.Equals(snapped, Snapped)) { Snapped = snapped; Touch(); }
+            float2 point = snapped ?? (hit.HasValue ? hit.Value.xz : float2.zero);
             int hovered = -1;
             if (hit.HasValue && dragging < 0)
             {
@@ -263,25 +288,28 @@ namespace SteppedStreets.Tool
             bool leftHeld = mouse != null && mouse.leftButton.isPressed;
             if (dragging >= 0)
             {
-                if (hit.HasValue && leftHeld && math.distance(corners[dragging], hit.Value.xz) > 0.05f)
+                if (hit.HasValue && leftHeld && math.distance(corners[dragging], point) > 0.05f)
                 {
-                    corners[dragging] = hit.Value.xz;
+                    corners[dragging] = point;
                     Touch();
                 }
                 if (!leftHeld) EndDrag();
                 return;
             }
             if (!leftPressed || !hit.HasValue) return;
+            bool closing = !areaClosed && corners.Count >= 3 && snapped.HasValue && math.distance(snapped.Value, corners[0]) < 0.01f;
+            if (closing) { CloseArea(); return; }
             if (hovered >= 0)
             {
-                if (!areaClosed && hovered == 0 && corners.Count >= 3) { CloseArea(); return; }
                 StartDrag(hovered);
                 return;
             }
             if (!areaClosed)
             {
+                // Two corners on one spot would make a zero-length edge.
+                if (corners.Count > 0 && math.distance(corners[corners.Count - 1], point) < 1f) return;
                 Remember();
-                corners.Add(hit.Value.xz);
+                corners.Add(point);
                 RefreshStage();
                 return;
             }
@@ -291,9 +319,68 @@ namespace SteppedStreets.Tool
                 float2 start = corners[index], end = corners[(index + 1) % corners.Count];
                 if (SiteGeometry.DistanceSquared(hit.Value.xz, start, end) > reach * reach) continue;
                 Remember();
-                corners.Insert(index + 1, hit.Value.xz);
+                corners.Insert(index + 1, point);
                 StartDrag(index + 1, remembered: true);
                 return;
+            }
+        }
+
+        /// <summary>
+        /// Where a click at this point lands: on the first corner when it would close the area, on another corner while
+        /// dragging, or on the nearest existing road's centreline; null when nothing is within reach.
+        /// </summary>
+        private float2? Snap(float2 point, float reach)
+        {
+            if (!areaClosed && corners.Count >= 3 && dragging < 0 && math.distance(point, corners[0]) <= reach * 1.6f) return corners[0];
+            if (dragging >= 0)
+                for (int index = 0; index < corners.Count; index++)
+                    if (index != dragging && math.distance(point, corners[index]) <= reach) return corners[index];
+            if (roadSnap == null) return null;
+            float best = reach;
+            float2? nearest = null;
+            foreach (var (start, end) in roadSnap.Near(point))
+            {
+                float2 direction = end - start;
+                float lengthSquared = math.lengthsq(direction);
+                float fraction = lengthSquared > 1e-6f ? math.saturate(math.dot(point - start, direction) / lengthSquared) : 0f;
+                float2 onRoad = start + direction * fraction;
+                float distance = math.distance(point, onRoad);
+                // Road ends and junctions win when they are close: corners there line the area up with the street grid.
+                if (fraction <= 0.001f || fraction >= 0.999f) distance *= 0.7f;
+                if (distance < best) { best = distance; nearest = onRoad; }
+            }
+            return nearest;
+        }
+
+        /// <summary>Collects the ground roads' centrelines in 64 m buckets for snapping.</summary>
+        private void RefreshRoadSnap()
+        {
+            try
+            {
+                var buckets = new SpatialBuckets<(float2, float2)>(64f);
+                using (var query = EntityManager.CreateEntityQuery(Unity.Entities.ComponentType.ReadOnly<Game.Net.Road>(),
+                    Unity.Entities.ComponentType.ReadOnly<Game.Net.Curve>(), Unity.Entities.ComponentType.Exclude<Game.Tools.Temp>(),
+                    Unity.Entities.ComponentType.Exclude<Deleted>()))
+                using (var edges = query.ToEntityArray(Unity.Collections.Allocator.Temp))
+                    foreach (var edge in edges)
+                    {
+                        var curve = EntityManager.GetComponentData<Game.Net.Curve>(edge);
+                        int pieces = math.max(1, (int)math.ceil(curve.m_Length / 12f));
+                        float2 previous = curve.m_Bezier.a.xz;
+                        for (int piece = 1; piece <= pieces; piece++)
+                        {
+                            float2 next = Colossal.Mathematics.MathUtils.Position(curve.m_Bezier, piece / (float)pieces).xz;
+                            // Padded by the largest snapping reach, so a query finds every segment it could snap to.
+                            buckets.Add(math.min(previous, next) - 80f, math.max(previous, next) + 80f, (previous, next));
+                            previous = next;
+                        }
+                    }
+                roadSnap = buckets;
+            }
+            catch (Exception exception)
+            {
+                roadSnap = null;
+                LogUpdateError(exception, "Stepped Streets: collecting roads for snapping failed");
             }
         }
 
@@ -351,6 +438,7 @@ namespace SteppedStreets.Tool
             planCancel = null;
             planTask = null;
             Plan = null;
+            EarlyRoads = null;
             PlannedRequest = null;
             PlanVersion++;
             ClearPlanState();
@@ -377,7 +465,10 @@ namespace SteppedStreets.Tool
             taskVersion = ++requestedVersion;
             taskSnapshot = snapshot;
             taskRequest = request;
-            planTask = Task.Run(() => NeighbourhoodPlanner.Plan(request, cancel.Token), cancel.Token);
+            int version = taskVersion;
+            planTask = Task.Run(() => NeighbourhoodPlanner.Plan(request, cancel.Token, roads =>
+                // Handed across threads by one reference write; the main thread keeps it only if its request is still current.
+                Volatile.Write(ref earlyFromWorker, new EarlyRoadsHandOff { Version = version, Roads = roads })), cancel.Token);
             State.Stage = ToolStage.Planning;
             Touch();
             Log(Invariant($"planning an area of {State.AreaSquareMetres / 10000f:0.0} ha with {boundary.Length} corners; snapshot {captureMilliseconds:0} ms, {snapshot.ExistingRoads.Length} existing road edges, {snapshot.BuildingCount} buildings"));
@@ -385,6 +476,16 @@ namespace SteppedStreets.Tool
 
         private void AdoptFinishedPlan()
         {
+            var handOff = Interlocked.Exchange(ref earlyFromWorker, null);
+            if (handOff != null && handOff.Version == requestedVersion && planTask != null && !planTask.IsCompleted)
+            {
+                var early = handOff.Roads;
+                EarlyRoads = early;
+                PlannedRequest = taskRequest;
+                PlanVersion++;
+                State.Summary = Invariant($"{early.RoadLength / 1000f:0.0} km of road planned; laying out the lots and the ground...");
+                Touch();
+            }
             var task = planTask;
             if (task == null || !task.IsCompleted) return;
             planTask = null;
@@ -403,6 +504,7 @@ namespace SteppedStreets.Tool
             }
             var plan = task.Result;
             Plan = plan;
+            EarlyRoads = null;
             PlannedRequest = taskRequest;
             plannedSnapshot = taskSnapshot;
             PlanVersion++;
@@ -420,7 +522,7 @@ namespace SteppedStreets.Tool
             State.Stage = plan.Buildable ? ToolStage.Planned : ToolStage.Drawing;
             if (!IsActive && State.Stage != ToolStage.Building) State.Stage = ToolStage.Closed;
             Touch();
-            Log(Invariant($"plan in {plan.Milliseconds:0} ms: {plan.Roads.Count} roads, {plan.RoadLength / 1000f:0.00} km, {plan.Lots.Count} lots, {plan.ZonedCells} cells, {plan.Trees.Count} trees, {plan.Walls.Count} wall pieces, connected {plan.Connected}; {plan.SummaryLine}"));
+            Log(Invariant($"plan in {plan.Milliseconds:0} ms ({plan.Timings}): {plan.Roads.Count} roads, {plan.RoadLength / 1000f:0.00} km, {plan.Lots.Count} lots, {plan.ZonedCells} cells, {plan.Trees.Count} trees, {plan.Walls.Count} wall pieces, connected {plan.Connected}; {plan.SummaryLine}"));
             foreach (var message in plan.Messages) Log(message);
         }
 

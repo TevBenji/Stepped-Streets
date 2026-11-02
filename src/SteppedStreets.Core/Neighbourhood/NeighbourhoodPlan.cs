@@ -102,5 +102,8 @@ namespace SteppedStreets.Core.Neighbourhood
         public string SummaryLine = "";
         public List<string> Messages = new List<string>();
         public double Milliseconds;
+
+        /// <summary>Milliseconds per planning stage, for the log: where the time goes on the player's machine.</summary>
+        public string Timings = "";
     }
 }

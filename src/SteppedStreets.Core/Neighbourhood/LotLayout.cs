@@ -42,12 +42,12 @@ namespace SteppedStreets.Core.Neighbourhood
                     float clearance = road.HalfWidth + Shoulder;
                     existing.Add(math.min(start, end) - clearance, math.max(start, end) + clearance, (start, end, clearance));
                 }
-            var keepAway = new List<(float2 Centre, float Radius)>();
+            var keepAway = new SpatialBuckets<(float2 Centre, float Radius)>(32f);
             foreach (var node in plan.Nodes)
             {
                 // Lots keep off junctions (the game's junction and its corner radii) and the turning end of a cul-de-sac.
-                if (node.Degree >= 3 || node.ExistingRoadId != 0) keepAway.Add((node.Position.xz, halfWidth + 10f));
-                else if (node.DeadEnd) keepAway.Add((node.Position.xz, halfWidth + 4f));
+                float radius = node.Degree >= 3 || node.ExistingRoadId != 0 ? halfWidth + 10f : node.DeadEnd ? halfWidth + 4f : 0f;
+                if (radius > 0f) keepAway.Add(node.Position.xz - radius, node.Position.xz + radius, (node.Position.xz, radius));
             }
             var occupied = new SpatialBuckets<Pad>(32f);
 
@@ -75,7 +75,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         // Its own street only stops a lot that cuts into the carriageway on the inside of a bend.
                         if (distance < (item.z == street ? halfWidth - 2f : halfWidth + Shoulder)) return true;
                     }
-                    foreach (var (centre, radius) in keepAway)
+                    foreach (var (centre, radius) in keepAway.Near(point))
                         if (math.distancesq(point, centre) < radius * radius) return true;
                     foreach (var pad in occupied.Near(point))
                         if (InsidePad(pad, point, 0.3f)) return true;

@@ -168,6 +168,7 @@ namespace SteppedStreets.Tool
                 {
                     buildReport.Add(Invariant($"{levelCells} level cells zoned ({zonedRuns} of {requestedRuns} runs verified)"));
                     if (zonedRuns < requestedRuns) Message("Some zoning runs were not verified. The log lists the cells.");
+                    ReportGrowth();
                     PlantTrees();
                     return;
                 }
@@ -178,6 +179,51 @@ namespace SteppedStreets.Tool
                 World.GetOrCreateSystemManaged<ZoneBuildSystem>().Begin(quads, zone, ZoneNext);
             }
             catch (Exception exception) { BuildFailed(exception, "Zoning failed. The ground and roads remain."); }
+        }
+
+        /// <summary>
+        /// Houses only grow where the game sees demand (ZoneSpawnSystem: residential needs the average of low, medium and high
+        /// building demand above zero, and each density its own demand of at least 1). Logs the vacant lots the new zoning made
+        /// and the demand, and tells the player when a chosen zone has none, so empty lots don't look like a failed build.
+        /// </summary>
+        private void ReportGrowth()
+        {
+            try
+            {
+                Core.Terrain.Poly.Bounds(corners.ToArray(), out var low, out var high);
+                low -= 60f;
+                high += 60f;
+                int lots = 0;
+                using (var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Block>(), ComponentType.ReadOnly<VacantLot>(),
+                    ComponentType.Exclude<Game.Tools.Temp>()))
+                using (var blocks = query.ToEntityArray(Unity.Collections.Allocator.Temp))
+                    foreach (var block in blocks)
+                    {
+                        var position = EntityManager.GetComponentData<Block>(block).m_Position.xz;
+                        if (math.any(position < low) || math.any(position > high)) continue;
+                        lots += EntityManager.GetBuffer<VacantLot>(block, true).Length;
+                    }
+                var residential = World.GetOrCreateSystemManaged<Game.Simulation.ResidentialDemandSystem>().buildingDemand;
+                int commercial = World.GetOrCreateSystemManaged<Game.Simulation.CommercialDemandSystem>().buildingDemand;
+                var industrial = World.GetOrCreateSystemManaged<Game.Simulation.IndustrialDemandSystem>();
+                Log(Invariant($"growth: {lots} vacant lots in and around the area; building demand residential low/medium/high {residential.x}/{residential.y}/{residential.z}, commercial {commercial}, industrial {industrial.industrialBuildingDemand}, office {industrial.officeBuildingDemand}"));
+                if (lots == 0) Message("The zoning made no vacant lots for houses. The log has the zoning details.");
+                var waiting = new List<string>();
+                foreach (var zone in buildPlan.ZoneCounts)
+                {
+                    string name = zone.Key.ToLowerInvariant();
+                    bool none = name.Contains("residential")
+                        ? (residential.x + residential.y + residential.z) / 3 <= 0
+                            || (name.Contains("high") ? residential.z : name.Contains("medium") || name.Contains("row") ? residential.y : residential.x) < 1
+                        : name.Contains("commercial") ? commercial <= 0
+                        : name.Contains("office") ? industrial.officeBuildingDemand <= 0
+                        : name.Contains("industrial") && industrial.industrialBuildingDemand <= 0;
+                    if (none) waiting.Add(zone.Key);
+                }
+                if (waiting.Count > 0)
+                    Message("No demand for " + string.Join(", ", waiting) + " right now, so houses there grow once the city needs them (the demand bars in the zoning menu show it).");
+            }
+            catch (Exception exception) { Mod.Logger.Warn("Stepped Streets: reading the demand after zoning failed: " + exception.Message); }
         }
 
         private void PlantTrees()
@@ -214,7 +260,10 @@ namespace SteppedStreets.Tool
             Log(State.Summary);
             // The built area is history now: its plan cannot be built twice, and the preview stops drawing it over the real thing.
             Plan = null;
+            EarlyRoads = null;
             PlanVersion++;
+            // The new streets are snapping targets for the next area.
+            RefreshRoadSnap();
             Touch();
         }
 

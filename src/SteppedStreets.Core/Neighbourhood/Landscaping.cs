@@ -17,7 +17,8 @@ namespace SteppedStreets.Core.Neighbourhood
         private const int MostTrees = 6000;
         private const float OpenView = 12f;
 
-        public static List<PlannedTree> Trees(NeighbourhoodPlan plan, List<PlannedLot> lots, SiteSurvey survey, NeighbourhoodRequest request)
+        public static List<PlannedTree> Trees(NeighbourhoodPlan plan, List<PlannedLot> lots, SiteSurvey survey, NeighbourhoodRequest request,
+            System.Threading.CancellationToken cancellation = default)
         {
             var trees = new List<PlannedTree>();
             if (!request.Trees) return trees;
@@ -31,14 +32,20 @@ namespace SteppedStreets.Core.Neighbourhood
                 Poly.Bounds(corners, out var low, out var high);
                 pads.Add(low - OpenView, high + OpenView, lot.Pad);
             }
-            var existing = new List<(float2, float2, float)>();
+            var existing = new SpatialBuckets<(float2, float2, float)>(32f);
             foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
                 for (int point = 1; point < (road?.Points?.Length ?? 0); point++)
-                    existing.Add((road.Points[point - 1].xz, road.Points[point].xz, road.HalfWidth + 4f));
+                {
+                    float2 start = road.Points[point - 1].xz, end = road.Points[point].xz;
+                    float clearance = road.HalfWidth + 4f;
+                    existing.Add(math.min(start, end) - clearance, math.max(start, end) + clearance, (start, end, clearance));
+                }
 
             int columns = (int)math.ceil((survey.BoundaryMaximum.x - survey.BoundaryMinimum.x) / TreeSpacing);
             int rows = (int)math.ceil((survey.BoundaryMaximum.y - survey.BoundaryMinimum.y) / TreeSpacing);
             for (int row = 0; row < rows; row++)
+            {
+                cancellation.ThrowIfCancellationRequested();
                 for (int column = 0; column < columns; column++)
                 {
                     float2 jitter = new float2(Geometry.Hash01(request.Seed, column, row * 2 + 1), Geometry.Hash01(request.Seed, column, row * 2 + 2));
@@ -47,7 +54,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     if (request.Blocked != null && request.Blocked(point)) continue;
                     if (NearRoad(roads, plan, point, request.RoadHalfWidth + 3.5f)) continue;
                     bool nearExisting = false;
-                    foreach (var (start, end, clearance) in existing)
+                    foreach (var (start, end, clearance) in existing.Near(point))
                         if (Geometry.DistanceToSegment(point, start, end) < clearance) { nearExisting = true; break; }
                     if (nearExisting) continue;
 
@@ -79,6 +86,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         Variation = Geometry.Hash(request.Seed, column, row),
                     });
                 }
+            }
             if (trees.Count > MostTrees)
             {
                 // Thin evenly rather than cut off one side of the area.

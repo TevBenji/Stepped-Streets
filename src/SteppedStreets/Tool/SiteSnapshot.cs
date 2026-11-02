@@ -25,8 +25,10 @@ namespace SteppedStreets.Tool
     {
         private const float HeightSpacing = 4f;
         private const float WaterSpacing = 8f;
-        // The connection may reach an existing road up to 400 m from the area; the survey reaches a little further.
-        private const float Margin = 460f;
+        // The connection may reach an existing road up to 400 m from the area; the survey reaches a little further, and only
+        // as far as the nearest road needs (sampling heights is most of the snapshot's time).
+        private const float MinimumMargin = 80f;
+        private const float MaximumMargin = 460f;
         private const float RoadReach = 400f;
 
         private readonly float2 origin;
@@ -42,8 +44,14 @@ namespace SteppedStreets.Tool
         {
             float2 low = new float2(float.MaxValue), high = new float2(float.MinValue);
             foreach (var corner in boundary) { low = math.min(low, corner); high = math.max(high, corner); }
-            origin = low - Margin;
-            float2 maximum = high + Margin;
+            ExistingRoads = CaptureRoads(entities, low - RoadReach, high + RoadReach);
+            float nearestRoad = float.MaxValue;
+            foreach (var road in ExistingRoads)
+                foreach (var point in road.Points)
+                    nearestRoad = math.min(nearestRoad, Core.Terrain.Poly.Contains(boundary, point.xz) ? 0f : Core.Terrain.Poly.DistanceToBoundary(boundary, point.xz));
+            float margin = nearestRoad == float.MaxValue ? MinimumMargin : math.clamp(nearestRoad + 64f, MinimumMargin, MaximumMargin);
+            origin = low - margin;
+            float2 maximum = high + margin;
             columns = math.max(2, (int)math.ceil((maximum.x - origin.x) / HeightSpacing) + 1);
             rows = math.max(2, (int)math.ceil((maximum.y - origin.y) / HeightSpacing) + 1);
             heights = new float[checked(columns * rows)];
@@ -74,7 +82,6 @@ namespace SteppedStreets.Tool
                 }
 
             BuildingCount = CaptureBuildings(entities, origin, maximum);
-            ExistingRoads = CaptureRoads(entities, low - RoadReach, high + RoadReach);
             fingerprint = fingerprint * 31 + BuildingCount;
             fingerprint = fingerprint * 31 + ExistingRoads.Length;
             Fingerprint = fingerprint;
