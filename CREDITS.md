@@ -101,3 +101,47 @@ Original integration corrections, Tevin Benjamin, 2026-11: `TerraformApplyMath.R
 
 - `src/SteppedStreets.UI/tools/css-presence.js` is adapted from Placemaker's `UI/tools/css-presence.js` (jackwrichards, GPL-3.0), which follows the official Cities: Skylines II UI mod template: the bundle exports `hasCSS`, without which the game never loads the panel's stylesheet.
 - The panel's look (dark docked panel, small-caps sections, label-left rows, segmented choices, accent footer button and the UI sound calls) follows Placemaker's `UI/src/styles/_tokens.scss`, `components/common.module.scss`, `components/panel.module.scss` and `components/dialog.module.scss`. The panel code and stylesheet are written for Stepped Streets; no Placemaker component is copied.
+
+## Version 2: the hillside neighbourhood generator (November 2026)
+
+Original work by Tevin Benjamin, 2026-11, GPL-3.0:
+
+- `src/SteppedStreets.Core/Neighbourhood/*.cs`: the layout generator (survey, contour streets, S-curve and traced-ramp links,
+  connection, mountain lane, validation and pruning, lot layout with settling and gaps, the zone mix, the grading field with
+  its bank cones, trees and garden-wall placement). Placemaker's Hillside terraces (`Core/Layers/Roads/Terraces/*.cs`,
+  `docs/proposals/s52.md`) were studied for ideas — contour streets at a constant height interval and the terrace spacing
+  rule — but no code was copied or adapted; `TerraceField.LimitBanks` and `Resolve` were not used, and `LotLevel.cs` and
+  `PolishLookLayer.cs` were not read for code.
+- `tests/SteppedStreets.Tests/Neighbourhood/*.cs`: the synthetic hillsides, rule tests and the PNG gallery (its small PNG
+  writer included). Placemaker's `Tests/Placemaker.Gallery` was the idea for a gallery; nothing was copied.
+- `src/SteppedStreets/Tool/NeighbourhoodToolSystem*.cs`, `NeighbourhoodPreviewSystem.cs`, `ToolState.cs`,
+  `src/SteppedStreets/Build/RoadCatalog.cs`, the settings and the registration changes: original, following the earlier
+  tool, preview and build patterns credited above.
+- The panel rebuild (`src/SteppedStreets.UI/src/Panel.tsx`, `Panel.module.css`, `lib/state.ts`, `lib/bindings.ts`,
+  `tests/state.test.cjs`, `assets/dice.svg`, `assets/plus.svg`): original, keeping the look credited under "Panel styling
+  fix" and the adapted bindings helper credited under Wave 4.
+
+Adapted from Placemaker by jackwrichards, GPL-3.0, commit `e654b32` (headers retained, each with its "Adapted from
+Placemaker ... Modified by Tevin Benjamin, 2026-11" line):
+
+- `src/SteppedStreets/Build/NetBuildSystem.cs`: the net-course path of `Game/Build/BuildService.Emit.cs` (`EmitNets`,
+  `MakeCoursePos`, `NewDefinition`). Kept `NetCourse` and `CoursePos` construction, attaching an end to an existing edge or
+  node by `m_Entity` and `m_SplitPosition`, and rebuilding the curve to the snapped point; the roads come from the plan cut
+  into short cubic pieces at their planned heights. Removed course fitting, elevation, fences, objects, surfaces, groups and
+  audit code; added the build-tool cadence, a count of temporaries refused before Apply and a count of built edges. The
+  emitter's header credits **ParkManager by tomkpunkt** (`CreateNetCourseDefinition`) and **Grid Road Generator by Ti4goc**
+  (`CreateGridDefinitions`/`MakeCoursePos`), both GPL-3.0; those credits carry over.
+- `src/SteppedStreets/Build/TerrainCullGuard.cs`: copied from `Game/Build/TerrainCullGuard.cs`; namespace and log lines
+  changed. Needed now that the mod emits nets (the road-cull list overflow behind `TerrainSystem.CullForCascades`).
+- `src/SteppedStreets/Build/TreeBuildSystem.cs`: the object-definition path of `Game/Build/BuildService.Emit.cs:534-569`, as
+  `WallBuildSystem` already used it; tree prefabs chosen by name, live ground heights and batches of 1500 per frame
+  (`BuildService.DefinitionsPerFrame`). Credits **ParkingLotTool by KruemelGames (GPL-3.0)** through Placemaker's header.
+- `src/SteppedStreets/Tool/SiteSnapshot.cs` (already adapted from `Game/Preview/SiteCapture.cs`): now captures a drawn area,
+  rasterises buildings and water into one blocked grid, samples existing road edges with their entity handles, and keeps a
+  fingerprint to notice changes before a build.
+- `src/SteppedStreets/Build/TerrainBuildSystem.cs` (already adapted): takes the raster ready-made from the planner's field.
+- The build order (ground, then nets, then zoning after the zone blocks appear) follows `Game/Build/BuildService.cs`'s step
+  sequence; the code is this mod's own.
+
+Removed in version 2: the street picker (`Tool/StepStreetToolSystem*.cs`, `StreetCapture.cs`, `StepPreviewSystem.cs`); the
+generator covers it. Their credits above are kept for the history.

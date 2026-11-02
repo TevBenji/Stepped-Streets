@@ -5,7 +5,7 @@
 | Item | Detail |
 |---|---|
 | Owner | Tevin Benjamin |
-| Status | Draft 4, 2 November 2026: the hillside neighbourhood generator replaces the one-street tool (changes listed at the end) |
+| Status | Draft 4, 2 November 2026: the hillside neighbourhood generator replaces the one-street tool; M1–M5 built and installed, the in-game test is next (changes listed at the end) |
 | Purpose | A fun side project: my own standalone mod, open source, and a portfolio piece |
 | Working name | Stepped Streets (check Paradox Mods for a clash before publishing) |
 | Licence | GPL-3.0, because it reuses Placemaker code (section 9) |
@@ -191,11 +191,11 @@ for code, and `TerraceField.LimitBanks` / `Resolve` were studied but not adapted
 
 | Step | What | Done when |
 |---|---|---|
-| M1 Generator | Core generator, tests on synthetic terrain, PNG gallery | Section 6's off-game criteria pass and the gallery looks right |
-| M2 Area tool | Area drawing, live preview on a worker, the new panel | The plan appears in game within a second of closing an area |
-| M3 Build | Ground, roads, zoning | One neighbourhood built end to end in the game |
-| M4 Landscape and polish | Trees, walls, panel polish | Trees and walls appear; panel complete |
-| M5 Docs | README, CREDITS, in-game test checklist | The owner can test without asking |
+| M1 Generator | Done 2 November 2026: Core generator, 45 rule tests on eight synthetic sites and four variants, PNG gallery | Section 6's off-game criteria pass and the gallery looks right |
+| M2 Area tool | Built 2 November 2026: area drawing, live preview on a worker, the new panel (panel by a reviewed subagent) | The plan appears in game within a second of closing an area — in-game test pending |
+| M3 Build | Built 2 November 2026: ground from the field, road courses with the crash guard, zone-block wait, zoning per zone | One neighbourhood built end to end in the game — in-game test pending |
+| M4 Landscape and polish | Built 2 November 2026: trees in batches, garden walls, panel polish | Trees and walls appear — in-game test pending |
+| M5 Docs | Done 2 November 2026: README, CREDITS, `docs/IN-GAME-TEST.md` | The owner can test without asking |
 
 After each milestone: build, run all tests, install to the Mods folder, commit, report.
 
