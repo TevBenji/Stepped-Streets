@@ -25,7 +25,7 @@ namespace SteppedStreets.Tool
                 }
                 var input = InputManager.instance;
                 if (hotkey != null && hotkey.WasPerformedThisFrame() && input != null && !input.hasInputFieldFocus)
-                    World.GetOrCreateSystemManaged<StepStreetToolSystem>().Toggle();
+                    World.GetOrCreateSystemManaged<NeighbourhoodToolSystem>().Toggle();
             }
             catch (Exception exception)
             {

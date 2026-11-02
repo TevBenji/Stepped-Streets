@@ -6,7 +6,7 @@
 // source fills the basin. Zoning follows GridRoadGenerator's Zoning
 // definitions (Ti4goc, GPL-3.0): ZoningFlags.Zone|Marquee without Overwrite never repaints cells
 // that are already zoned.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: standalone terrain apply system and report; removed dabs, water, zoning, pits, debug hooks and plan/group types; retained the original height copy for curtains and corrected low-strength rollback.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: standalone terrain apply system and report; removed dabs, water, zoning, pits, debug hooks and plan/group types; retained the original height copy for curtains and corrected low-strength rollback; the raster now comes ready-made from the neighbourhood planner's ground field.
 // The original header above describes the source file; none of its ParkManager or GridRoadGenerator code is included here.
 
 using System;
@@ -44,7 +44,6 @@ namespace SteppedStreets.Build
 
     public sealed partial class TerrainBuildSystem : GameSystemBase
     {
-        private const float RasterCell = 1.75f;
         private const float Tolerance = 0.3f;
         private const float AllowedOffFraction = 0.02f;
         private const int MaximumPasses = 4;
@@ -88,9 +87,12 @@ namespace SteppedStreets.Build
             _terrain = World.GetOrCreateSystemManaged<TerrainSystem>();
         }
 
-        /// <summary>Starts a terrain build; completion is delivered once on the calling game thread.</summary>
-        public void Begin(IReadOnlyList<PlannedTerraform> patches, float bankWidth, Action<TerrainBuildReport> whenDone,
-            Func<float2, bool> blocked = null)
+        /// <summary>
+        /// Starts a terrain build from a raster the worker prepares (the neighbourhood's planned ground); completion is
+        /// delivered once on the calling game thread. <paramref name="blocked"/>, when given, rejects the build before any brush
+        /// if a changed texel's blend reaches protected ground.
+        /// </summary>
+        public void Begin(Func<TerraformRaster> prepareRaster, Action<TerrainBuildReport> whenDone, Func<float2, bool> blocked = null)
         {
             if (Busy)
             {
@@ -109,16 +111,14 @@ namespace SteppedStreets.Build
 
             try
             {
-                if (!math.isfinite(bankWidth) || bankWidth < 0f) throw new ArgumentOutOfRangeException(nameof(bankWidth));
-                var items = TerraformApplyMath.PreparePatches(patches, out var vertexHeights);
+                if (prepareRaster == null) throw new ArgumentNullException(nameof(prepareRaster));
                 _originalHeights = CopyHeights();
-                var original = _originalHeights;
-                // The worker owns no live game data; the copied arrays stay alive until it finishes and curtains are measured.
+                // The worker owns no live game data; the copied heights stay alive until it finishes and curtains are measured.
                 _rasterJob = Task.Run(() =>
                 {
-                    var raster = TerraformRaster.Build(items, RasterCell, bankWidth, MaximumRasterCells,
-                        vertexHeights, position => SampleHeight(ref original, position));
-                    // Pad checks alone miss obstacles under the bank outside the pad. Abort before applying any brush.
+                    var raster = prepareRaster();
+                    if (raster != null && (long)raster.Width * raster.Height > MaximumRasterCells)
+                        throw new InvalidOperationException("The planned ground is too large to build in one go. Draw a smaller area.");
                     TerraformApplyMath.RequireClearGround(raster, blocked);
                     return raster;
                 });

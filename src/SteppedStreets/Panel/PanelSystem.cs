@@ -4,7 +4,7 @@
 // PLT; RESEARCH-NOTES rule 22). The UI parses them (JSON.parse). Values are rebuilt only when
 // their inputs changed (version stamps) and pushed only when the JSON actually differs
 // (ValueBinding compares) — not ~100 bindings per frame like GRG.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: one Stepped Streets state value, validated settings triggers and a one-time zone catalog.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: one Stepped Streets state value for the neighbourhood tool, validated settings triggers, and one-time zone and road catalogues.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -13,7 +13,8 @@ using Colossal.UI.Binding;
 using Game.Prefabs;
 using Game.SceneFlow;
 using Game.UI;
-using SteppedStreets.Core.Planning;
+using SteppedStreets.Build;
+using SteppedStreets.Core.Neighbourhood;
 using SteppedStreets.Settings;
 using SteppedStreets.Tool;
 using Unity.Collections;
@@ -25,17 +26,15 @@ namespace SteppedStreets.Panel
     public sealed partial class PanelSystem : UISystemBase
     {
         private const string Group = "SteppedStreets";
-        private StepStreetToolSystem _tool;
+        private NeighbourhoodToolSystem _tool;
         private PrefabSystem _prefabs;
         private EntityQuery _zoneQuery;
         private ValueBinding<string> _state;
         private readonly SortedDictionary<string, string> _zones = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        private string _zonesJson = "[]";
-        private bool _zonesBuilt;
-        private bool _published;
-        private bool _updateFailed;
+        private string _zonesJson = "[]", _roadsJson = "[]";
+        private bool _zonesBuilt, _roadsBuilt, _published, _updateFailed;
         private int _version;
-        private SettingsSnapshot _settings;
+        private string _settingsJson = "";
 
         [Preserve]
         protected override void OnCreate()
@@ -43,46 +42,58 @@ namespace SteppedStreets.Panel
             try
             {
                 base.OnCreate();
-                _tool = World.GetOrCreateSystemManaged<StepStreetToolSystem>();
+                _tool = World.GetOrCreateSystemManaged<NeighbourhoodToolSystem>();
                 _prefabs = World.GetOrCreateSystemManaged<PrefabSystem>();
                 _zoneQuery = GetEntityQuery(ComponentType.ReadOnly<ZoneData>(), ComponentType.ReadOnly<PrefabData>());
                 AddBinding(_state = new ValueBinding<string>(Group, "state", "{}"));
                 Trigger("toggleTool", () => _tool.Toggle());
                 Trigger("close", () => _tool.Close());
-                Trigger("clearSelection", () => _tool.ClearSelection());
+                Trigger("clearArea", () => _tool.ClearArea());
+                Trigger("closeArea", () => _tool.CloseArea());
+                Trigger("undo", () => _tool.Undo());
                 Trigger("build", () => { if (_tool.State.Stage == ToolStage.Planned) _tool.Build(); });
-                Trigger<string>("setSide", value => ChangeSettings(settings =>
+                Trigger("reroll", () => _tool.Reroll());
+                Trigger<string>("setStyle", value => ChangeSettings(settings =>
                 {
-                    switch (value)
-                    {
-                        case "Both": settings.Side = StreetSide.Both; return true;
-                        case "Left": settings.Side = StreetSide.Left; return true;
-                        case "Right": settings.Side = StreetSide.Right; return true;
-                        default: return false;
-                    }
-                }));
-                Trigger<string>("setZone", value => ChangeSettings(settings =>
-                {
-                    if (value == null || !_zones.ContainsKey(value)) return false;
-                    settings.ZoneName = value;
+                    if (!Enum.TryParse(value, out NeighbourhoodStyle style) || !Enum.IsDefined(typeof(NeighbourhoodStyle), style)) return false;
+                    settings.Style = style;
                     return true;
                 }));
-                Trigger<string>("setLook", value => ChangeSettings(settings =>
+                Trigger<string>("setMixPattern", value => ChangeSettings(settings =>
                 {
-                    switch (value)
-                    {
-                        case "PlantedBank": settings.Look = StepLook.PlantedBank; return true;
-                        case "LowWall": settings.Look = StepLook.LowWall; return true;
-                        default: return false;
-                    }
+                    if (!Enum.TryParse(value, out MixPattern pattern) || !Enum.IsDefined(typeof(MixPattern), pattern)) return false;
+                    settings.MixPattern = pattern;
+                    return true;
                 }));
-                NumberTrigger("setLotWidth", 2, 6, (settings, value) => settings.LotWidthCells = (int)Math.Round(value, MidpointRounding.AwayFromZero));
-                NumberTrigger("setNarrowest", 2, 6, (settings, value) => settings.NarrowestWidthCells = (int)Math.Round(value, MidpointRounding.AwayFromZero));
-                NumberTrigger("setDepth", 2, 6, (settings, value) => settings.DepthCells = (int)Math.Round(value, MidpointRounding.AwayFromZero));
-                NumberTrigger("setMinimumGrade", 4, 12, (settings, value) => settings.MinimumGradePercent = (int)Math.Round(value, MidpointRounding.AwayFromZero));
-                NumberTrigger("setHighestStep", 0.5, 5, (settings, value) => settings.HighestStep = (float)value);
-                NumberTrigger("setBankGrade", 0.2, 0.5, (settings, value) => settings.BankGrade = (float)value);
-                NumberTrigger("setEarthworkLimit", 1, 8, (settings, value) => settings.EarthworkLimit = (float)value);
+                Trigger<string>("setRoad", value => ChangeSettings(settings =>
+                {
+                    if (string.IsNullOrWhiteSpace(value) || value.Length > 200) return false;
+                    settings.RoadName = value;
+                    return true;
+                }));
+                Trigger<string>("setZoneMix", value => ChangeSettings(settings =>
+                {
+                    if (value == null || value.Length > 4000) return false;
+                    var shares = SteppedStreetsSettings.ParseZoneMix(value);
+                    // Only zones the game has; the rest would zone nothing.
+                    if (_zones.Count > 0) shares.RemoveAll(share => !_zones.ContainsKey(share.Zone));
+                    if (shares.Count == 0) return false;
+                    settings.ZoneMix = SteppedStreetsSettings.WriteZoneMix(shares);
+                    return true;
+                }));
+                NumberTrigger("setBlockDepth", 60, 200, (settings, value) => settings.BlockDepth = (int)Math.Round(value / 5.0) * 5);
+                NumberTrigger("setMaxRoadGrade", 4, 12, (settings, value) => settings.MaxRoadGradePercent = Whole(value));
+                NumberTrigger("setSteepestBuildable", 8, 30, (settings, value) => settings.SteepestBuildablePercent = Whole(value));
+                NumberTrigger("setLotWidth", 2, 6, (settings, value) => settings.LotWidthCells = Whole(value));
+                NumberTrigger("setLotDepth", 2, 6, (settings, value) => settings.DepthCells = Whole(value));
+                NumberTrigger("setEarthworkLimit", 1, 8, (settings, value) => settings.EarthworkLimit = (float)(Math.Round(value * 2.0) / 2.0));
+                NumberTrigger("setBankGrade", 20, 50, (settings, value) => settings.BankGrade = (float)(Math.Round(value / 5.0) * 5.0 / 100.0));
+                NumberTrigger("setLotSpacing", -1, 2, (settings, value) => settings.LotSpacing = Whole(value));
+                NumberTrigger("setTreeDensity", 10, 100, (settings, value) => settings.TreeDensityPercent = (int)Math.Round(value / 5.0) * 5);
+                NumberTrigger("setSeed", 1, 99999, (settings, value) => settings.Seed = Whole(value));
+                BoolTrigger("setLevelLots", (settings, value) => settings.LevelLots = value);
+                BoolTrigger("setRetainingWalls", (settings, value) => settings.RetainingWalls = value);
+                BoolTrigger("setTrees", (settings, value) => settings.Trees = value);
             }
             catch (Exception exception)
             {
@@ -90,6 +101,8 @@ namespace SteppedStreets.Panel
                 Mod.Logger.Error(exception, "Stepped Streets: panel initialization failed");
             }
         }
+
+        private static int Whole(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
 
         private void Trigger(string name, Action action) =>
             AddBinding(new TriggerBinding(Group, name, () => Safe(name, action)));
@@ -113,11 +126,14 @@ namespace SteppedStreets.Panel
             }));
         }
 
+        private void BoolTrigger(string name, Action<SteppedStreetsSettings, bool> write) =>
+            Trigger<bool>(name, value => ChangeSettings(settings => { write(settings, value); return true; }));
+
         private void ChangeSettings(Func<SteppedStreetsSettings, bool> write)
         {
             var settings = Mod.Settings;
             if (settings == null || _tool.State.Stage == ToolStage.Building || !write(settings)) return;
-            // Replanning still happens if saving fails, so the visible settings cannot leave a stale preview buildable.
+            // Replanning still happens if saving fails, so the visible settings never leave a stale plan buildable.
             try { settings.ApplyAndSave(); }
             finally { _tool.SettingsChanged(); }
         }
@@ -130,13 +146,13 @@ namespace SteppedStreets.Panel
                 base.OnUpdate();
                 var settings = Mod.Settings;
                 if (settings == null || _state == null || _tool == null) return;
-                bool catalogChanged = BuildZones();
-                var snapshot = new SettingsSnapshot(settings);
+                bool catalogueChanged = BuildZones() | BuildRoads();
+                string settingsJson = SettingsJson(settings);
                 var state = _tool.State;
-                if (_published && !catalogChanged && _version == state.Version && _settings.SameAs(snapshot)) return;
-                _state.Update(StateJson(state, snapshot));
+                if (_published && !catalogueChanged && _version == state.Version && settingsJson == _settingsJson) return;
+                _state.Update(StateJson(state, settingsJson));
                 _version = state.Version;
-                _settings = snapshot;
+                _settingsJson = settingsJson;
                 _published = true;
                 _updateFailed = false;
             }
@@ -148,32 +164,30 @@ namespace SteppedStreets.Panel
             }
         }
 
+        private string Localised(string name)
+        {
+            var dictionary = GameManager.instance?.localizationManager?.activeDictionary;
+            return dictionary != null && dictionary.TryGetValue("Assets.NAME[" + name + "]", out var localised) && !string.IsNullOrEmpty(localised)
+                ? localised : name;
+        }
+
         private bool BuildZones()
         {
             if (_zonesBuilt || _zoneQuery.CalculateEntityCount() == 0) return false;
-            var dictionary = GameManager.instance?.localizationManager?.activeDictionary;
             using (var entities = _zoneQuery.ToEntityArray(Allocator.Temp))
-            {
                 foreach (var entity in entities)
                 {
                     var prefab = _prefabs.GetPrefab<ZonePrefab>(EntityManager.GetComponentData<PrefabData>(entity));
                     if (prefab == null || string.IsNullOrEmpty(prefab.name)) continue;
-                    string name = prefab.name;
-                    string label = name;
-                    if (dictionary != null && dictionary.TryGetValue("Assets.NAME[" + name + "]", out var localized) && !string.IsNullOrEmpty(localized))
-                        label = localized;
-                    _zones[name] = label;
+                    _zones[prefab.name] = Localised(prefab.name);
                 }
-            }
             if (_zones.Count == 0) return false;
             var json = new StringBuilder("[");
             foreach (var zone in _zones)
             {
                 if (json.Length > 1) json.Append(',');
-                json.Append("{\"name\":");
-                String(json, zone.Key);
-                json.Append(",\"label\":");
-                String(json, zone.Value);
+                json.Append("{\"name\":"); String(json, zone.Key);
+                json.Append(",\"label\":"); String(json, zone.Value);
                 json.Append('}');
             }
             _zonesJson = json.Append(']').ToString();
@@ -181,13 +195,61 @@ namespace SteppedStreets.Panel
             return true;
         }
 
-        private string StateJson(ToolState state, SettingsSnapshot settings)
+        private bool BuildRoads()
+        {
+            if (_roadsBuilt) return false;
+            var roads = RoadCatalog.List(EntityManager, _prefabs, Localised);
+            if (roads.Count == 0) return false;
+            var json = new StringBuilder("[");
+            foreach (var road in roads)
+            {
+                if (json.Length > 1) json.Append(',');
+                json.Append("{\"name\":"); String(json, road.Name);
+                json.Append(",\"label\":"); String(json, road.Label);
+                json.Append('}');
+            }
+            _roadsJson = json.Append(']').ToString();
+            _roadsBuilt = true;
+            return true;
+        }
+
+        private static string SettingsJson(SteppedStreetsSettings settings)
+        {
+            var json = new StringBuilder("{\"style\":");
+            String(json, settings.Style.ToString());
+            json.Append(",\"road\":"); String(json, settings.RoadName);
+            json.Append(",\"blockDepth\":").Append(Integer(settings.BlockDepth));
+            json.Append(",\"maxRoadGradePercent\":").Append(Integer(settings.MaxRoadGradePercent));
+            json.Append(",\"steepestBuildablePercent\":").Append(Integer(settings.SteepestBuildablePercent));
+            json.Append(",\"zoneMix\":[");
+            var shares = settings.ZoneShares();
+            for (int index = 0; index < shares.Count; index++)
+            {
+                if (index > 0) json.Append(',');
+                json.Append("{\"zone\":"); String(json, shares[index].Zone);
+                json.Append(",\"share\":").Append(Number(shares[index].Share)).Append('}');
+            }
+            json.Append("],\"mixPattern\":"); String(json, settings.MixPattern.ToString());
+            json.Append(",\"lotWidthCells\":").Append(Integer(settings.LotWidthCells));
+            json.Append(",\"lotDepthCells\":").Append(Integer(settings.DepthCells));
+            json.Append(",\"levelLots\":").Append(settings.LevelLots ? "true" : "false");
+            json.Append(",\"earthworkLimit\":").Append(Number(settings.EarthworkLimit));
+            json.Append(",\"bankGradePercent\":").Append(Integer((int)Math.Round(settings.BankGrade * 100f)));
+            json.Append(",\"lotSpacing\":").Append(Integer(settings.LotSpacing));
+            json.Append(",\"retainingWalls\":").Append(settings.RetainingWalls ? "true" : "false");
+            json.Append(",\"trees\":").Append(settings.Trees ? "true" : "false");
+            json.Append(",\"treeDensityPercent\":").Append(Integer(settings.TreeDensityPercent));
+            json.Append(",\"seed\":").Append(Integer(settings.Seed));
+            return json.Append('}').ToString();
+        }
+
+        private string StateJson(ToolState state, string settingsJson)
         {
             var json = new StringBuilder("{\"stage\":");
             String(json, state.Stage.ToString());
-            json.Append(",\"streetName\":"); String(json, state.StreetName);
-            json.Append(",\"hoverGradePercent\":").Append(Number(state.HoverGradePercent));
-            json.Append(",\"hoverTooFlat\":").Append(state.HoverTooFlat ? "true" : "false");
+            json.Append(",\"corners\":").Append(Integer(state.Corners));
+            json.Append(",\"areaClosed\":").Append(state.AreaClosed ? "true" : "false");
+            json.Append(",\"areaSquareMetres\":").Append(Number(state.AreaSquareMetres));
             json.Append(",\"summary\":"); String(json, state.Summary);
             json.Append(",\"messages\":[");
             var messages = state.Messages ?? Array.Empty<string>();
@@ -196,18 +258,27 @@ namespace SteppedStreets.Panel
                 if (index > 0) json.Append(',');
                 String(json, messages[index]);
             }
-            json.Append("],\"settings\":{\"side\":"); String(json, settings.Side.ToString());
-            json.Append(",\"zone\":"); String(json, settings.Zone);
-            json.Append(",\"lotWidthCells\":").Append(settings.LotWidth.ToString(CultureInfo.InvariantCulture));
-            json.Append(",\"narrowestWidthCells\":").Append(settings.Narrowest.ToString(CultureInfo.InvariantCulture));
-            json.Append(",\"depthCells\":").Append(settings.Depth.ToString(CultureInfo.InvariantCulture));
-            json.Append(",\"look\":"); String(json, settings.Look.ToString());
-            json.Append(",\"minimumGradePercent\":").Append(settings.MinimumGrade.ToString(CultureInfo.InvariantCulture));
-            json.Append(",\"highestStep\":").Append(Number(settings.HighestStep));
-            json.Append(",\"bankGrade\":").Append(Number(settings.BankGrade));
-            json.Append(",\"earthworkLimit\":").Append(Number(settings.EarthworkLimit));
-            return json.Append("},\"zones\":").Append(_zonesJson).Append('}').ToString();
+            json.Append("],\"stats\":{\"roadKilometres\":").Append(Number(state.RoadKilometres));
+            json.Append(",\"lots\":").Append(Integer(state.Lots));
+            json.Append(",\"zonedCells\":").Append(Integer(state.ZonedCells));
+            json.Append(",\"earthCubicMetres\":").Append(Number(state.EarthCubicMetres));
+            json.Append(",\"steepestRoadPercent\":").Append(Number(state.SteepestRoadPercent));
+            json.Append(",\"wildPercent\":").Append(Number(state.WildPercent));
+            json.Append(",\"connected\":").Append(state.Connected ? "true" : "false");
+            json.Append(",\"trees\":").Append(Integer(state.Trees));
+            json.Append("},\"zoneCounts\":[");
+            for (int index = 0; index < state.ZoneCounts.Count; index++)
+            {
+                if (index > 0) json.Append(',');
+                json.Append("{\"zone\":"); String(json, state.ZoneCounts[index].Key);
+                json.Append(",\"lots\":").Append(Integer(state.ZoneCounts[index].Value)).Append('}');
+            }
+            json.Append("],\"progress\":").Append(Number(state.Progress));
+            json.Append(",\"settings\":").Append(settingsJson);
+            return json.Append(",\"zones\":").Append(_zonesJson).Append(",\"roads\":").Append(_roadsJson).Append('}').ToString();
         }
+
+        private static string Integer(int value) => value.ToString(CultureInfo.InvariantCulture);
 
         private static string Number(float value) => float.IsNaN(value) || float.IsInfinity(value)
             ? "null" : value.ToString("R", CultureInfo.InvariantCulture);
@@ -229,29 +300,6 @@ namespace SteppedStreets.Panel
                 }
             }
             json.Append('"');
-        }
-
-        private readonly struct SettingsSnapshot
-        {
-            public readonly StreetSide Side;
-            public readonly string Zone;
-            public readonly int LotWidth, Narrowest, Depth, MinimumGrade;
-            public readonly StepLook Look;
-            public readonly float HighestStep, BankGrade, EarthworkLimit;
-
-            public SettingsSnapshot(SteppedStreetsSettings settings)
-            {
-                Side = settings.Side; Zone = settings.ZoneName;
-                LotWidth = settings.LotWidthCells; Narrowest = settings.NarrowestWidthCells;
-                Depth = settings.DepthCells; MinimumGrade = settings.MinimumGradePercent;
-                Look = settings.Look; HighestStep = settings.HighestStep;
-                BankGrade = settings.BankGrade; EarthworkLimit = settings.EarthworkLimit;
-            }
-
-            public bool SameAs(SettingsSnapshot other) => Side == other.Side && Zone == other.Zone
-                && LotWidth == other.LotWidth && Narrowest == other.Narrowest && Depth == other.Depth
-                && MinimumGrade == other.MinimumGrade && Look == other.Look && HighestStep.Equals(other.HighestStep)
-                && BankGrade.Equals(other.BankGrade) && EarthworkLimit.Equals(other.EarthworkLimit);
         }
     }
 }

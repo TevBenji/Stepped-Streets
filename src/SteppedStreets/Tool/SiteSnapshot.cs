@@ -5,7 +5,7 @@
 // grid (idea from Grid Road Generator's HeightSnapshot), a coarser water-depth grid, nearby nets
 // as Bézier curves with widths, building lots as obstacles, and the asset info map. The result
 // (SiteContext) is immutable after capture and therefore safe to read from any thread.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: keep fixed 4 m terrain and 8 m water grids, building lots and sampled road corridors only; reject capture failures instead of assuming dry ground.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: a drawn area instead of one street; fixed 4 m terrain and 8 m water grids, building lots and water rasterised into one blocked grid, existing road edges sampled for the neighbourhood generator with their entity handles, and a fingerprint to notice changes before a build.
 using System;
 using System.Collections.Generic;
 using Colossal.Mathematics;
@@ -14,6 +14,7 @@ using Game.Net;
 using Game.Prefabs;
 using Game.Simulation;
 using Game.Tools;
+using SteppedStreets.Core.Neighbourhood;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -24,58 +25,64 @@ namespace SteppedStreets.Tool
     {
         private const float HeightSpacing = 4f;
         private const float WaterSpacing = 8f;
+        // The connection may reach an existing road up to 400 m from the area; the survey reaches a little further.
+        private const float Margin = 460f;
+        private const float RoadReach = 400f;
+
         private readonly float2 origin;
-        private readonly int heightColumns, heightRows, waterColumns, waterRows;
-        private readonly float[] heights, waterDepths;
-        private readonly float2[][] lots;
-        private readonly RoadSegment[] roads;
+        private readonly int columns, rows;
+        private readonly float[] heights;
+        private readonly bool[] blocked;
 
-        private struct RoadSegment
-        {
-            public float2 Start, End;
-            public float Clearance;
-        }
+        public readonly ExistingRoad[] ExistingRoads;
+        public readonly long Fingerprint;
+        public readonly int BuildingCount;
 
-        private SiteSnapshot(EntityManager entities, World world, StreetCapture street, int depthCells)
+        private SiteSnapshot(EntityManager entities, World world, float2[] boundary)
         {
-            float2 minimum = new float2(float.MaxValue), maximum = new float2(float.MinValue);
-            foreach (var point in street.Centreline)
-            {
-                minimum = math.min(minimum, point.xz);
-                maximum = math.max(maximum, point.xz);
-            }
-            float margin = street.HalfWidth + depthCells * 8f + 32f;
-            origin = minimum - margin;
-            maximum += margin;
-            heightColumns = math.max(2, (int)math.ceil((maximum.x - origin.x) / HeightSpacing) + 1);
-            heightRows = math.max(2, (int)math.ceil((maximum.y - origin.y) / HeightSpacing) + 1);
-            heights = new float[checked(heightColumns * heightRows)];
+            float2 low = new float2(float.MaxValue), high = new float2(float.MinValue);
+            foreach (var corner in boundary) { low = math.min(low, corner); high = math.max(high, corner); }
+            origin = low - Margin;
+            float2 maximum = high + Margin;
+            columns = math.max(2, (int)math.ceil((maximum.x - origin.x) / HeightSpacing) + 1);
+            rows = math.max(2, (int)math.ceil((maximum.y - origin.y) / HeightSpacing) + 1);
+            heights = new float[checked(columns * rows)];
+            blocked = new bool[heights.Length];
+
             var terrain = world.GetOrCreateSystemManaged<TerrainSystem>();
             var heightData = terrain.GetHeightData();
-            for (int row = 0; row < heightRows; row++)
-                for (int column = 0; column < heightColumns; column++)
-                    heights[row * heightColumns + column] = TerrainUtils.SampleHeight(ref heightData,
-                        new float3(origin.x + column * HeightSpacing, 0f, origin.y + row * HeightSpacing));
+            long fingerprint = 17;
+            for (int row = 0; row < rows; row++)
+                for (int column = 0; column < columns; column++)
+                {
+                    float height = TerrainUtils.SampleHeight(ref heightData, new float3(origin.x + column * HeightSpacing, 0f, origin.y + row * HeightSpacing));
+                    if (!math.isfinite(height)) throw new InvalidOperationException("The terrain returned a height that is not a number.");
+                    heights[row * columns + column] = height;
+                    if ((row & 7) == 0 && (column & 7) == 0) fingerprint = fingerprint * 31 + (long)math.round(height * 10f);
+                }
 
-            waterColumns = math.max(2, (int)math.ceil((maximum.x - origin.x) / WaterSpacing) + 1);
-            waterRows = math.max(2, (int)math.ceil((maximum.y - origin.y) / WaterSpacing) + 1);
-            waterDepths = new float[checked(waterColumns * waterRows)];
+            // Water deeper than 0.1 m blocks the nodes around it.
             var water = world.GetOrCreateSystemManaged<WaterSystem>();
             var waterData = water.GetSurfacesData(out var dependencies);
             dependencies.Complete();
-            for (int row = 0; row < waterRows; row++)
-                for (int column = 0; column < waterColumns; column++)
-                    waterDepths[row * waterColumns + column] = WaterUtils.SampleDepth(ref waterData,
-                        new float3(origin.x + column * WaterSpacing, 0f, origin.y + row * WaterSpacing));
+            for (float z = origin.y; z <= maximum.y; z += WaterSpacing)
+                for (float x = origin.x; x <= maximum.x; x += WaterSpacing)
+                {
+                    float depth = WaterUtils.SampleDepth(ref waterData, new float3(x, 0f, z));
+                    if (math.isfinite(depth) && depth <= 0.1f) continue;
+                    MarkBox(new float2(x, z) - WaterSpacing * 0.6f, new float2(x, z) + WaterSpacing * 0.6f, _ => true);
+                }
 
-            // ponytail: one scan per selection/settings edit; use the game's spatial search trees if capture exceeds R10's 250 ms budget.
-            lots = CaptureLots(entities, origin, maximum);
-            roads = CaptureRoads(entities, new HashSet<Entity>(street.Edges), origin, maximum);
+            BuildingCount = CaptureBuildings(entities, origin, maximum);
+            ExistingRoads = CaptureRoads(entities, low - RoadReach, high + RoadReach);
+            fingerprint = fingerprint * 31 + BuildingCount;
+            fingerprint = fingerprint * 31 + ExistingRoads.Length;
+            Fingerprint = fingerprint;
         }
 
-        internal static SiteSnapshot Capture(EntityManager entities, World world, StreetCapture street, int depthCells)
+        internal static SiteSnapshot Capture(EntityManager entities, World world, float2[] boundary)
         {
-            try { return new SiteSnapshot(entities, world, street, depthCells); }
+            try { return new SiteSnapshot(entities, world, boundary); }
             catch (Exception exception)
             {
                 Mod.Logger.Error(exception, "Stepped Streets: taking the site snapshot failed");
@@ -83,22 +90,35 @@ namespace SteppedStreets.Tool
             }
         }
 
-        public float GroundHeight(float2 point) => SiteGeometry.Bilinear(heights, heightColumns, heightRows, origin, HeightSpacing, point);
+        public float GroundHeight(float2 point) => SiteGeometry.Bilinear(heights, columns, rows, origin, HeightSpacing, point);
 
+        /// <summary>True on building lots and water: any of the four grid nodes around the point is blocked.</summary>
         public bool Blocked(float2 point)
         {
-            float depth = SiteGeometry.Bilinear(waterDepths, waterColumns, waterRows, origin, WaterSpacing, point);
-            if (!math.isfinite(depth) || depth > 0.1f) return true;
-            foreach (var lot in lots)
-                if (SiteGeometry.Inside(point, lot)) return true;
-            foreach (var road in roads)
-                if (SiteGeometry.DistanceSquared(point, road.Start, road.End) <= road.Clearance * road.Clearance) return true;
-            return false;
+            float2 coordinate = (point - origin) / HeightSpacing;
+            int column = (int)math.floor(coordinate.x), row = (int)math.floor(coordinate.y);
+            if (column < 0 || row < 0 || column >= columns - 1 || row >= rows - 1) return false;
+            int index = row * columns + column;
+            return blocked[index] || blocked[index + 1] || blocked[index + columns] || blocked[index + columns + 1];
         }
 
-        private static float2[][] CaptureLots(EntityManager entities, float2 minimum, float2 maximum)
+        private void MarkBox(float2 low, float2 high, Func<float2, bool> inside)
         {
-            var result = new List<float2[]>();
+            int firstColumn = math.max(0, (int)math.floor((low.x - origin.x) / HeightSpacing));
+            int lastColumn = math.min(columns - 1, (int)math.ceil((high.x - origin.x) / HeightSpacing));
+            int firstRow = math.max(0, (int)math.floor((low.y - origin.y) / HeightSpacing));
+            int lastRow = math.min(rows - 1, (int)math.ceil((high.y - origin.y) / HeightSpacing));
+            for (int row = firstRow; row <= lastRow; row++)
+                for (int column = firstColumn; column <= lastColumn; column++)
+                {
+                    float2 node = origin + new float2(column, row) * HeightSpacing;
+                    if (inside(node)) blocked[row * columns + column] = true;
+                }
+        }
+
+        private int CaptureBuildings(EntityManager entities, float2 minimum, float2 maximum)
+        {
+            int count = 0;
             using (var query = entities.CreateEntityQuery(ComponentType.ReadOnly<Game.Buildings.Building>(),
                 ComponentType.ReadOnly<Game.Objects.Transform>(), ComponentType.ReadOnly<PrefabRef>(),
                 ComponentType.Exclude<Temp>(), ComponentType.Exclude<Deleted>()))
@@ -111,41 +131,49 @@ namespace SteppedStreets.Tool
                     if (!math.all(size > 0f)) continue;
                     var transform = entities.GetComponentData<Game.Objects.Transform>(building);
                     var corners = Game.Objects.ObjectUtils.CalculateBaseCorners(transform.m_Position, transform.m_Rotation, size);
-                    float2 lower = math.min(math.min(corners.a.xz, corners.b.xz), math.min(corners.c.xz, corners.d.xz));
-                    float2 upper = math.max(math.max(corners.a.xz, corners.b.xz), math.max(corners.c.xz, corners.d.xz));
+                    var lot = new[] { corners.a.xz, corners.b.xz, corners.c.xz, corners.d.xz };
+                    float2 lower = math.min(math.min(lot[0], lot[1]), math.min(lot[2], lot[3]));
+                    float2 upper = math.max(math.max(lot[0], lot[1]), math.max(lot[2], lot[3]));
                     if (math.any(upper < minimum) || math.any(lower > maximum)) continue;
-                    result.Add(new[] { corners.a.xz, corners.b.xz, corners.c.xz, corners.d.xz });
+                    count++;
+                    // A node a few metres outside the lot still counts, so grading keeps a clear margin round the building.
+                    MarkBox(lower - 4f, upper + 4f, node =>
+                    {
+                        if (SiteGeometry.Inside(node, lot)) return true;
+                        for (int edge = 0; edge < 4; edge++)
+                            if (SiteGeometry.DistanceSquared(node, lot[edge], lot[(edge + 1) % 4]) < 16f) return true;
+                        return false;
+                    });
                 }
-            return result.ToArray();
+            return count;
         }
 
-        private static RoadSegment[] CaptureRoads(EntityManager entities, HashSet<Entity> selected, float2 minimum, float2 maximum)
+        private static ExistingRoad[] CaptureRoads(EntityManager entities, float2 minimum, float2 maximum)
         {
-            var result = new List<RoadSegment>();
+            var result = new List<ExistingRoad>();
             using (var query = entities.CreateEntityQuery(ComponentType.ReadOnly<Road>(), ComponentType.ReadOnly<Edge>(),
                 ComponentType.ReadOnly<Curve>(), ComponentType.ReadOnly<Composition>(),
                 ComponentType.Exclude<Temp>(), ComponentType.Exclude<Deleted>()))
             using (var edges = query.ToEntityArray(Allocator.Temp))
                 foreach (var edge in edges)
                 {
-                    if (selected.Contains(edge)) continue;
                     Entity composition = entities.GetComponentData<Composition>(edge).m_Edge;
+                    if (!entities.HasComponent<NetCompositionData>(composition)) continue;
                     var data = entities.GetComponentData<NetCompositionData>(composition);
                     if ((data.m_Flags.m_General & (CompositionFlags.General.Elevated | CompositionFlags.General.Tunnel)) != 0) continue;
                     var curve = entities.GetComponentData<Curve>(edge);
-                    float clearance = data.m_Width * 0.5f + 2f;
                     var bounds = MathUtils.Bounds(curve.m_Bezier);
-                    if (math.any(bounds.max.xz + clearance < minimum) || math.any(bounds.min.xz - clearance > maximum)) continue;
+                    if (math.any(bounds.max.xz < minimum) || math.any(bounds.min.xz > maximum)) continue;
                     int segments = math.max(1, (int)math.ceil(curve.m_Length / 4f));
-                    float2 start = curve.m_Bezier.a.xz;
-                    for (int index = 1; index <= segments; index++)
-                    {
-                        float2 end = MathUtils.Position(curve.m_Bezier, index / (float)segments).xz;
-                        result.Add(new RoadSegment { Start = start, End = end, Clearance = clearance });
-                        start = end;
-                    }
+                    var points = new float3[segments + 1];
+                    for (int index = 0; index <= segments; index++) points[index] = MathUtils.Position(curve.m_Bezier, index / (float)segments);
+                    result.Add(new ExistingRoad { Id = Pack(edge), Points = points, HalfWidth = data.m_Width * 0.5f });
                 }
             return result.ToArray();
         }
+
+        public static long Pack(Entity entity) => ((long)entity.Version << 32) | (uint)entity.Index;
+
+        public static Entity Unpack(long id) => new Entity { Index = (int)(id & 0xFFFFFFFF), Version = (int)(id >> 32) };
     }
 }

@@ -38,6 +38,11 @@ namespace SteppedStreets
             catch (Exception exception) { Logger.Error(exception, "Stepped Streets build tool registration failed"); }
             try { updateSystem.UpdateBefore<Build.ZoneBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
             catch (Exception exception) { Logger.Error(exception, "Stepped Streets zoning system registration failed"); }
+            // The road and tree builders hand their Apply to the build tool in the same frame, so they update just before it.
+            try { updateSystem.UpdateBefore<Build.NetBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
+            catch (Exception exception) { Logger.Error(exception, "Stepped Streets road builder registration failed"); }
+            try { updateSystem.UpdateBefore<Build.TreeBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
+            catch (Exception exception) { Logger.Error(exception, "Stepped Streets tree builder registration failed"); }
             try
             {
                 updateSystem.UpdateAt<Build.TerrainBuildSystem>(SystemUpdatePhase.ToolUpdate);
@@ -49,11 +54,11 @@ namespace SteppedStreets
 
             try
             {
-                updateSystem.UpdateAt<StepStreetToolSystem>(SystemUpdatePhase.ToolUpdate);
+                updateSystem.UpdateAt<NeighbourhoodToolSystem>(SystemUpdatePhase.ToolUpdate);
             }
             catch (Exception exception)
             {
-                Logger.Error(exception, "Stepped Streets: the street picker failed to register");
+                Logger.Error(exception, "Stepped Streets: the neighbourhood tool failed to register");
             }
 
             try
@@ -65,10 +70,10 @@ namespace SteppedStreets
                 Logger.Error(exception, "Stepped Streets wall system registration failed");
             }
             try { updateSystem.UpdateAt<StepStreetHotkeySystem>(SystemUpdatePhase.ToolUpdate); }
-            catch (Exception exception) { Logger.Error(exception, "Stepped Streets: the street picker hotkey failed to register"); }
+            catch (Exception exception) { Logger.Error(exception, "Stepped Streets: the tool hotkey failed to register"); }
 
-            try { updateSystem.UpdateAt<StepPreviewSystem>(SystemUpdatePhase.Rendering); }
-            catch (Exception exception) { Logger.Error(exception, "Stepped Streets: the street preview failed to register"); }
+            try { updateSystem.UpdateAt<NeighbourhoodPreviewSystem>(SystemUpdatePhase.Rendering); }
+            catch (Exception exception) { Logger.Error(exception, "Stepped Streets: the preview failed to register"); }
 
             try
             {
