@@ -9,6 +9,11 @@ The build setup is adapted from [Placemaker by jackwrichards](https://github.com
 
 The default game DLL path is shared through `build/GameReferences.props`.
 
+The game terrain apply path is adapted from the same Placemaker commit (`e654b32`, GPL-3.0):
+
+- `src/SteppedStreets/Build/TerrainBuildSystem.cs`: from `Game/Build/BuildService.Terrain.cs:30-451` and `Height()` in `Game/Build/BuildService.Emit.cs:97-106`. Kept direct Shift passes, masks, calibration and height copying; replaced plan/group types with the patch/report contract, retained the original snapshot for final curtain measurement, and removed pits, debug hooks, paint, dabs, water and zoning. No ParkManager or GridRoadGenerator code is included in this apply system.
+- `src/SteppedStreets.Core/Terrain/TerraformApplyMath.cs`: extracted patch inputs (`Game/Build/BuildService.Terrain.cs:94-114`) and delta-time compensation (`:404-416`). Added patch validation and snapshot copies, and the inverse low-strength curve verified in the installed game's `TerrainSystem.ApplyToTerrain`, so reversing with a longer frame still cancels the original Shift displacement. Removed game and plan types.
+
 The pure terrain code below is adapted from the same Placemaker commit (`e654b32`, GPL-3.0):
 
 - `src/SteppedStreets.Core/Terrain/Sculpt.cs`: from `Core/Layers/Common/Sculpt.cs`. Changed the namespace and usings; `Emit` takes a patch list and cancellation token and returns the emitted cell count. Removed `Over`, `Resnap`, `GradeAt`, `Warn`, `CrossesRing`, the `Ground.Override` call, plan facts, and the clip path and state. Kept the shaping, interpolation, and earthwork code.

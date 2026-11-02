@@ -11,6 +11,14 @@ namespace SteppedStreets
         public void OnLoad(UpdateSystem updateSystem)
         {
             Logger.Info("Stepped Streets loading");
+            try
+            {
+                updateSystem.UpdateAt<Build.TerrainBuildSystem>(SystemUpdatePhase.ToolUpdate);
+            }
+            catch (System.Exception exception)
+            {
+                Logger.Error(exception, "Stepped Streets terrain registration failed.");
+            }
         }
 
         public void OnDispose()
