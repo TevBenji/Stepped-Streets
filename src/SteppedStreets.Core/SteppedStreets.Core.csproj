@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\build\GameReferences.props" />
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>SteppedStreets.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Unity.Mathematics">
+      <HintPath>$(ManagedPath)\Unity.Mathematics.dll</HintPath>
+      <Private>false</Private>
+      <!-- Keep UnityEngine dependencies out of the planner's compiler references. -->
+      <ExternallyResolved>true</ExternallyResolved>
+    </Reference>
+  </ItemGroup>
+</Project>
