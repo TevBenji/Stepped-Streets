@@ -12,6 +12,7 @@ namespace SteppedStreets.Core.Planning
         internal readonly List<Step> steps = new List<Step>();
         internal readonly List<EmptyLot> emptyLots = new List<EmptyLot>();
         internal readonly List<FlatStretch> flatStretches = new List<FlatStretch>();
+        internal readonly List<string> messages = new List<string>();
 
         /// <summary>Left side first, each side from the downhill end.</summary>
         public IReadOnlyList<Pad> Pads => pads;
@@ -26,6 +27,10 @@ namespace SteppedStreets.Core.Planning
 
         /// <summary>PRD 5.5's "flatter than" message when the whole street is too gentle to step; otherwise null.</summary>
         public string Message { get; internal set; }
+
+        public string SummaryLine { get; internal set; }
+
+        public IReadOnlyList<string> Messages => messages;
     }
 
     /// <summary>One lot on its own level pad.</summary>
@@ -45,6 +50,9 @@ namespace SteppedStreets.Core.Planning
         public int WidthCells { get; internal set; }
 
         public int DepthCells { get; internal set; }
+
+        // Keep every change of street grade so an apron follows the road even within a lot.
+        internal IReadOnlyList<float2> StreetProfile { get; set; }
 
         /// <summary>
         /// World x and z of a point given in cells from the pad's front corner at its start: column along the kerb,
@@ -86,6 +94,10 @@ namespace SteppedStreets.Core.Planning
 
         /// <summary>The end of the street, shorter than the narrowest lot.</summary>
         LeftOver,
+
+        TooMuchEarthwork,
+
+        Blocked,
     }
 
     /// <summary>Land beside the street that gets no pad, and why.</summary>
@@ -103,7 +115,13 @@ namespace SteppedStreets.Core.Planning
         public EmptyLotReason Reason { get; internal set; }
 
         /// <summary>The reason in the preview's words (PRD 5.5).</summary>
-        public string Wording => Reason == EmptyLotReason.TooSteep ? "too steep for lots this wide" : "too short for a lot";
+        public string Wording => Reason switch
+        {
+            EmptyLotReason.TooSteep => "too steep for lots this wide",
+            EmptyLotReason.TooMuchEarthwork => "too much earthwork",
+            EmptyLotReason.Blocked => "blocked by a building, road or water",
+            _ => "too short for a lot",
+        };
     }
 
     /// <summary>A stretch left alone because it is flatter than the minimum grade (R1).</summary>
@@ -127,7 +145,7 @@ namespace SteppedStreets.Core.Planning
         /// <summary>The tallest step height in metres, ignoring direction; 0 when there are no steps.</summary>
         public float TallestStep { get; internal set; }
 
-        /// <summary>Lots left empty because they were too steep. Left-over ends are not lots, so they are not counted.</summary>
+        /// <summary>All rejected lots. Left-over ends are not lots, so they are not counted.</summary>
         public int EmptyCount { get; internal set; }
     }
 }
