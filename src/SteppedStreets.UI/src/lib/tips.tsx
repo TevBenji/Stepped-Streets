@@ -9,7 +9,8 @@ import styles from "../Panel.module.css";
 
 /** What each setting does, shown when the pointer rests on its row. Keyed by the row's label. */
 export const SETTING_TIPS: Record<string, string> = {
-    "Style": "Contour suburb: streets along the hill, linked by gentle ramps. Terraced blocks: straighter, level streets, one terrace per block. Mountain lane: one winding road with hairpins and forest around it.",
+    "Junctions": "How cross streets meet the main streets. Crossroads: four-way junctions. Staggered: offset T-junctions, like brickwork. Traffic: one through road carries the traffic and is the only road that meets yours.",
+    "Shape the ground": "Grade roads and lots into the ground. Off: no terrain changes at all; roads follow the ground as the game builds them and lots aren't levelled.",
     "Mix mode": "How a mix of zones is spread: Random picks for each lot, Clumps makes runs of neighbouring lots, Even spreads them out evenly.",
     "Steep hills": "Build on slopes up to 60 %, with up to 12 m of earthwork. Connectors may switch back to climb.",
     "Trees": "Forest on ground too steep to build, and trees on the banks and between lots.",
@@ -26,6 +27,18 @@ export const SETTING_TIPS: Record<string, string> = {
     "Retaining walls": "Garden walls where a road runs through a cutting.",
     "Tree density": "How many trees to plant.",
     "Seed": "Which layout you get. Reroll picks another; the same seed and settings always give the same plan.",
+};
+
+/** What each layout makes, shown under the layout picker. */
+export const LAYOUT_TIPS: Record<string, string> = {
+    ContourSuburb: "Streets along the hill, linked by gentle ramps; every lot on its own level pad.",
+    TerracedBlocks: "Straighter, level streets along the hill, one terrace per block.",
+    MountainLane: "One winding road climbing the hill with hairpins, forest around it.",
+    SquareGrid: "Straight streets at right angles; blocks as long as they are deep. For flat or gentle ground.",
+    RectangularGrid: "Straight streets at right angles with long blocks. For flat or gentle ground.",
+    IrregularGrid: "A grid with varied street spacing and block lengths, less regimented.",
+    SkewedGrid: "Long blocks whose cross streets lean, so the blocks are parallelograms.",
+    FragmentedGrid: "Parallel streets with gaps: some cross streets left out and some streets broken.",
 };
 
 /** A setting's description on hover, in the game's tooltip bubble; rows without one are left as they are. */

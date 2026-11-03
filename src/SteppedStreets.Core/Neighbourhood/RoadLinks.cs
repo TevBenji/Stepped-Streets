@@ -61,7 +61,9 @@ namespace SteppedStreets.Core.Neighbourhood
         private float Exempt => (Clearance + 2f) / 0.88f;
 
         // As far as the validation looks for a road too close (its clearance plus 20 m).
-        private void Stamp(Street street) => ContourStreets.Stamp(survey, street.Points, Clearance + 20f, roadDistance, street.Heights, roadHeight);
+        // As far as the road check looks (RoadNetwork.ClearanceReach): a shorter reach here let through connections the check
+        // then dropped, with no second try, leaving a neighbourhood unconnected beside a city road split into edges.
+        private void Stamp(Street street) => ContourStreets.Stamp(survey, street.Points, RoadNetwork.ClearanceReach(request), roadDistance, street.Heights, roadHeight);
 
         internal sealed class Candidate
         {
@@ -151,7 +153,7 @@ namespace SteppedStreets.Core.Neighbourhood
             for (int from = 0; from < count; from++)
             {
                 var piece = streets[from];
-                if (piece.Removed || piece.Kind != RoadKind.Contour || !inPiece(from)) continue;
+                if (piece.Removed || !piece.Kind.IsMain() || !inPiece(from)) continue;
                 // Every 32 m along the street: closer starts would only repeat the same search.
                 for (int point = 0; point < piece.Points.Count; point += 8)
                 {
@@ -159,7 +161,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     for (int to = 0; to < count; to++)
                     {
                         var main = streets[to];
-                        if (main.Removed || main.Kind != RoadKind.Contour || !inMain(to)) continue;
+                        if (main.Removed || !main.Kind.IsMain() || !inMain(to)) continue;
                         float distance = math.distance(piece.Points[point], main.Points[NearestPoint(main, piece.Points[point])]);
                         if (distance <= reach) tries.Add((from, point, to, distance));
                     }
@@ -248,40 +250,49 @@ namespace SteppedStreets.Core.Neighbourhood
         /// </summary>
         public bool Connect(Func<int, bool> targetAllowed, CancellationToken cancellation)
         {
-            var starts = new List<(int Road, int Point, float Distance)>();
+            var starts = new List<(int Road, float3 Origin, float2 Along, float T, float Distance)>();
             var roads = request.ExistingRoads ?? new ExistingRoad[0];
             for (int road = 0; road < roads.Length; road++)
             {
                 var points = roads[road]?.Points;
                 if (points == null || points.Length < 2) continue;
-                // Stations about every 12 m along the edge, whatever its sampling.
-                float travelled = 12f;
-                for (int point = 0; point < points.Length; point++)
+                // Places about every 12 m along the edge's clear middle, whatever its sampling, so a short edge still offers its
+                // middle: the samples alone could all miss a clear stretch of a few metres.
+                var stations = new float[points.Length];
+                for (int point = 1; point < points.Length; point++) stations[point] = stations[point - 1] + math.distance(points[point - 1].xz, points[point].xz);
+                float total = stations[points.Length - 1], clear = ExistingRoad.EndClearance;
+                if (total < 2f * clear) continue;
+                var places = new List<float>();
+                for (float at = clear; at <= total - clear + 0.01f; at += 12f) places.Add(at);
+                if (total - 2f * clear < 12f) places.Add(total * 0.5f);
+                foreach (float at in places)
                 {
-                    if (point > 0) travelled += math.distance(points[point].xz, points[point - 1].xz);
-                    if (travelled < 12f && point != points.Length - 1) continue;
-                    travelled = 0f;
-                    float2 position = points[point].xz;
+                    int segment = 0;
+                    while (segment < points.Length - 2 && stations[segment + 1] < at) segment++;
+                    float length = stations[segment + 1] - stations[segment];
+                    float share = length > 1e-4f ? math.saturate((at - stations[segment]) / length) : 0f;
+                    float3 origin = math.lerp(points[segment], points[segment + 1], share);
+                    float2 position = origin.xz;
                     if (!survey.InsideGrid(position, 24f)) continue;
                     float distance = Poly.Contains(survey.Boundary, position) ? 0f : Poly.DistanceToBoundary(survey.Boundary, position);
                     bool taken = false;
                     foreach (var other in connectionStarts) taken |= math.distance(other, position) < JunctionSpacing;
-                    if (distance <= 400f && !taken) starts.Add((road, point, distance));
+                    float2 along = math.normalizesafe(points[segment + 1].xz - points[segment].xz, new float2(1f, 0f));
+                    if (distance <= 400f && !taken) starts.Add((road, origin, along, (segment + share) / (points.Length - 1), distance));
                 }
             }
             starts.Sort((x, y) => x.Distance != y.Distance ? x.Distance.CompareTo(y.Distance)
-                : x.Road != y.Road ? x.Road.CompareTo(y.Road) : x.Point.CompareTo(y.Point));
+                : x.Road != y.Road ? x.Road.CompareTo(y.Road) : x.T.CompareTo(y.T));
             if (starts.Count > 48) starts.RemoveRange(48, starts.Count - 48);
 
             Candidate best = null;
-            (int Road, int Point, float Distance) bestStart = default;
+            (int Road, float3 Origin, float2 Along, float T, float Distance) bestStart = default;
             foreach (var start in starts)
             {
                 cancellation.ThrowIfCancellationRequested();
                 var road = roads[start.Road];
-                float3 origin = road.Points[start.Point];
-                int before = math.max(0, start.Point - 1), after = math.min(road.Points.Length - 1, start.Point + 1);
-                float2 along = math.normalizesafe(road.Points[after].xz - road.Points[before].xz, new float2(1f, 0f));
+                float3 origin = start.Origin;
+                float2 along = start.Along;
                 var targets = new List<(int Street, int Point, float Distance, bool End)>();
                 for (int street = 0; street < streets.Count; street++)
                 {
@@ -337,11 +348,10 @@ namespace SteppedStreets.Core.Neighbourhood
             }
             if (best == null) return false;
             var existing = roads[bestStart.Road];
-            connectionStarts.Add(existing.Points[bestStart.Point].xz);
+            connectionStarts.Add(bestStart.Origin.xz);
             Accept(RoadKind.Connection, best, new Attachment
             {
-                Street = -1, Point = -1, Existing = true, ExistingId = existing.Id,
-                ExistingT = bestStart.Point / (float)(existing.Points.Length - 1),
+                Street = -1, Point = -1, Existing = true, ExistingId = existing.Id, ExistingT = bestStart.T,
             });
             return true;
         }
@@ -609,7 +619,7 @@ namespace SteppedStreets.Core.Neighbourhood
             {
                 if (stations[index] < fromStart || length - stations[index] < fromEnd) continue;
                 float distance = survey.Sample(roadDistance, path[index]);
-                if (distance > Clearance + 20f) continue;
+                if (distance > RoadNetwork.ClearanceReach(request)) continue;
                 if (distance < Clearance + math.abs(heights[index] - roadHeight[NearestNode(path[index])]) / bank) return null;
             }
             // Clean ramps over squiggles: every degree the road turns costs half a metre.

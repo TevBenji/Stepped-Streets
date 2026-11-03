@@ -18,6 +18,43 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>One winding road that climbs the hill with hairpins, sparse lots, forest elsewhere.</summary>
         MountainLane,
+
+        // Grid layouts, for flat or gentle ground (appended, so saved settings keep their meaning).
+
+        /// <summary>Straight streets at right angles, blocks as long as they are deep.</summary>
+        SquareGrid,
+
+        /// <summary>Straight streets at right angles, long blocks.</summary>
+        RectangularGrid,
+
+        /// <summary>A grid with varied street spacing and block lengths.</summary>
+        IrregularGrid,
+
+        /// <summary>Long blocks whose cross streets lean, so the blocks are parallelograms.</summary>
+        SkewedGrid,
+
+        /// <summary>Parallel streets with gaps: some cross streets left out and some streets broken, so T-junctions and L-turns.</summary>
+        FragmentedGrid,
+    }
+
+    public static class NeighbourhoodStyles
+    {
+        /// <summary>The hillside layouts, which follow the contours and so need a slope.</summary>
+        public static bool FollowsContours(this NeighbourhoodStyle style) => style == NeighbourhoodStyle.ContourSuburb
+            || style == NeighbourhoodStyle.TerracedBlocks || style == NeighbourhoodStyle.MountainLane;
+    }
+
+    /// <summary>How the cross streets of a grid meet its main streets.</summary>
+    public enum JunctionPattern
+    {
+        /// <summary>Cross streets line up: four-way junctions.</summary>
+        Crossroads,
+
+        /// <summary>Cross streets offset like brickwork: every junction a T.</summary>
+        Staggered,
+
+        /// <summary>Staggered T-junctions for the local streets, and one through road that is the only road meeting the city's.</summary>
+        TrafficOptimised,
     }
 
     public enum MixPattern { Random, Clumps, Even }
@@ -126,6 +163,27 @@ namespace SteppedStreets.Core.Neighbourhood
         public float3[] Points = new float3[0];
 
         public float HalfWidth = 6f;
+
+        /// <summary>
+        /// How far along the edge from either end a new road may join it. An edge ends at a node of the player's network,
+        /// often a junction; a new junction closer than this crowds it and the game's shapes for the two overlap (owner's
+        /// in-game test of 2.1.1, 3 November 2026).
+        /// </summary>
+        public const float EndClearance = 20f;
+
+        /// <summary>Whether a point a share of the way along one of the edge's segments is clear of both its ends.</summary>
+        public bool ClearOfEnds(int segment, float share)
+        {
+            float along = 0f, total = 0f;
+            for (int index = 1; index < Points.Length; index++)
+            {
+                float length = math.distance(Points[index - 1].xz, Points[index].xz);
+                if (index - 1 < segment) along += length;
+                else if (index - 1 == segment) along += length * share;
+                total += length;
+            }
+            return along >= EndClearance && total - along >= EndClearance;
+        }
     }
 
     /// <summary>The drawn area, the site and the player's settings.</summary>
@@ -178,6 +236,12 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Grade the lots into level pads with banks. Off: only the roads are graded and every lot cell is zoned.</summary>
         public bool LevelLots = true;
+
+        /// <summary>Change the terrain at all. Off: no grading, roads follow the ground as the game builds them, lots aren't levelled.</summary>
+        public bool ShapeGround = true;
+
+        /// <summary>How a grid's cross streets meet its main streets.</summary>
+        public JunctionPattern Junctions = JunctionPattern.Staggered;
 
         /// <summary>The most cut or fill, in metres, under a lot or a road.</summary>
         public float EarthworkLimit = 4f;

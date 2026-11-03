@@ -128,7 +128,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 for (int point = 0; point < road.Points.Length; point++)
                 {
                     float2 position = road.Points[point].xz;
-                    if (!survey.InsideGrid(position, 24f)) continue;
+                    if (!survey.InsideGrid(position, 24f) || !road.ClearOfEnds(point, 0f)) continue;
                     float distance = Poly.Contains(survey.Boundary, position) ? 0f : Poly.DistanceToBoundary(survey.Boundary, position);
                     if (distance >= best) continue;
                     int before = math.max(0, point - 1), after = math.min(road.Points.Length - 1, point + 1);

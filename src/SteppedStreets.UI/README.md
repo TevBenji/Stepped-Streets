@@ -31,7 +31,7 @@ and read defensively by `src/lib/state.ts` (`readState` never throws and clamps 
 `stage` (Closed, Drawing, Planning, Planned, Building, Built, Failed), `corners`, `areaClosed`, `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
 `connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
-`settings` (the trigger values below, plus `steepGround` and `serviceMix` as `name`/`count` rows), and the catalogues `zones` and
+`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `junctions` and `serviceMix` as `name`/`count` rows), and the catalogues `zones` and
 `roads` (`name`/`label`) and `services` (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read
 again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
 the game's own menu icon path (ImageSystem.GetIconOrGroupIcon); it is left out when the game has none. While Planning and Building, `summary` is the current step; once Built,
@@ -43,7 +43,8 @@ it is the build report (the panel shows it under the status line). The state is 
 | `clearArea`, `closeArea`, `undo` | none | Area editing |
 | `build` | none | Build when Planned, after the UI confirmation |
 | `reroll` | none | A new seed |
-| `setStyle` | string | ContourSuburb / TerracedBlocks / MountainLane |
+| `setStyle` | string | ContourSuburb / TerracedBlocks / MountainLane / SquareGrid / RectangularGrid / IrregularGrid / SkewedGrid / FragmentedGrid |
+| `setJunctions` | string | Crossroads / Staggered / TrafficOptimised (grid layouts) |
 | `setRoad` | string | A road `name` from the catalogue |
 | `setMixPattern` | string | Random / Clumps / Even |
 | `setZoneMix` | string | `[{"zone":"...","share":N},...]`; zones not in the catalogue are dropped |
@@ -56,6 +57,7 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setLotSpacing` | double | −1 (Auto) to 2 cells |
 | `setTreeDensity`, `setSeed` | double | 10–100 %, 1–99999 |
 | `setLevelLots`, `setRetainingWalls`, `setTrees` | bool | Switches |
+| `setShapeGround` | bool | Off: no terrain changes at all (and no level lots) |
 | `setSteepGround` | bool | Steep hills; on lifts `steepestBuildablePercent` to at least 50 and `earthworkLimit` to at least 8, off caps them at 30 and 8 |
 
 Numeric triggers reject NaN/infinity and clamp before saving. Valid writes call `Mod.Settings.ApplyAndSave()` and then

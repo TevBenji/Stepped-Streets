@@ -26,9 +26,13 @@ namespace SteppedStreets.Core.Neighbourhood
                 changed = false;
                 foreach (var street in streets)
                 {
-                    if (street.Removed || street.Kind == RoadKind.Contour) continue;
-                    bool lost = (street.Start.Street >= 0 && streets[street.Start.Street].Removed)
-                        || (street.End.Street >= 0 && streets[street.End.Street].Removed);
+                    // A link or connection goes with a street it joins, and so does a main street that hangs off another (a grid's
+                    // through-road end). A main street stays when a link or connection joined to its end goes: it may record that
+                    // road at its end (a connection extending it), and other links may still hold it.
+                    if (street.Removed) continue;
+                    bool Lost(Attachment attachment) => attachment.Street >= 0 && streets[attachment.Street].Removed
+                        && (!street.Kind.IsMain() || streets[attachment.Street].Kind.IsMain());
+                    bool lost = Lost(street.Start) || Lost(street.End);
                     if (lost) { street.Pruned = true; changed = true; }
                 }
             }
@@ -115,16 +119,36 @@ namespace SteppedStreets.Core.Neighbourhood
                     if (attachment.Street >= 0 && !streets[attachment.Street].Removed) cuts[attachment.Street].Add(attachment.Point);
             }
 
+            // A join makes two points one node, whichever end records it: a connection arriving at a street's open end and that
+            // end may each point at the other. Every join merges its two points into one group, and each group is one node.
+            var parent = new Dictionary<long, long>();
+            long Raw(int street, int point) => ((long)street << 20) | (uint)point;
+            long Find(long key)
+            {
+                while (parent.TryGetValue(key, out long up) && up != key) key = up;
+                return key;
+            }
+            for (int index = 0; index < streets.Count; index++)
+            {
+                var street = streets[index];
+                if (street.Removed || street.Closed) continue;
+                foreach (var (attachment, point) in new[] { (street.Start, 0), (street.End, street.Points.Count - 1) })
+                {
+                    if (attachment.Existing || attachment.Street < 0 || streets[attachment.Street].Removed) continue;
+                    long a = Find(Raw(index, point)), b = Find(Raw(attachment.Street, attachment.Point));
+                    if (a != b) parent[a > b ? a : b] = a > b ? b : a;
+                }
+            }
+
             long Key(int street, int point)
             {
                 var owner = streets[street];
-                if (owner.Kind != RoadKind.Contour)
+                if (!owner.Closed)
                 {
                     var attachment = point == 0 ? owner.Start : point == owner.Points.Count - 1 ? owner.End : Attachment.None;
                     if (attachment.Existing) return -1 - street;
-                    if (attachment.Street >= 0) return ((long)attachment.Street << 20) | (uint)attachment.Point;
                 }
-                return ((long)street << 20) | (uint)point;
+                return Find(Raw(street, point));
             }
             int Node(int street, int point)
             {
@@ -204,7 +228,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (planned.SteepestGrade > limit + 0.003f) Flag(road, $"a {planned.Kind} road was steeper than {limit:P0}");
                 var plan2 = new List<float2>(planned.Points.Length);
                 foreach (var point in planned.Points) plan2.Add(point.xz);
-                float minimumRadius = planned.Kind == RoadKind.Contour ? streetRadius : linkRadius;
+                float minimumRadius = planned.Kind.IsMain() ? streetRadius : linkRadius;
                 if (plan2.Count >= 7 && Geometry.TightestRadius(plan2, 12f, out _) < minimumRadius * 0.95f)
                     Flag(road, $"a {planned.Kind} road turned tighter than {minimumRadius:0} m");
             }
@@ -229,7 +253,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         float angle = math.degrees(math.acos(math.clamp(math.dot(list[first].Direction, list[second].Direction), -1f, 1f)));
                         float heading = math.degrees(math.acos(math.clamp(math.dot(list[first].Heading, list[second].Heading), -1f, 1f)));
                         if (angle >= SharpestJunction(request) - 1f && heading >= SharpestHeading - 1f) continue;
-                        int blamed = streets[owners[list[first].Road]].Kind == RoadKind.Contour ? list[second].Road : list[first].Road;
+                        int blamed = streets[owners[list[first].Road]].Kind.IsMain() ? list[second].Road : list[first].Road;
                         Flag(blamed, "a junction was too sharp");
                     }
             }
@@ -239,7 +263,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     float distance = math.distance(plan.Nodes[junctions[first]].Position.xz, plan.Nodes[junctions[second]].Position.xz);
                     if (distance >= RoadLinks.JunctionSpacing - 1f) continue;
                     foreach (var end in ends[junctions[second]])
-                        if (streets[owners[end.Road]].Kind != RoadKind.Contour) { Flag(end.Road, "two junctions were closer than 40 m"); break; }
+                        if (!streets[owners[end.Road]].Kind.IsMain()) { Flag(end.Road, "two junctions were closer than 40 m"); break; }
                 }
 
             // Clearance between roads away from the nodes they share: both corridors (road and shoulders), and room for a bank
@@ -290,7 +314,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         if (other.x != road && NearShared(planned, otherRoad, plan, position, nodeReach)) continue;
                         // Two connections clashing: the later one goes, as the first serves the largest network.
                         var kind = streets[owners[road]].Kind;
-                        int blamed = kind == RoadKind.Contour || (kind == RoadKind.Connection && streets[owners[other.x]].Kind == RoadKind.Connection)
+                        int blamed = kind.IsMain() || (kind == RoadKind.Connection && streets[owners[other.x]].Kind == RoadKind.Connection)
                             ? other.x : road;
                         Flag(blamed, "two roads came too close");
                     }

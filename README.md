@@ -8,7 +8,7 @@
 
 <p>
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods" src="https://img.shields.io/badge/Paradox%20Mods-Subscribe-1f6feb?style=for-the-badge"></a>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.1.1-2ea44f?style=for-the-badge"></a>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.2.0-2ea44f?style=for-the-badge"></a>
 <img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490?style=for-the-badge">
 <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c?style=for-the-badge"></a>
 </p>
@@ -53,7 +53,10 @@ builder would, previews it on the ground, and builds it when you say so.
 - **Service buildings in the mix**: police, fire, health, schools, parks, utilities, any unlocked roadside service building,
   each on a level site of its own, facing the road.
 - **Forest** on ground too steep to build, trees on the banks, and optional garden walls.
-- **Three styles**, a live preview, and **Reroll** for another layout from the same area.
+- **Hillside and grid layouts**: three that follow the contours, and five grids for flat or gentle ground, with
+  crossroads, staggered T-junctions or a traffic-optimised road hierarchy.
+- **Shape the ground, or don't**: grade roads and lots into the hill, or leave the terrain exactly as it is.
+- A live preview, and **Reroll** for another layout from the same area.
 - **Steep hills mode** for slopes up to 60 %, and areas up to 6.4 km across.
 
 <table>
@@ -67,6 +70,11 @@ builder would, previews it on the ground, and builds it when you say so.
 <td><img src="src/SteppedStreets/Properties/Screenshots/06.png" alt="Forest on steep ground"></td>
 <td><img src="src/SteppedStreets/Properties/Screenshots/07.png" alt="Mountain lane"></td>
 </tr>
+<tr>
+<td><img src="src/SteppedStreets/Properties/Screenshots/08.png" alt="Grids for flat ground"></td>
+<td><img src="src/SteppedStreets/Properties/Screenshots/09.png" alt="Traffic-optimised grid"></td>
+<td><img src="src/SteppedStreets/Properties/Screenshots/10.png" alt="Crossroads, staggered or skewed"></td>
+</tr>
 </table>
 
 ## Installation
@@ -78,7 +86,7 @@ mod browser, and restart the game.
 
 1. Open the tool: click **Stepped Streets** in the bottom toolbar beside Zones, or press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>.
 2. **Draw the area.** Click corners on the ground and click the first corner again to close it.
-3. **Choose what to build.** Pick a style, then add zones with their shares and services with how many of each.
+3. **Choose what to build.** Pick a layout, then add zones with their shares and services with how many of each.
 4. **Check the preview.** The plan appears on the ground within moments and updates with every change. Press **Reroll** for
    another layout.
 5. **Build.** The ground is graded, the roads are laid, the lots are zoned, and the services and trees are placed.
@@ -110,13 +118,25 @@ tells you so you can join them up with a road of your own.
 | Blue pad | A service building's site; the white edge faces the road |
 | Brown and tan | Ground being cut and filled |
 
-## Styles
+## Layouts
 
-| Style | What you get |
+| Layout | What you get |
 |---|---|
 | **Contour suburb** (default) | Streets on the contours, linked by diagonal ramps and S-curves, every lot on its own level pad. |
 | **Terraced blocks** | Straighter, level streets so each side of a block is one terrace, with plain connectors between them. |
 | **Mountain lane** | One winding road that climbs with hairpins, sparse lots along it, forest everywhere else. |
+| **Square grid** | Straight streets at right angles, blocks as long as they are deep. For flat or gentle ground. |
+| **Rectangular grid** | Straight streets at right angles with long blocks. |
+| **Irregular grid** | A grid with varied street spacing and block lengths. |
+| **Skewed grid** | Long blocks whose cross streets lean, so the blocks are parallelograms. |
+| **Fragmented grid** | Parallel streets with gaps: some cross streets left out and some streets broken. |
+
+The hillside layouts need a slope; the grids work on flat land too. A grid lines up with your nearest road and meets
+it the way a real grid does: every street that runs towards it joins it in a T.
+
+**Junctions** (grids): **Crossroads** lines the cross streets up into four-way junctions; **Staggered** offsets them like
+brickwork, so every junction is a T; **Traffic** runs one through road across the grid as the only road that meets
+yours, with the local streets joining it in T-junctions.
 
 ## Settings
 
@@ -124,7 +144,9 @@ The panel shows the essentials; everything else is under **More settings**. One 
 
 | Setting | Range | Default | What it does |
 |---|---|---|---|
-| Style | see above | Contour suburb | The kind of layout. |
+| Layout | see above | Contour suburb | The kind of layout. |
+| Junctions | Crossroads, Staggered, Traffic | Staggered | How a grid's cross streets meet its main streets. |
+| Shape the ground | on / off | on | Grade roads and lots. Off: no terrain changes at all; roads follow the ground. |
 | Zones | zones and shares | Residential Low | Each lot's zone. **Add a zone** mixes in another. |
 | Services | buildings and counts (1–20) | none | Service buildings on level sites beside the new roads. **Add a service** adds one. |
 | Mix mode | Random, Clumps, Even | Clumps | How a zone mix is spread: per lot, in runs of neighbouring lots, or evenly. |

@@ -6,9 +6,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./lib/bindings";
 import { ErrorBoundary } from "./lib/errorBoundary";
-import { SettingTip } from "./lib/tips";
+import { LAYOUT_TIPS, SettingTip } from "./lib/tips";
 import {
-    formatArea, MixPattern, NeighbourhoodStyle, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, zoneColour, ZoneShare,
+    formatArea, isHillStyle, JunctionPattern, MixPattern, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, zoneColour, ZoneShare,
 } from "./lib/state";
 import { vanilla } from "./lib/vanilla";
 import icon from "./assets/stepped-streets.svg";
@@ -161,10 +161,13 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
         {open && !disabled ? <div className={classes(styles.list, !label && styles.listFull)}>
             {searchable && vanilla.TextInput ? <vanilla.TextInput className={styles.search} value={query} placeholder="Search"
                 onChange={event => setQuery(event.target.value)} /> : null}
-            {listed.map(option => <Button key={option.name} className={styles.listItem} selected={option.name === value}
-                onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>
-                {option.icon ? <img className={styles.optionIcon} src={option.icon} /> : null}<div>{option.label}</div>
-            </Button>)}
+            {listed.map((option, index) => <React.Fragment key={option.name}>
+                {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}
+                <Button className={styles.listItem} selected={option.name === value}
+                    onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>
+                    {option.icon ? <img className={styles.optionIcon} src={option.icon} /> : null}<div>{option.label}</div>
+                </Button>
+            </React.Fragment>)}
             {listed.length === 0 ? <div className={styles.noMatch}>Nothing matches "{query.trim()}"</div> : null}
         </div> : null}
     </>;
@@ -289,7 +292,17 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>;
 }
 
-const STYLES: [NeighbourhoodStyle, string][] = [["ContourSuburb", "Contour suburb"], ["TerracedBlocks", "Terraced blocks"], ["MountainLane", "Mountain lane"]];
+const LAYOUTS: Option[] = [
+    { name: "ContourSuburb", label: "Contour suburb", group: "Hills" },
+    { name: "TerracedBlocks", label: "Terraced blocks", group: "Hills" },
+    { name: "MountainLane", label: "Mountain lane", group: "Hills" },
+    { name: "SquareGrid", label: "Square grid", group: "Grid" },
+    { name: "RectangularGrid", label: "Rectangular grid", group: "Grid" },
+    { name: "IrregularGrid", label: "Irregular grid", group: "Grid" },
+    { name: "SkewedGrid", label: "Skewed grid", group: "Grid" },
+    { name: "FragmentedGrid", label: "Fragmented grid", group: "Grid" },
+];
+const JUNCTIONS: [JunctionPattern, string][] = [["Crossroads", "Crossroads"], ["Staggered", "Staggered"], ["TrafficOptimised", "Traffic"]];
 const MIX_PATTERNS: [MixPattern, string][] = [["Random", "Random"], ["Clumps", "Clumps"], ["Even", "Even"]];
 const SPACINGS: [string, string][] = [["-1", "Auto"], ["0", "0"], ["1", "1"], ["2", "2"]];
 
@@ -364,10 +377,13 @@ function NeighbourhoodPanel() {
                         </div> : null}
                     </div>
 
-                    <Section title="Style">
-                        <SettingTip label="Style"><div className={styles.row}>
-                            <Segmented options={STYLES} value={settings.style} disabled={disabled} onChange={style => act("setStyle", style)} />
-                        </div></SettingTip>
+                    <Section title="Layout">
+                        <Picker options={LAYOUTS} value={settings.style} disabled={disabled} onPick={style => act("setStyle", style)} />
+                        <div className={styles.layoutTip}>{LAYOUT_TIPS[settings.style]}</div>
+                        {!isHillStyle(settings.style) ? <Row label="Junctions">
+                            <Segmented options={JUNCTIONS} value={settings.junctions} disabled={disabled}
+                                onChange={junctions => act("setJunctions", junctions)} />
+                        </Row> : null}
                     </Section>
 
                     <Section title="What to build">
@@ -379,6 +395,7 @@ function NeighbourhoodPanel() {
                     </Section>
 
                     <Section title="Ground">
+                        <ToggleRow label="Shape the ground" value={settings.shapeGround} trigger="setShapeGround" disabled={disabled} />
                         <ToggleRow label="Steep hills" value={settings.steepGround} trigger="setSteepGround" disabled={disabled} />
                         <ToggleRow label="Trees" value={settings.trees} trigger="setTrees" disabled={disabled} />
                     </Section>

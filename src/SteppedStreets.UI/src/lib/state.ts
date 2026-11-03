@@ -1,10 +1,16 @@
 // Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
 export type ToolStage = "Closed" | "Drawing" | "Planning" | "Planned" | "Building" | "Built" | "Failed";
-export type NeighbourhoodStyle = "ContourSuburb" | "TerracedBlocks" | "MountainLane";
+export type NeighbourhoodStyle = "ContourSuburb" | "TerracedBlocks" | "MountainLane"
+    | "SquareGrid" | "RectangularGrid" | "IrregularGrid" | "SkewedGrid" | "FragmentedGrid";
+export const STYLES: NeighbourhoodStyle[] = ["ContourSuburb", "TerracedBlocks", "MountainLane",
+    "SquareGrid", "RectangularGrid", "IrregularGrid", "SkewedGrid", "FragmentedGrid"];
+/** The layouts that follow the contours, for which the junction choice doesn't apply. */
+export const isHillStyle = (style: NeighbourhoodStyle) => style === "ContourSuburb" || style === "TerracedBlocks" || style === "MountainLane";
+export type JunctionPattern = "Crossroads" | "Staggered" | "TrafficOptimised";
 export type MixPattern = "Random" | "Clumps" | "Even";
 
-/** A catalogue entry; icon is the game's own menu icon for it, when the game has one. */
-export interface Option { name: string; label: string; icon?: string }
+/** A catalogue entry; icon is the game's own menu icon for it, when the game has one; group heads its part of a list. */
+export interface Option { name: string; label: string; icon?: string; group?: string }
 export interface ZoneShare { zone: string; share: number }
 export interface ZoneCount { zone: string; lots: number }
 /** A service building the game offers: its lot in cells and the city service it belongs to. */
@@ -20,6 +26,10 @@ export interface Settings {
     steepestBuildablePercent: number;
     /** Steep hills and mountains: buildable ground up to 60 % and earthwork up to 12 m. */
     steepGround: boolean;
+    /** Change the terrain at all; off, nothing is graded. */
+    shapeGround: boolean;
+    /** How a grid's cross streets meet its main streets. */
+    junctions: JunctionPattern;
     zoneMix: ZoneShare[];
     serviceMix: ServiceCount[];
     mixPattern: MixPattern;
@@ -138,12 +148,14 @@ export function readState(raw: unknown): ToolState {
         zoneCounts: rows(state.zoneCounts, readCount, count => count.zone),
         progress: number(state.progress, 0, 0, 1),
         settings: {
-            style: choice(settings.style, ["ContourSuburb", "TerracedBlocks", "MountainLane"], "ContourSuburb"),
+            style: choice(settings.style, STYLES, "ContourSuburb"),
             road: text(settings.road) || "Small Road",
             blockDepth: number(settings.blockDepth, 90, 60, 200),
             maxRoadGradePercent: number(settings.maxRoadGradePercent, 8, 4, 12),
             steepestBuildablePercent: number(settings.steepestBuildablePercent, 15, 8, 60),
             steepGround: flag(settings.steepGround, false),
+            shapeGround: flag(settings.shapeGround, true),
+            junctions: choice(settings.junctions, ["Crossroads", "Staggered", "TrafficOptimised"], "Staggered"),
             zoneMix: zoneMix.length > 0 ? zoneMix : DEFAULT_MIX.map(share => ({ ...share })),
             serviceMix: rows(settings.serviceMix, readServiceCount, service => service.name),
             mixPattern: choice(settings.mixPattern, ["Random", "Clumps", "Even"], "Clumps"),
