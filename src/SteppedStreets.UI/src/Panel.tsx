@@ -1,10 +1,12 @@
 // Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
-// The look follows Placemaker's panel (jackwrichards, GPL-3.0): a dark panel docked on the right, small-caps sections,
-// label-left rows, segmented choices and one accent button in the footer. Plain elements rather than cs2/ui components,
-// so nothing depends on the vanilla themes, which left the first version unstyled.
+// The layout follows Placemaker's panel (jackwrichards, GPL-3.0): docked on the right, small-caps sections, label-left
+// rows. The look is the game's own: its panel colours, its green primary pill, tick boxes and pill-shaped choices.
+// Plain elements rather than cs2/ui components, so nothing depends on the vanilla themes, which left the first version
+// unstyled; the game's slider and text box are used where the registry has them.
 import React, { useEffect, useRef, useState } from "react";
 import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./lib/bindings";
 import { ErrorBoundary } from "./lib/errorBoundary";
+import { SettingTip } from "./lib/tips";
 import {
     formatArea, MixPattern, NeighbourhoodStyle, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, zoneColour, ZoneShare,
 } from "./lib/state";
@@ -13,7 +15,11 @@ import icon from "./assets/stepped-streets.svg";
 import closeIcon from "./assets/close.svg";
 import chevronIcon from "./assets/chevron.svg";
 import diceIcon from "./assets/dice.svg";
-import plusIcon from "./assets/plus.svg";
+import circlePlusIcon from "./assets/circle-plus.svg";
+import circleGoIcon from "./assets/circle-go.svg";
+import checkIcon from "./assets/check.svg";
+import undoIcon from "./assets/undo.svg";
+import trashIcon from "./assets/trash.svg";
 import styles from "./Panel.module.css";
 
 const classes = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
@@ -34,10 +40,10 @@ function Button({ children, onSelect, disabled = false, selected = false, classN
 }
 
 function Row({ label, children }: React.PropsWithChildren<{ label: string }>) {
-    return <div className={styles.row}>
+    return <SettingTip label={label}><div className={styles.row}>
         <div className={styles.label}>{label}</div>
         <div className={styles.editor}>{children}</div>
-    </div>;
+    </div></SettingTip>;
 }
 
 function Section({ title, children }: React.PropsWithChildren<{ title: string }>) {
@@ -116,8 +122,9 @@ function ToggleRow({ label, value, disabled, trigger }: { label: string; value: 
     return <Row label={label}>
         <Button className={styles.toggle} label={label} selected={value} disabled={disabled}
             sound={value ? "toggle-off" : "toggle-on"} onSelect={() => act(trigger, !value)}>
-            <div className={classes(styles.toggleTrack, value && styles.toggleOn)}><div className={styles.toggleKnob} /></div>
-            <div className={styles.toggleText}>{value ? "On" : "Off"}</div>
+            <div className={classes(styles.toggleTrack, value && styles.toggleOn)}>
+                {value ? <img className={styles.toggleTick} src={checkIcon} /> : null}
+            </div>
         </Button>
     </Row>;
 }
@@ -128,27 +135,42 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
 }>) {
     // A row just added opens its list at once, so adding is one click to choose rather than two.
     const [open, setOpen] = useState(initiallyOpen);
+    const [query, setQuery] = useState("");
     // Disabling closes the list, so it doesn't pop back open after the build or the confirmation.
     useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
+    useEffect(() => { if (!open) setQuery(""); }, [open]);
     // A saved choice the game no longer lists still shows, so the button never reads blank.
     const shown = options.some(option => option.name === value) ? options : [{ name: value, label: value }, ...options];
-    const current = shown.find(option => option.name === value)?.label ?? value;
+    const chosen = shown.find(option => option.name === value);
+    const current = chosen?.label ?? value;
+    // A long list (zones from other mods, every service building) gets a search box at its top.
+    const searchable = vanilla.TextInput !== undefined && shown.length > SEARCH_FROM;
+    const needle = query.trim().toLowerCase();
+    const listed = needle ? shown.filter(option => option.label.toLowerCase().includes(needle)) : shown;
     // An inline list instead of a popup: the panel scrolls, and a popup would be clipped by it.
     return <>
-        <div className={styles.row}>
+        <SettingTip label={label}><div className={styles.row}>
             {label ? <div className={styles.label}>{label}</div> : null}
             <Button className={styles.picker} disabled={disabled} selected={open} onSelect={() => setOpen(!open)}>
+                {chosen?.icon ? <img className={styles.optionIcon} src={chosen.icon} /> : null}
                 <div className={styles.pickerLabel}>{current}</div>
                 <img className={classes(styles.chevron, open && styles.chevronOpen)} src={chevronIcon} />
             </Button>
             {children}
-        </div>
+        </div></SettingTip>
         {open && !disabled ? <div className={classes(styles.list, !label && styles.listFull)}>
-            {shown.map(option => <Button key={option.name} className={styles.listItem} selected={option.name === value}
-                onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>{option.label}</Button>)}
+            {searchable && vanilla.TextInput ? <vanilla.TextInput className={styles.search} value={query} placeholder="Search"
+                onChange={event => setQuery(event.target.value)} /> : null}
+            {listed.map(option => <Button key={option.name} className={styles.listItem} selected={option.name === value}
+                onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>
+                {option.icon ? <img className={styles.optionIcon} src={option.icon} /> : null}<div>{option.label}</div>
+            </Button>)}
+            {listed.length === 0 ? <div className={styles.noMatch}>Nothing matches "{query.trim()}"</div> : null}
         </div> : null}
     </>;
 }
+
+const SEARCH_FROM = 6;
 
 /** What to build: zones with their shares and service buildings with their counts, in one list. */
 function Mix({ mix, zones, services, serviceOptions, disabled }: {
@@ -165,7 +187,7 @@ function Mix({ mix, zones, services, serviceOptions, disabled }: {
             const replace = (change: Partial<ServiceCount>) => sendServices(services.map((other, at) => at === index ? { ...other, ...change } : other));
             const label = serviceLabel(entry.name);
             const options = serviceOptions.filter(option => option.name === entry.name || !services.some(other => other.name === option.name))
-                .map(option => ({ name: option.name, label: option.group ? `${option.label} (${option.group})` : option.label }));
+                .map(option => ({ name: option.name, label: option.group ? `${option.label} (${option.group})` : option.label, icon: option.icon }));
             return <div key={entry.name} className={styles.mixEntry}>
                 <Picker options={options} value={entry.name} disabled={disabled} initiallyOpen={entry.name === justAdded}
                     onPick={name => { setJustAdded(null); replace({ name }); }}>
@@ -175,13 +197,14 @@ function Mix({ mix, zones, services, serviceOptions, disabled }: {
                     </Button>
                 </Picker>
                 <div className={styles.row}>
-                    <div className={styles.serviceDot} />
                     <div className={styles.countLabel}>How many</div>
-                    <Button className={styles.stepButton} label={`Fewer ${label}`} disabled={disabled || entry.count <= 1}
-                        onSelect={() => replace({ count: entry.count - 1 })}>-</Button>
-                    <div className={styles.countValue}>{entry.count}</div>
-                    <Button className={styles.stepButton} label={`More ${label}`} disabled={disabled || entry.count >= 20}
-                        onSelect={() => replace({ count: entry.count + 1 })}>+</Button>
+                    <div className={styles.countBox}>
+                        <Button className={styles.countButton} label={`Fewer ${label}`} disabled={disabled || entry.count <= 1}
+                            onSelect={() => replace({ count: entry.count - 1 })}>-</Button>
+                        <div className={styles.countValue}>{entry.count}</div>
+                        <Button className={styles.countButton} label={`More ${label}`} disabled={disabled || entry.count >= 20}
+                            onSelect={() => replace({ count: entry.count + 1 })}>+</Button>
+                    </div>
                 </div>
             </div>;
         })}
@@ -189,11 +212,11 @@ function Mix({ mix, zones, services, serviceOptions, disabled }: {
             {unusedZone ? <Button className={styles.addZone} disabled={disabled} onSelect={() => {
                 setJustAdded(unusedZone.name);
                 act("setZoneMix", JSON.stringify([...mix, { zone: unusedZone.name, share: 25 }]));
-            }}><img className={styles.buttonIcon} src={plusIcon} /><div>Add a zone</div></Button> : null}
+            }}><div>Add a zone</div><img className={styles.pillIcon} src={circlePlusIcon} /></Button> : null}
             {unusedService ? <Button className={styles.addZone} disabled={disabled} onSelect={() => {
                 setJustAdded(unusedService.name);
                 sendServices([...services, { name: unusedService.name, count: 1 }]);
-            }}><img className={styles.buttonIcon} src={plusIcon} /><div>Add a service</div></Button> : null}
+            }}><div>Add a service</div><img className={styles.pillIcon} src={circlePlusIcon} /></Button> : null}
         </div>
     </>;
 }
@@ -222,8 +245,8 @@ function ZoneMix({ mix, zones, disabled, justAdded }: { mix: ZoneShare[]; zones:
                 <div className={styles.row}>
                     {/* ponytail: shares start at 5, because the tool drops a row whose share is 0; the remove button covers "none". */}
                     <NumberControl label={`${label} share`} value={entry.share} minimum={5} maximum={100} step={5}
-                        format={value => String(Math.round(value))} disabled={disabled || missing} onCommit={share => replace({ share })} />
-                    <div className={styles.shareOfTotal}>{Math.round(100 * entry.share / total)}%</div>
+                        format={value => `${Math.round(100 * value / (total - entry.share + value))}%`}
+                        disabled={disabled || missing} onCommit={share => replace({ share })} />
                 </div>
             </div>;
         })}
@@ -236,6 +259,26 @@ function Measure({ text, className }: { text: string; className?: string }) {
     return <div className={classes(styles.measure, className)}>
         <div>{power ? power[1] : text}</div>
         {power ? <div className={styles.power}>{power[2]}</div> : null}
+    </div>;
+}
+
+const STEPS = ["Draw", "Choose", "Build"];
+
+/** Where the player is: draw the area, choose what to build, build. A finished step shows a tick. */
+function Steps({ state }: { state: ToolState }) {
+    const current = state.stage === "Building" || state.stage === "Built" ? 2 : state.areaClosed ? 1 : 0;
+    const finished = state.stage === "Built";
+    return <div className={styles.steps}>
+        {STEPS.map((name, index) => {
+            const done = index < current || finished;
+            return <React.Fragment key={name}>
+                {index > 0 ? <div className={styles.stepLine} /> : null}
+                <div className={classes(styles.step, done ? styles.stepDone : index === current && styles.stepCurrent)}>
+                    <div className={styles.stepNumber}>{done ? <img className={styles.stepTick} src={checkIcon} /> : index + 1}</div>
+                    <div>{name}</div>
+                </div>
+            </React.Fragment>;
+        })}
     </div>;
 }
 
@@ -297,28 +340,34 @@ function NeighbourhoodPanel() {
                 </div>
 
                 <div className={styles.content}>
+                    <Steps state={state} />
                     <div className={classes(styles.status, statusTone(state))} aria-live="polite">
-                        <div className={styles.statusText}>{statusLine(state)}</div>
+                        <div className={styles.statusHead}>
+                            {statusTone(state) === styles.toneGood ? <div className={styles.statusTick}><img className={styles.stepTick} src={checkIcon} /></div> : null}
+                            <div className={styles.statusText}>{statusLine(state)}</div>
+                            {state.corners >= 3 ? <Measure className={styles.areaChip} text={formatArea(state.areaSquareMetres)} /> : null}
+                        </div>
                         {statusDetail(state) ? <div className={styles.statusDetail}>{statusDetail(state)}</div> : null}
                         {building ? <div className={styles.progressTrack}>
                             <div className={styles.progress} style={{ width: `${100 * state.progress}%` }} />
                         </div> : null}
-                        {state.corners >= 3 ? <Measure className={styles.area} text={`Area ${formatArea(state.areaSquareMetres)}`} /> : null}
                         {!building && state.stage !== "Built" ? <div className={styles.hints}>
-                            <div>{state.areaClosed ? "Drag a corner to reshape it; right-click removes one." : "Click the ground to add corners; click the first one to finish."}</div>
-                            <div>Ctrl+Z undoes, Esc goes back.</div>
+                            <div>{state.areaClosed ? "Drag corners to reshape. Right-click to remove." : "Click the ground to add corners. Click the first one to finish."}</div>
+                            <div>Ctrl+Z to undo · Esc to go back</div>
                         </div> : null}
                         {state.corners > 0 ? <div className={styles.statusButtons}>
                             {state.stage === "Drawing" && state.corners >= 3 && !state.areaClosed
                                 ? <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("closeArea")}>Close area</Button> : null}
-                            <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("undo")}>Undo</Button>
+                            <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("undo")}>
+                                <img className={styles.buttonIcon} src={undoIcon} /><div>Undo</div>
+                            </Button>
                         </div> : null}
                     </div>
 
                     <Section title="Style">
-                        <div className={styles.row}>
+                        <SettingTip label="Style"><div className={styles.row}>
                             <Segmented options={STYLES} value={settings.style} disabled={disabled} onChange={style => act("setStyle", style)} />
-                        </div>
+                        </div></SettingTip>
                     </Section>
 
                     <Section title="What to build">
@@ -407,12 +456,17 @@ function NeighbourhoodPanel() {
 
                 <div className={styles.footer}>
                     <Button className={styles.secondary} disabled={disabled || state.corners === 0}
-                        onSelect={() => { setConfirmedPlan(null); act("clearArea"); }}>Clear</Button>
+                        onSelect={() => { setConfirmedPlan(null); act("clearArea"); }}>
+                        <img className={styles.buttonIcon} src={trashIcon} /><div>Clear</div>
+                    </Button>
                     <Button className={styles.secondary} label="Reroll: another layout" disabled={disabled} onSelect={() => act("reroll")}>
                         <img className={styles.buttonIcon} src={diceIcon} /><div>Reroll</div>
                     </Button>
                     <Button className={styles.primary} disabled={disabled || state.stage !== "Planned"}
-                        onSelect={() => setConfirmedPlan(state)}>{buildLabel}</Button>
+                        onSelect={() => setConfirmedPlan(state)}>
+                        <div>{buildLabel}</div>
+                        {!disabled && state.stage === "Planned" ? <img className={styles.pillIcon} src={circleGoIcon} /> : null}
+                    </Button>
                 </div>
 
                 {confirming ? <div className={styles.backdrop}>
@@ -425,7 +479,7 @@ function NeighbourhoodPanel() {
                             <Button className={styles.primary} onSelect={() => {
                                 if (confirmedPlan === state && state.stage === "Planned") act("build");
                                 setConfirmedPlan(null);
-                            }}>Build</Button>
+                            }}><div>Build</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
                         </div>
                     </div>
                 </div> : null}

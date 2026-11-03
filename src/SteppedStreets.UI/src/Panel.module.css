@@ -1,5 +1,6 @@
 /* Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
-   Palette and proportions follow Placemaker's panel (jackwrichards, GPL-3.0, UI/src/styles/_tokens.scss).
+   Proportions follow Placemaker's panel (jackwrichards, GPL-3.0, UI/src/styles/_tokens.scss); colours and controls
+   follow the game's own UI (its theme variables, .primary-button and .toggle in Cities2_Data/Content/Game/UI/index.css).
    Gameface rules (tools/css-lint.js): flexbox without gap, rgba not hsla, var() only in longhands, rem units. */
 
 /* Full-screen layer: only the panel takes the mouse, so the map stays usable around it. */
@@ -34,7 +35,8 @@
     pointer-events: auto;
     border-radius: 6rem;
     border: 1rem solid rgba(255, 255, 255, 0.13);
-    background-color: rgba(12, 18, 23, 0.9);
+    /* The game's own panel colour and blur, so the panel matches the game's panels and theme. */
+    background-color: var(--panelColorNormal);
     backdrop-filter: var(--panelBlur);
     box-shadow: 0 10rem 34rem rgba(0, 0, 0, 0.45);
     color: #eaf2f6;
@@ -49,7 +51,7 @@
     flex-shrink: 0;
     height: 42rem;
     padding: 0 6rem 0 12rem;
-    background-color: rgba(0, 0, 0, 0.25);
+    background-color: var(--panelColorDark);
     border-bottom: 1rem solid rgba(255, 255, 255, 0.1);
 }
 
@@ -106,7 +108,7 @@
     display: flex;
     flex-direction: column;
     padding: 9rem 12rem;
-    border-radius: 4rem;
+    border-radius: 8rem;
     border-left: 3rem solid rgba(255, 255, 255, 0.3);
     background-color: rgba(255, 255, 255, 0.05);
 }
@@ -137,11 +139,6 @@
     background-color: rgba(255, 255, 255, 0.15);
 }
 
-.area {
-    margin-top: 4rem;
-    font-size: 13rem;
-    color: rgba(234, 242, 246, 0.85);
-}
 
 .hints {
     margin-top: 6rem;
@@ -156,7 +153,19 @@
     margin-top: 8rem;
 }
 
-.statusButton { margin-right: 6rem; }
+/* After .button in weight: the base button rule comes later in this file. */
+.button.statusButton {
+    height: 26rem;
+    padding: 0 12rem;
+    margin-right: 6rem;
+    border: 2rem solid rgba(234, 242, 246, 0.6);
+    border-radius: 13rem;
+    background-color: transparent;
+    font-size: 11rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
 
 /* No superscript glyphs in the game's font: a smaller digit, top-aligned beside its unit. */
 .measure {
@@ -263,34 +272,37 @@
 
 .disabled:hover { background-color: rgba(255, 255, 255, 0.06); }
 
+/* A pill-shaped track; the chosen option is a pill in the game's accent colour. */
 .segmented {
     display: flex;
     flex-direction: row;
     flex: 1 1 auto;
     min-width: 0;
-    padding: 2rem;
-    border-radius: 5rem;
+    padding: 3rem;
+    border-radius: 17rem;
     background-color: rgba(0, 0, 0, 0.28);
 }
 
-.segment {
+.button.segment {
     flex: 1 1 0;
-    height: 24rem;
-    padding: 0 6rem;
+    height: 28rem;
+    padding: 0 8rem;
+    border-radius: 14rem;
     font-size: 12rem;
     background-color: transparent;
-    color: rgba(234, 242, 246, 0.72);
+    color: rgba(240, 251, 255, 0.75);
 }
 
-.segment:hover { background-color: rgba(255, 255, 255, 0.1); }
+.button.segment:hover { background-color: rgba(255, 255, 255, 0.12); }
 
-.segment.selected {
-    background-color: rgba(255, 255, 255, 0.18);
-    color: #ffffff;
+.button.segment.selected {
+    background-color: var(--accentColorNormal);
+    color: #262d3f;
+    font-weight: bold;
 }
 
-.segment.disabled:hover { background-color: transparent; }
-.segment.selected.disabled:hover { background-color: rgba(255, 255, 255, 0.18); }
+.button.segment.disabled:hover { background-color: transparent; }
+.button.segment.selected.disabled:hover { background-color: var(--accentColorNormal); }
 
 /* ── sliders ── */
 .slider {
@@ -315,8 +327,9 @@
 }
 
 .stepButton {
-    width: 24rem;
+    width: 26rem;
     padding: 0;
+    border-radius: 13rem;
 }
 
 .track {
@@ -338,12 +351,16 @@
     flex: 1 1 auto;
     justify-content: space-between;
     height: 28rem;
+    padding: 0 12rem;
+    border-radius: 14rem;
     border: 1rem solid rgba(255, 255, 255, 0.12);
     background-color: rgba(0, 0, 0, 0.28);
 }
 
 .pickerLabel {
+    flex: 1 1 auto;
     min-width: 0;
+    text-align: left;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -365,7 +382,7 @@
     overflow-y: auto;
     margin: 0 0 6rem 132rem;
     padding: 3rem;
-    border-radius: 4rem;
+    border-radius: 10rem;
     border: 1rem solid rgba(255, 255, 255, 0.1);
     background-color: rgba(0, 0, 0, 0.32);
 }
@@ -373,6 +390,7 @@
 .listItem {
     flex-shrink: 0;
     justify-content: flex-start;
+    border-radius: 13rem;
     background-color: transparent;
 }
 
@@ -386,8 +404,8 @@
     display: flex;
     flex-direction: column;
     margin-bottom: 6rem;
-    padding: 2rem 8rem;
-    border-radius: 4rem;
+    padding: 4rem 8rem;
+    border-radius: 10rem;
     border: 1rem solid rgba(255, 255, 255, 0.08);
     background-color: rgba(255, 255, 255, 0.03);
 }
@@ -396,27 +414,30 @@
     width: 28rem;
     height: 28rem;
     padding: 0;
+    border-radius: 14rem;
     margin-left: 6rem;
     flex-shrink: 0;
 }
 
-.shareOfTotal {
-    width: 44rem;
-    flex-shrink: 0;
-    text-align: right;
-    font-size: 12rem;
-    color: rgba(234, 242, 246, 0.6);
-    white-space: nowrap;
-}
 
+/* Adding to the mix: the same green pill as the main action, smaller, with a circled plus. */
 .addZone {
     align-self: flex-start;
-    height: 28rem;
+    height: 34rem;
+    padding: 0 7rem 0 14rem;
     margin-right: 10rem;
     margin-bottom: 6rem;
-    background-color: transparent;
-    color: var(--accentColorNormal);
+    border: 2rem solid #2d9640;
+    border-radius: 17rem;
+    background-color: #35be4f;
+    color: #2c2c2c;
+    font-size: 12rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
+
+.addZone:hover { background-color: #48c960; }
 
 .addRow {
     display: flex;
@@ -449,9 +470,11 @@
 
 .moreButton {
     width: 100%;
-    height: 30rem;
+    height: 36rem;
+    padding: 0 14rem;
     margin-top: 12rem;
     margin-bottom: 4rem;
+    border-radius: 18rem;
     justify-content: space-between;
     background-color: rgba(255, 255, 255, 0.06);
 }
@@ -473,34 +496,31 @@
 .toggle:hover { background-color: rgba(255, 255, 255, 0.08); }
 .toggle.disabled:hover { background-color: transparent; }
 
+/* The game's tick box (.toggle in the game's UI): a square with a light accent outline and a white tick when on. */
 .toggleTrack {
     display: flex;
-    flex-direction: row;
     align-items: center;
-    justify-content: flex-start;
-    width: 32rem;
-    height: 18rem;
-    border-radius: 9rem;
-    background-color: rgba(255, 255, 255, 0.18);
+    justify-content: center;
+    width: 24rem;
+    height: 24rem;
+    border-style: solid;
+    border-top-width: 2rem;
+    border-right-width: 2rem;
+    border-bottom-width: 2rem;
+    border-left-width: 2rem;
+    border-top-color: var(--accentColorLight);
+    border-right-color: var(--accentColorLight);
+    border-bottom-color: var(--accentColorLight);
+    border-left-color: var(--accentColorLight);
+    border-radius: 3rem;
+    background-color: rgba(0, 0, 0, 0.15);
 }
 
-.toggleOn {
-    justify-content: flex-end;
-    background-color: var(--accentColorNormal);
-}
+.toggleOn { background-color: var(--accentColorNormal); }
 
-.toggleKnob {
-    width: 14rem;
-    height: 14rem;
-    margin: 0 2rem;
-    border-radius: 7rem;
-    background-color: #ffffff;
-}
-
-.toggleText {
-    margin-left: 8rem;
-    font-size: 13rem;
-    color: rgba(234, 242, 246, 0.78);
+.toggleTick {
+    width: 16rem;
+    height: 16rem;
 }
 
 /* ── seed ── */
@@ -519,7 +539,7 @@
     flex-direction: column;
     margin-bottom: 6rem;
     padding: 5rem 10rem;
-    border-radius: 4rem;
+    border-radius: 10rem;
     background-color: rgba(255, 255, 255, 0.05);
 }
 
@@ -612,27 +632,52 @@
     background-color: rgba(0, 0, 0, 0.22);
 }
 
+/* Other actions: white outlined pills in capitals. */
 .secondary {
-    height: 32rem;
+    height: 38rem;
     padding: 0 16rem;
     margin-right: 8rem;
+    border: 2rem solid rgba(240, 251, 255, 0.75);
+    border-radius: 20rem;
+    background-color: transparent;
+    color: #ffffff;
+    font-size: 13rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
+/* A circled icon at a pill's right end. */
+.pillIcon {
+    width: 22rem;
+    height: 22rem;
+    margin-left: 14rem;
+    flex-shrink: 0;
+}
+
+/* The main action, as Paradox Mods' "Add to playsets": a green pill with a darker green edge, near-black capitals and a
+   circled icon at its right (colours measured from the game's mod browser). */
 .primary {
     flex: 1 1 auto;
-    height: 32rem;
-    border-radius: 5rem;
-    background-color: var(--accentColorNormal);
-    color: #0b1d26;
-    font-size: 14rem;
+    height: 44rem;
+    padding: 0 10rem 0 20rem;
+    justify-content: space-between;
+    border: 2rem solid #2d9640;
+    border-radius: 22rem;
+    background-color: #35be4f;
+    color: #2c2c2c;
+    font-size: var(--fontSizeS);
     font-weight: bold;
-    box-shadow: 0 1rem 6rem rgba(63, 182, 240, 0.3);
+    text-transform: uppercase;
 }
 
-.primary:hover { background-color: var(--accentColorLight); }
+.primary:hover { background-color: #48c960; }
+.primary:active { background-color: #2fa846; }
 
 .primary.disabled {
     opacity: 1;
+    justify-content: center;
+    border-color: rgba(255, 255, 255, 0.12);
     background-color: rgba(255, 255, 255, 0.1);
     color: rgba(234, 242, 246, 0.55);
     box-shadow: 0 0 0 rgba(0, 0, 0, 0);
@@ -700,4 +745,132 @@
 .hotkey {
     margin-top: 8rem;
     color: rgba(234, 242, 246, 0.7);
+}
+
+/* -- the three steps: draw, choose, build -- */
+.steps {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 10rem;
+}
+
+.step {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex: 0 0 auto;
+    color: rgba(240, 251, 255, 0.45);
+    font-size: 13rem;
+    font-weight: bold;
+}
+
+.stepNumber {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22rem;
+    height: 22rem;
+    margin-right: 6rem;
+    border: 2rem solid rgba(240, 251, 255, 0.3);
+    border-radius: 11rem;
+    font-size: 12rem;
+    flex-shrink: 0;
+}
+
+.stepTick {
+    width: 12rem;
+    height: 12rem;
+}
+
+.stepCurrent { color: #ffffff; }
+.stepCurrent .stepNumber { border-top-color: var(--accentColorNormal); border-right-color: var(--accentColorNormal); border-bottom-color: var(--accentColorNormal); border-left-color: var(--accentColorNormal); background-color: var(--accentColorNormal); color: #262d3f; }
+.stepDone { color: rgba(240, 251, 255, 0.75); }
+.stepDone .stepNumber { border-color: #5abe41; background-color: #5abe41; }
+
+/* -- search box at the top of a long list -- */
+.search {
+    flex-shrink: 0;
+    height: 28rem;
+    margin-bottom: 4rem;
+    padding: 0 12rem;
+    border: 1rem solid rgba(255, 255, 255, 0.22);
+    border-radius: 14rem;
+    background-color: rgba(0, 0, 0, 0.35);
+    color: #ffffff;
+    font-family: var(--fontFamily);
+    font-size: 13rem;
+}
+
+.noMatch {
+    flex-shrink: 0;
+    padding: 6rem 10rem;
+    font-size: 12rem;
+    color: rgba(240, 251, 255, 0.6);
+}
+
+/* -- refinements: steps joined by lines, status head with a chip, grouped counts, option icons -- */
+.stepLine {
+    flex: 1 1 auto;
+    height: 2rem;
+    margin: 0 8rem;
+    background-color: rgba(240, 251, 255, 0.2);
+}
+
+.statusHead {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.statusTick {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20rem;
+    height: 20rem;
+    margin-right: 8rem;
+    border-radius: 10rem;
+    background-color: #35be4f;
+    flex-shrink: 0;
+}
+
+.areaChip {
+    margin-left: 10rem;
+    padding: 2rem 9rem;
+    border: 1rem solid rgba(240, 251, 255, 0.35);
+    border-radius: 11rem;
+    font-size: 12rem;
+    font-weight: bold;
+    color: rgba(240, 251, 255, 0.9);
+    flex-shrink: 0;
+}
+
+.countBox {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 28rem;
+    border: 1rem solid rgba(240, 251, 255, 0.3);
+    border-radius: 14rem;
+    background-color: rgba(0, 0, 0, 0.25);
+}
+
+.button.countButton {
+    width: 30rem;
+    height: 26rem;
+    padding: 0;
+    border-radius: 13rem;
+    background-color: transparent;
+    font-size: 15rem;
+    font-weight: bold;
+}
+
+.button.countButton:hover { background-color: rgba(255, 255, 255, 0.12); }
+
+.optionIcon {
+    width: 18rem;
+    height: 18rem;
+    margin-right: 8rem;
+    flex-shrink: 0;
 }

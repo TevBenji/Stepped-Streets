@@ -33,7 +33,8 @@ and read defensively by `src/lib/state.ts` (`readState` never throws and clamps 
 `connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
 `settings` (the trigger values below, plus `steepGround` and `serviceMix` as `name`/`count` rows), and the catalogues `zones` and
 `roads` (`name`/`label`) and `services` (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read
-again each time the tool opens). While Planning and Building, `summary` is the current step; once Built,
+again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
+the game's own menu icon path (ImageSystem.GetIconOrGroupIcon); it is left out when the game has none. While Planning and Building, `summary` is the current step; once Built,
 it is the build report (the panel shows it under the status line). The state is rebuilt only when ToolState.Version, a setting or a catalogue changes.
 
 | Trigger | Argument | Action |

@@ -26,6 +26,8 @@ namespace SteppedStreets.Build
         public int Requested;
         public int Placed;
         public string Summary = "";
+        /// <summary>The buildings the game did not put up, by name (trees are not checked).</summary>
+        public List<string> Missing = new List<string>();
     }
 
     /// <summary>Places trees or buildings as object definitions through the invisible build tool, 1500 a frame.</summary>
@@ -39,6 +41,8 @@ namespace SteppedStreets.Build
             public quaternion Rotation;
             public int Seed;
             public float Age;
+            /// <summary>A building's name for the player, should the game refuse it.</summary>
+            public string Label;
         }
 
         private const int PerFrame = 1500;
@@ -56,6 +60,7 @@ namespace SteppedStreets.Build
         private List<Entity> _conifers, _broadleaves;
         private int _cursor, _activationFrame, _emittedFrame = -1, _applyFrame = -1, _placed;
         private Action<ObjectBuildReport> _whenDone;
+        private readonly List<string> _missing = new List<string>();
 
         public bool Busy { get; private set; }
 
@@ -122,6 +127,7 @@ namespace SteppedStreets.Build
             _whenDone = whenDone;
             _objects = new List<Placement>();
             _cursor = _placed = 0;
+            _missing.Clear();
             _emittedFrame = _applyFrame = -1;
             return true;
         }
@@ -188,8 +194,16 @@ namespace SteppedStreets.Build
                     _applyFrame = frame;
                     return;
                 }
-                if (frame - _applyFrame >= 3)
-                    Finish(_tool.LastAppliedFrame >= _applyFrame ? "Apply handed to the game; definitions counted, objects not verified" : "the build tool never handed Apply to the game");
+                bool applied = _tool.LastAppliedFrame >= _applyFrame;
+                if (_what != "buildings")
+                {
+                    if (frame - _applyFrame >= 3)
+                        Finish(applied ? "Apply handed to the game; definitions counted, objects not verified" : "the build tool never handed Apply to the game");
+                    return;
+                }
+                // The game may still refuse a building it was handed: once the Apply has settled, count the ones standing.
+                if (frame - _applyFrame == 4) DestroyOwnDefinitions();
+                if (frame - _applyFrame >= 20) Finish(applied ? CountBuildings() : "the build tool never handed Apply to the game");
             }
             catch (Exception exception)
             {
@@ -230,6 +244,32 @@ namespace SteppedStreets.Build
             }
         }
 
+        /// <summary>Which buildings stand where they were put (same prefab within 6 m); the rest are named as missing.</summary>
+        private string CountBuildings()
+        {
+            var wanted = new HashSet<Entity>();
+            foreach (var item in _objects) wanted.Add(item.Prefab);
+            var standing = new Dictionary<Entity, List<float2>>();
+            using (var query = EntityManager.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[] { ComponentType.ReadOnly<Game.Buildings.Building>(), ComponentType.ReadOnly<PrefabRef>(), ComponentType.ReadOnly<Game.Objects.Transform>() },
+                None = new[] { ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Deleted>() },
+            }))
+            using (var entities = query.ToEntityArray(Allocator.Temp))
+                foreach (var entity in entities)
+                {
+                    var prefab = EntityManager.GetComponentData<PrefabRef>(entity).m_Prefab;
+                    if (!wanted.Contains(prefab)) continue;
+                    if (!standing.TryGetValue(prefab, out var positions)) standing[prefab] = positions = new List<float2>();
+                    positions.Add(EntityManager.GetComponentData<Game.Objects.Transform>(entity).m_Position.xz);
+                }
+            _placed = 0;
+            foreach (var item in _objects)
+                if (standing.TryGetValue(item.Prefab, out var positions) && positions.Exists(position => math.distance(position, item.Position.xz) < 6f)) _placed++;
+                else _missing.Add(string.IsNullOrEmpty(item.Label) ? "a building" : item.Label);
+            return _missing.Count == 0 ? "all standing" : "not standing: " + string.Join(", ", _missing);
+        }
+
         private void DestroyOwnDefinitions()
         {
             foreach (var definition in _definitions)
@@ -248,7 +288,8 @@ namespace SteppedStreets.Build
             {
                 Requested = _objects?.Count ?? 0,
                 Placed = _placed,
-                Summary = $"Stepped Streets {_what}: emitted {_placed} of {_objects?.Count ?? 0}; {details}.",
+                Summary = $"Stepped Streets {_what}: {_placed} of {_objects?.Count ?? 0}; {details}.",
+                Missing = new List<string>(_missing),
             };
             Mod.Logger.Info(report.Summary);
             var whenDone = _whenDone;
