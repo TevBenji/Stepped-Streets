@@ -197,8 +197,11 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 if (math.distance(line[index], hit.xz) > target.HalfWidth + request.RoadHalfWidth + 8f && survey.ConnectionRoomAt(line[index]) < 0f
                     && survey.StreetRoomAt(line[index]) < 0f) return false;
             }
-            var heights = RoadProfile.Fit(line, survey.GroundAt, request.MaxRoadGrade, streets[host].Heights[point], hit.y);
-            if (heights == null) return false;
+            // An even grade from the grid to the city's road: the landings a longer road gets don't fit in a short join on a slope.
+            float from = streets[host].Heights[point], length = math.distance(origin, hit.xz);
+            if (math.abs(hit.y - from) > request.MaxRoadGrade * length) return false;
+            var heights = new float[line.Count];
+            for (int index = 0; index < line.Count; index++) heights[index] = math.lerp(from, hit.y, index / (float)(line.Count - 1));
             var street = new Street(RoadKind.Connection, line, heights)
             {
                 Start = new Attachment { Street = host, Point = point },
