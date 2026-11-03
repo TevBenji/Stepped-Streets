@@ -224,12 +224,15 @@ namespace SteppedStreets.Build
             var centres = new float2[_quads.Length];
             var blockedCauses = new string[_quads.Length];
             float2 low = float2.zero, high = float2.zero;
+            // Each block looks only at the cell centres near it: a 6 km area has hundreds of thousands of them.
+            var centreBuckets = new SteppedStreets.Core.Neighbourhood.SpatialBuckets<int>(64f);
             for (int index = 0; index < _quads.Length; index++)
             {
                 var quad = _quads[index];
                 centres[index] = 0.25f * (quad[0] + quad[1] + quad[2] + quad[3]);
                 low = index == 0 ? centres[index] : math.min(low, centres[index]);
                 high = index == 0 ? centres[index] : math.max(high, centres[index]);
+                centreBuckets.Add(centres[index], centres[index], index);
             }
             // ponytail: scans the city's blocks once, skipping those that can't reach the quads; use Zones.SearchSystem if a
             // huge city still makes this slow.
@@ -244,7 +247,7 @@ namespace SteppedStreets.Build
                     if (math.any(position < low - reach) || math.any(position > high + reach)) continue;
                     var cells = EntityManager.GetBuffer<Cell>(entity, true);
                     if (cells.Length < block.m_Size.x * block.m_Size.y) continue;
-                    for (int index = 0; index < centres.Length; index++)
+                    foreach (int index in centreBuckets.Within(position, reach))
                     {
                         var cellIndex = ZoneUtils.GetCellIndex(block, centres[index]);
                         if (math.any(cellIndex < 0) || math.any(cellIndex >= block.m_Size)) continue;

@@ -29,7 +29,8 @@ namespace SteppedStreets.Tool
     /// </summary>
     public sealed partial class NeighbourhoodToolSystem : ToolBaseSystem
     {
-        private const float LargestSide = 2000f;
+        // About ten times the area of the first version's 2 km square; planning a whole 6 km hillside takes a while.
+        private const float LargestSide = 6400f;
         private readonly List<float2> corners = new List<float2>();
         private readonly List<(float2[] Corners, bool Closed)> history = new List<(float2[], bool)>();
         private readonly RightClickGesture rightClick = new RightClickGesture();
@@ -459,7 +460,7 @@ namespace SteppedStreets.Tool
             if (math.any(high - low > LargestSide))
             {
                 State.Stage = ToolStage.Drawing;
-                Message(Invariant($"The area is too large: keep it within {LargestSide / 1000f:0} km on each side."));
+                Message(Invariant($"The area is too large: keep it within {LargestSide / 1000f:0.0} km on each side."));
                 Touch();
                 return;
             }

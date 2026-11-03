@@ -22,7 +22,9 @@ tested off-game on eight synthetic hillsides; the in-game test is next ([docs/IN
    and fill tan, trees as dots. The panel sums it up: road length, lots, zoned cells, earth moved, steepest road.
 4. **Reroll** gives another layout from a new seed. The same seed and settings give the same layout.
 5. **Build**, after **"Ground changes are permanent, like the game's terrain tools. Build?"**. The build grades the ground,
-   lays the roads, waits for the game's zone blocks, zones each lot's level cells, then plants trees and adds walls.
+   lays the roads, waits for the game's zone blocks, zones each lot from the kerb back (the game only grows a house on a lot
+   whose front row is zoned), then plants trees and adds walls. The roads are built even where the last few patches of
+   ground land a little off the plan.
 
 ## Styles
 
@@ -69,7 +71,8 @@ steeper bank, the lot gives way. Details: [the PRD](docs/Stepped_Streets_PRD.md)
 ## Known limits
 
 - Terrain changes are permanent; nothing in the mod undoes a build.
-- An area is at most 2 km on a side.
+- An area is at most 6.4 km on a side. A big area takes a while: a whole 6 km hillside can take most of a minute to plan
+  and lays hundreds of kilometres of road at once.
 - On true mountain slopes (40–50 %), even with Steep hills on, the plan keeps the gentler streets and the lots that fit;
   contour streets that no connector can reach without breaking the grade are left out rather than built as roads to nowhere.
 - Houses grow only where the game has demand for that zone; the panel says when a chosen zone has none yet.

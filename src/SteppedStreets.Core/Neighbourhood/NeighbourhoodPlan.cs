@@ -52,6 +52,7 @@ namespace SteppedStreets.Core.Neighbourhood
         public string Zone = "";
 
         /// <summary>The pad's cells (column, row) that come out level on the planned ground and get zoned.</summary>
+        /// <summary>The cells to zone: every cell of a kept lot, front row included.</summary>
         public List<int2> LevelCells = new List<int2>();
     }
 

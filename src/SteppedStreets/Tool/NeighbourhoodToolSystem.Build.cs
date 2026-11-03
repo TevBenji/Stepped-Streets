@@ -19,7 +19,6 @@ namespace SteppedStreets.Tool
     /// </summary>
     public sealed partial class NeighbourhoodToolSystem
     {
-        private const float LevelTolerance = 0.3f;
         private const int BlocksFirstCheck = 30, BlocksStableFrames = 12, BlocksMostFrames = 150;
 
         private NeighbourhoodPlan buildPlan;
@@ -82,12 +81,11 @@ namespace SteppedStreets.Tool
                 if (report != null)
                 {
                     Log("ground: " + report.Summary);
-                    buildReport.Add(Invariant($"ground {(report.Reached ? "reached" : "missed")} in {report.Passes} passes, {report.Curtains} curtains"));
-                    if (!report.Reached)
-                    {
-                        Stop("The ground did not reach the plan, so no roads were built. The ground changes made remain.");
-                        return;
-                    }
+                    // The roads are built whatever the check says: the ground lands within a metre or so of the plan even when the
+                    // last few texels never settle, and the game's roads follow the ground they are laid on.
+                    buildReport.Add(report.Reached
+                        ? Invariant($"ground reached in {report.Passes} passes")
+                        : Invariant($"ground within {report.WorstError:0.0} m of the plan ({100f - report.FractionOff * 100f:0}% exact)"));
                 }
                 State.Progress = 0.35f;
                 State.Summary = "Building the roads...";
@@ -162,13 +160,13 @@ namespace SteppedStreets.Tool
         {
             try
             {
-                var terrain = World.GetOrCreateSystemManaged<TerrainBuildSystem>();
                 var byZone = new Dictionary<string, List<float2[]>>();
                 levelCells = 0;
                 foreach (var lot in buildPlan.Lots)
                 {
-                    // Zone only what really came out level on the live ground (R8), unless the player turned levelling off.
-                    var cells = buildRequest.LevelLots ? StepPlanner.LevelCells(lot.Pad, terrain.HeightAt, LevelTolerance) : lot.LevelCells;
+                    // Every cell of the lot, front row included, like the game's fill: the game starts a house lot only at a
+                    // zoned cell against the road, so zoning just the cells that came out dead level grew nothing.
+                    var cells = lot.LevelCells;
                     if (cells.Count == 0) continue;
                     levelCells += cells.Count;
                     if (!byZone.TryGetValue(lot.Zone, out var quads)) byZone[lot.Zone] = quads = new List<float2[]>();
@@ -176,7 +174,7 @@ namespace SteppedStreets.Tool
                 }
                 zoneQueue = new Queue<(string, List<float2[]>)>(byZone.Select(pair => (pair.Key, pair.Value)));
                 zonedRuns = requestedRuns = 0;
-                Log(Invariant($"zoning: {levelCells} level cells in {byZone.Count} zones"));
+                Log(Invariant($"zoning: {levelCells} cells in {byZone.Count} zones"));
                 ZoneNext(null);
             }
             catch (Exception exception) { BuildFailed(exception, "Zoning failed. The ground and roads remain."); }
@@ -195,7 +193,7 @@ namespace SteppedStreets.Tool
                 }
                 if (zoneQueue.Count == 0)
                 {
-                    buildReport.Add(Invariant($"{levelCells} level cells zoned ({zonedRuns} of {requestedRuns} runs verified)"));
+                    buildReport.Add(Invariant($"{levelCells} cells zoned ({zonedRuns} of {requestedRuns} runs verified)"));
                     if (zonedRuns < requestedRuns) Message("Some zoning runs were not verified. The log lists the cells.");
                     ReportGrowth();
                     PlantTrees();

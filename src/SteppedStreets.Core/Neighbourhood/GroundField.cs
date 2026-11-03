@@ -26,7 +26,8 @@ namespace SteppedStreets.Core.Neighbourhood
         private const float Shoulder = 1.5f;
         private const float PadMargin = 1.5f;
         private const float SteepCorridorChange = 1.5f;
-        private const int MaximumNodes = 600000;
+        // 2 m nodes up to about 1.5 km, about 4.7 m on a 6.4 km area; the terrain build takes up to 4M texels.
+        private const int MaximumNodes = 2400000;
         private const byte Free = 0, Locked = 1, Road = 2, Held = 3;
 
         public readonly float2 Origin;

@@ -131,6 +131,9 @@ namespace SteppedStreets.Core.Neighbourhood
             {
                 lot.LevelCells = request.LevelLots ? StepPlanner.LevelCells(lot.Pad, plan.Ground.HeightAt, 0.3f) : AllCells(lot.Pad);
                 if (lot.LevelCells.Count == 0) { lostToBanks++; continue; }
+                // Zoned whole, from the kerb back: the game starts a house lot only at a zoned cell in the row against the road
+                // (Game.Zones.LotSizeJobs), and that row often sits on the little bank between the shoulder and the pad.
+                lot.LevelCells = AllCells(lot.Pad);
                 plan.Lots.Add(lot);
                 plan.ZonedCells += lot.LevelCells.Count;
             }

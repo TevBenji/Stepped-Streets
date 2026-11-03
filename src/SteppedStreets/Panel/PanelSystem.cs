@@ -8,6 +8,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using Colossal.UI.Binding;
 using Game.Prefabs;
@@ -178,6 +179,8 @@ namespace SteppedStreets.Panel
             using (var entities = _zoneQuery.ToEntityArray(Allocator.Temp))
                 foreach (var entity in entities)
                 {
+                    // "Unzoned" is a zone prefab too, but nothing grows on it.
+                    if (EntityManager.GetComponentData<ZoneData>(entity).m_AreaType == Game.Zones.AreaType.None) continue;
                     var prefab = _prefabs.GetPrefab<ZonePrefab>(EntityManager.GetComponentData<PrefabData>(entity));
                     if (prefab == null || string.IsNullOrEmpty(prefab.name)) continue;
                     _zones[prefab.name] = Localised(prefab.name);
@@ -193,7 +196,32 @@ namespace SteppedStreets.Panel
             }
             _zonesJson = json.Append(']').ToString();
             _zonesBuilt = true;
+            RepairZoneMix();
             return true;
+        }
+
+        /// <summary>
+        /// A saved mix may name zones the game doesn't have or can't grow (an earlier version offered Unzoned, or an asset pack
+        /// was removed): those rows go, and an empty mix falls back to Residential Low, so a build always zones something.
+        /// </summary>
+        private void RepairZoneMix()
+        {
+            var settings = Mod.Settings;
+            if (settings == null) return;
+            var shares = settings.ZoneShares();
+            int before = shares.Count;
+            shares.RemoveAll(share => !_zones.ContainsKey(share.Zone));
+            if (shares.Count == before) return;
+            if (shares.Count == 0)
+            {
+                string fallback = _zones.ContainsKey("Residential Low") ? "Residential Low"
+                    : _zones.Keys.FirstOrDefault(name => name.IndexOf("Residential", StringComparison.OrdinalIgnoreCase) >= 0) ?? _zones.Keys.First();
+                shares.Add(new ZoneShare { Zone = fallback, Share = 100f });
+            }
+            Mod.Logger.Info("Stepped Streets: the saved zone mix named zones that can't grow; now " + ZoneShare.WriteList(shares));
+            settings.ZoneMix = ZoneShare.WriteList(shares);
+            try { settings.ApplyAndSave(); }
+            finally { _tool.SettingsChanged(); }
         }
 
         private bool BuildRoads()

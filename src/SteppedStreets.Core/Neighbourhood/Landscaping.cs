@@ -14,7 +14,8 @@ namespace SteppedStreets.Core.Neighbourhood
     internal static class Landscaping
     {
         private const float TreeSpacing = 6f;
-        private const int MostTrees = 6000;
+        // Planted 1500 a frame, so a big area's forest costs a few frames.
+        private const int MostTrees = 20000;
         private const float OpenView = 12f;
 
         public static List<PlannedTree> Trees(NeighbourhoodPlan plan, List<PlannedLot> lots, SiteSurvey survey, NeighbourhoodRequest request,

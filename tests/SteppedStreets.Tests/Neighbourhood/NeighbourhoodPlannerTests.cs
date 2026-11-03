@@ -138,19 +138,25 @@ namespace SteppedStreets.Tests.Neighbourhood
             var (request, plan) = Planned(name, variant);
             if (plan.Roads.Count == 0) return;
             var survey = new SiteSurvey(request);
+            int zoned = 0, level = 0;
             foreach (var lot in plan.Lots)
             {
                 Assert.NotEmpty(lot.LevelCells);
+                // The game starts a house lot only at a zoned cell against the road, so every lot zones its front row.
+                Assert.Contains(lot.LevelCells, cell => cell.y == 0);
                 foreach (var cell in lot.LevelCells)
                 {
                     var centre = lot.Pad.PointAt(cell.x + 0.5f, cell.y + 0.5f);
                     Assert.True(Poly.Contains(request.Boundary, centre), "a lot outside the area");
                     Assert.True(survey.SlopeAt(centre) <= request.SteepestBuildable + 0.005f, "a lot on ground too steep to build");
                     // R8: row 0's front is the driveway down (or up) to the street, so it is checked at its back quarter.
-                    var level = lot.Pad.PointAt(cell.x + 0.5f, cell.y == 0 ? 0.8f : cell.y + 0.5f);
-                    Assert.True(math.abs(plan.Ground.HeightAt(level) - lot.Pad.Height) <= 0.3f, "a zoned cell is not level");
+                    var point = lot.Pad.PointAt(cell.x + 0.5f, cell.y == 0 ? 0.8f : cell.y + 0.5f);
+                    zoned++;
+                    if (math.abs(plan.Ground.HeightAt(point) - lot.Pad.Height) <= 0.3f) level++;
                 }
             }
+            // Lots are zoned whole, but the grading still makes them level pads: only the odd cell at an edge yields to a bank.
+            if (zoned > 0) Assert.True(level >= zoned * 0.85f, $"only {level} of {zoned} zoned cells are level");
 
             var field = plan.Ground;
             float2 low = field.Origin, high = field.Origin + new float2(field.Columns - 1, field.Rows - 1) * field.Cell;

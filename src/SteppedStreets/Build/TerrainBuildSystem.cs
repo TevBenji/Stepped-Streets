@@ -50,8 +50,9 @@ namespace SteppedStreets.Build
         private const int WaitFrames = 6;
         private const int MaximumStaleWaits = 3;
         private const int TileTexels = 1024;
-        private const int MaximumRasterCells = 1 << 20;
-        private const double MaximumSeconds = 6.0;
+        private const int MaximumRasterCells = 1 << 22;
+        // Correction passes stop here; the first pass always lands, and big areas need more brush tiles per pass.
+        private const double MaximumSeconds = 15.0;
         private const float ShiftToolStrength = 2000f;
 
         private static readonly ILog Logger = LogManager.GetLogger(nameof(SteppedStreets)).SetShowsErrorsInUI(false);

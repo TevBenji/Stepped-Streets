@@ -23,8 +23,8 @@ namespace SteppedStreets.Tool
 {
     internal sealed class SiteSnapshot
     {
-        private const float HeightSpacing = 4f;
-        private const float WaterSpacing = 8f;
+        private const float FinestSpacing = 4f;
+        private const float MostSamples = 1000000f;
         // The connection may reach an existing road up to 400 m from the area; the survey reaches a little further, and only
         // as far as the nearest road needs (sampling heights is most of the snapshot's time).
         private const float MinimumMargin = 80f;
@@ -35,6 +35,7 @@ namespace SteppedStreets.Tool
         private const float FingerprintMargin = 40f;
 
         private readonly float2 origin;
+        private readonly float HeightSpacing;
         private readonly int columns, rows;
         private readonly float[] heights;
         private readonly bool[] blocked;
@@ -55,6 +56,10 @@ namespace SteppedStreets.Tool
             float margin = nearestRoad == float.MaxValue ? MinimumMargin : math.clamp(nearestRoad + 64f, MinimumMargin, MaximumMargin);
             origin = low - margin;
             float2 maximum = high + margin;
+            // 4 m apart, wider on big areas: about a million heights at most (the planner's survey is coarser there anyway).
+            float2 box = maximum - origin;
+            HeightSpacing = math.max(FinestSpacing, math.sqrt(box.x * box.y / MostSamples));
+            float WaterSpacing = HeightSpacing * 2f;
             columns = math.max(2, (int)math.ceil((maximum.x - origin.x) / HeightSpacing) + 1);
             rows = math.max(2, (int)math.ceil((maximum.y - origin.y) / HeightSpacing) + 1);
             heights = new float[checked(columns * rows)];

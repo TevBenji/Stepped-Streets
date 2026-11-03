@@ -21,7 +21,8 @@ namespace SteppedStreets.Core.Neighbourhood
         // How far the survey reaches past the area: banks always, and connections up to 400 m to the nearest road.
         private const float MinimumMargin = 64f;
         private const float MaximumMargin = 448f;
-        private const int MaximumNodes = 260000;
+        // About 4 m nodes up to a 4 km box, coarsening slowly beyond (7 m on a 6.4 km area).
+        private const int MaximumNodes = 1000000;
 
         public readonly float2 Origin;
         public readonly float Cell;

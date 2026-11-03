@@ -260,6 +260,8 @@ Draft 5, 2 November 2026. After a code review and the owner's request for steep 
 - §5.2 G1, G3: Steep hills mode (off by default): buildable ground up to 60 %, earthwork up to 12 m, links joining at 35° or more with an adaptive climb and hairpins, banks reaching further.
 - §5.2 G5: unreached networks of 300 m or more with two or more streets are kept and reported, instead of dropped whenever any connection exists (the owner: the area should build even when it can't connect).
 - §5.4: Steep hills setting; Steepest buildable and Most earth ranges widen with it.
+- §5.3 (after the owner's in-game test): the build no longer stops when the ground check falls short (it landed within 1 m, 95 % exact, and the check wanted 98 %); lots are zoned whole from the kerb back, because the game starts a house lot only at a zoned cell against the road (Game.Zones.LotSizeJobs) and zoning only dead-level cells grew nothing; Unzoned is no longer offered in the zone mix.
+- §5.1: areas up to 6.4 km on a side (ten times the area), with finer survey and ground grids so big areas keep their detail.
 
 Draft 4, 2 November 2026. The owner rejected the one-street tool after the first in-game look and asked for a generator that lays out a whole hillside neighbourhood from a drawn area (their v2 hand-off prompt, approved the same day; it supersedes the wave 5 spec in `docs/HILLSIDE-NEIGHBOURHOODS.md`).
 
