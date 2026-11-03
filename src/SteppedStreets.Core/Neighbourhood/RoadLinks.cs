@@ -16,7 +16,8 @@ namespace SteppedStreets.Core.Neighbourhood
     internal sealed class RoadLinks
     {
         public const float JunctionSpacing = 40f;
-        private const float EndClearance = 12f;
+        // A connector joining just short of a street's dead end squeezes its junction against the turning circle.
+        private const float EndClearance = 26f;
         // Link shapes: how far each end leans from square towards the way the link travels, and the curve's tension.
         private static readonly (float Tilt, float Scale)[] CoarseShapes =
             { (0f, 1f), (math.radians(13f), 0.8f), (math.radians(26f), 0.6f) };
@@ -136,6 +137,49 @@ namespace SteppedStreets.Core.Neighbourhood
                     return;
                 }
         }
+
+        /// <summary>
+        /// Joins a piece of network to the main one with one connector, trying the closest street pairs first; false when no
+        /// connector fits within the grade. Tries are capped, as each runs the full link search.
+        /// </summary>
+        public bool JoinPiece(Func<int, bool> inPiece, Func<int, bool> inMain, CancellationToken cancellation)
+        {
+            this.cancellation = cancellation;
+            var tries = new List<(int From, int Point, int To, float Distance)>();
+            int count = streets.Count;
+            float reach = request.BlockDepth * 2.5f;
+            for (int from = 0; from < count; from++)
+            {
+                var piece = streets[from];
+                if (piece.Removed || piece.Kind != RoadKind.Contour || !inPiece(from)) continue;
+                // Every 32 m along the street: closer starts would only repeat the same search.
+                for (int point = 0; point < piece.Points.Count; point += 8)
+                {
+                    if (!JunctionAllowed(piece, point)) continue;
+                    for (int to = 0; to < count; to++)
+                    {
+                        var main = streets[to];
+                        if (main.Removed || main.Kind != RoadKind.Contour || !inMain(to)) continue;
+                        float distance = math.distance(piece.Points[point], main.Points[NearestPoint(main, piece.Points[point])]);
+                        if (distance <= reach) tries.Add((from, point, to, distance));
+                    }
+                }
+            }
+            tries.Sort((x, y) => x.Distance != y.Distance ? x.Distance.CompareTo(y.Distance)
+                : x.From != y.From ? x.From.CompareTo(y.From) : x.Point != y.Point ? x.Point.CompareTo(y.Point) : x.To.CompareTo(y.To));
+            for (int attempt = 0; attempt < math.min(MostJoinTries, tries.Count); attempt++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var (from, point, to, _) = tries[attempt];
+                var candidate = Search(from, point, to);
+                if (candidate == null) continue;
+                Accept(RoadKind.Link, candidate, new Attachment { Street = from, Point = point });
+                return true;
+            }
+            return false;
+        }
+
+        private const int MostJoinTries = 24;
 
         /// <summary>The best link from a point of one street to any point of another.</summary>
         internal Candidate Search(int from, int fromPoint, int to)
@@ -585,10 +629,15 @@ namespace SteppedStreets.Core.Neighbourhood
             return row * survey.Columns + column;
         }
 
+        private static readonly float HeadingCosine = math.cos(math.radians(RoadNetwork.SharpestHeading));
+
         private bool SquareEnough(List<float2> path, bool atStart, float2 axis)
         {
             if (math.lengthsq(axis) < 1e-6f) return true;
-            return math.abs(math.dot(RoadNetwork.EndDirection(path, atStart), math.normalizesafe(axis))) <= junctionCosine;
+            float2 along = math.normalizesafe(axis);
+            // Square at the node, and still heading away from the street 20 m out rather than bending back alongside it.
+            return math.abs(math.dot(RoadNetwork.EndDirection(path, atStart), along)) <= junctionCosine
+                && math.abs(math.dot(RoadNetwork.EndDirection(path, atStart, RoadNetwork.HeadingReach), along)) <= HeadingCosine;
         }
 
         /// <summary>A junction keeps 40 m from the street's other junctions and clear of its open ends.</summary>

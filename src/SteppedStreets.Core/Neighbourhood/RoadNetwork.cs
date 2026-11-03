@@ -13,10 +13,11 @@ namespace SteppedStreets.Core.Neighbourhood
         private const float ShortestStandalone = 300f;
 
         /// <summary>
-        /// Removes links whose streets are gone and pieces of network too small to keep; true when a connection survives.
-        /// <paramref name="loose"/> counts the kept pieces no connection reaches, while one does.
+        /// Removes links whose streets are gone and every piece of network apart from the main one: the pieces a connection
+        /// reaches, or with no connection the longest. True when a connection survives. <paramref name="leftOut"/> counts the
+        /// dropped pieces big enough to have been a neighbourhood of their own.
         /// </summary>
-        public static bool Prune(List<Street> streets, out int loose)
+        public static bool Prune(List<Street> streets, out int leftOut)
         {
             foreach (var street in streets) street.Pruned = false;
             bool changed = true;
@@ -41,16 +42,12 @@ namespace SteppedStreets.Core.Neighbourhood
             bool connected = rooted.Contains(true);
             int largest = -1;
             for (int id = 0; id < lengths.Count; id++) if (largest < 0 || lengths[id] > lengths[largest]) largest = id;
-            // Keep what a connection reaches, and every network big enough to be a neighbourhood of its own even if no road
-            // reaches it (the area need not touch a road, and the hilltop is often the best of it); with no connection at all,
-            // at least the largest. Beside a connected network, a lone street nothing links to is a road to nowhere: it goes.
-            var streetsIn = new int[lengths.Count];
-            for (int index = 0; index < count; index++) if (component[index] >= 0) streetsIn[component[index]]++;
+            // One network, never pieces side by side (owner's in-game test, 3 November 2026): the planner has already tried to
+            // join every piece to the main one, so what is still apart could not be joined within the grade.
             var kept = new bool[lengths.Count];
-            for (int id = 0; id < lengths.Count; id++)
-                kept[id] = rooted[id] || (lengths[id] >= ShortestStandalone && (!connected || streetsIn[id] >= 2)) || (!connected && id == largest);
-            loose = 0;
-            for (int id = 0; id < lengths.Count; id++) if (connected && kept[id] && !rooted[id]) loose++;
+            for (int id = 0; id < lengths.Count; id++) kept[id] = connected ? rooted[id] : id == largest;
+            leftOut = 0;
+            for (int id = 0; id < lengths.Count; id++) if (!kept[id] && lengths[id] >= ShortestStandalone) leftOut++;
             for (int index = 0; index < count; index++)
                 if (!streets[index].Removed && !kept[component[index]]) streets[index].Pruned = true;
             return connected;
@@ -213,12 +210,12 @@ namespace SteppedStreets.Core.Neighbourhood
             }
 
             // Junction angles and spacing.
-            var ends = new List<(int Road, float2 Direction)>[plan.Nodes.Count];
+            var ends = new List<(int Road, float2 Direction, float2 Heading)>[plan.Nodes.Count];
             for (int road = 0; road < plan.Roads.Count; road++)
             {
                 var points = plan.Roads[road].Points;
-                AddEnd(ends, plan.Roads[road].StartNode, road, Direction(points, true));
-                AddEnd(ends, plan.Roads[road].EndNode, road, Direction(points, false));
+                AddEnd(ends, plan.Roads[road].StartNode, road, Direction(points, true), Direction(points, true, HeadingReach));
+                AddEnd(ends, plan.Roads[road].EndNode, road, Direction(points, false), Direction(points, false, HeadingReach));
             }
             var junctions = new List<int>();
             for (int node = 0; node < plan.Nodes.Count; node++)
@@ -230,7 +227,8 @@ namespace SteppedStreets.Core.Neighbourhood
                     for (int second = first + 1; second < list.Count; second++)
                     {
                         float angle = math.degrees(math.acos(math.clamp(math.dot(list[first].Direction, list[second].Direction), -1f, 1f)));
-                        if (angle >= SharpestJunction(request) - 1f) continue;
+                        float heading = math.degrees(math.acos(math.clamp(math.dot(list[first].Heading, list[second].Heading), -1f, 1f)));
+                        if (angle >= SharpestJunction(request) - 1f && heading >= SharpestHeading - 1f) continue;
                         int blamed = streets[owners[list[first].Road]].Kind == RoadKind.Contour ? list[second].Road : list[first].Road;
                         Flag(blamed, "a junction was too sharp");
                     }
@@ -307,30 +305,45 @@ namespace SteppedStreets.Core.Neighbourhood
             return false;
         }
 
-        private static void AddEnd(List<(int, float2)>[] ends, int node, int road, float2 direction)
+        private static void AddEnd(List<(int, float2, float2)>[] ends, int node, int road, float2 direction, float2 heading)
         {
-            if (ends[node] == null) ends[node] = new List<(int, float2)>();
-            ends[node].Add((road, direction));
+            if (ends[node] == null) ends[node] = new List<(int, float2, float2)>();
+            ends[node].Add((road, direction, heading));
         }
+
+        /// <summary>
+        /// How far out a junction's roads are compared: one that leaves the node square but bends back alongside its
+        /// neighbour within this distance squeezes the junction into a wedge (owner's in-game test, 3 November 2026).
+        /// </summary>
+        internal const float HeadingReach = 20f;
+
+        /// <summary>The narrowest angle between where two roads at a junction head, <see cref="HeadingReach"/> out.</summary>
+        internal const float SharpestHeading = 45f;
 
         /// <summary>
         /// The direction a road leaves its start (or end) node: over its first 4–6 m, the way the game builds the junction
         /// from the edge's tangent at the node.
         /// </summary>
-        private static float2 Direction(float3[] points, bool fromStart)
+        private static float2 Direction(float3[] points, bool fromStart, float reach = NodeReach)
         {
             var plan = new List<float2>(points.Length);
             foreach (var point in points) plan.Add(point.xz);
-            return EndDirection(plan, fromStart);
+            return EndDirection(plan, fromStart, reach);
         }
 
-        internal static float2 EndDirection(IReadOnlyList<float2> points, bool fromStart)
+        private const float NodeReach = 3.5f;
+
+        /// <summary>
+        /// The direction from a road's end to its first point at least <paramref name="reach"/> away (or its far end): at the
+        /// default 3.5 m, how the game builds the junction; at <see cref="HeadingReach"/>, where the road is heading.
+        /// </summary>
+        internal static float2 EndDirection(IReadOnlyList<float2> points, bool fromStart, float reach = NodeReach)
         {
             float2 origin = fromStart ? points[0] : points[points.Count - 1];
             for (int step = 1; step < points.Count; step++)
             {
                 float2 point = fromStart ? points[step] : points[points.Count - 1 - step];
-                if (math.distance(point, origin) >= 3.5f || step == points.Count - 1) return math.normalizesafe(point - origin, new float2(1f, 0f));
+                if (math.distance(point, origin) >= reach || step == points.Count - 1) return math.normalizesafe(point - origin, new float2(1f, 0f));
             }
             return new float2(1f, 0f);
         }

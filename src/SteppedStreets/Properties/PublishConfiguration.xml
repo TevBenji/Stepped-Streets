@@ -51,9 +51,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/06.png" />
 	<Screenshot Value="Properties/Screenshots/07.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.0.1" />
+	<ModVersion Value="2.0.2" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- The game's mod list now shows the right version (2.0.1).&#10;- Credits and readme tidied." />
+	<ChangeLog Value="- Fixed: groups of streets built apart from the rest. Every group is now joined to your roads, or left out with a message when no gentle road can join it.&#10;- Fixed: squeezed junctions where a road bent back alongside the street it joined, or joined right next to a dead end." />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
 	<!--Public, Unlisted or Private, exactly as written-->
 	<AccessLevel Value="Public" />

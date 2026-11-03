@@ -87,21 +87,21 @@ namespace SteppedStreets.Core.Neighbourhood
             Stage("connection");
             var owners = new List<int>();
             var notes = new List<string>();
-            bool connected = RoadNetwork.Prune(streets, out int loose);
+            bool connected = RoadNetwork.Prune(streets, out int leftOut);
             RoadNetwork.Assemble(streets, plan, owners);
             for (int round = 0; round < 4; round++)
             {
                 var bad = RoadNetwork.Violations(plan, owners, streets, request, radius, LinkRadius(request), notes);
                 if (bad.Count == 0) break;
                 foreach (int street in bad) streets[street].Broken = true;
-                connected = RoadNetwork.Prune(streets, out loose);
+                connected = RoadNetwork.Prune(streets, out leftOut);
                 RoadNetwork.Assemble(streets, plan, owners);
             }
             plan.Connected = connected;
-            if (loose > 0)
-                plan.Messages.Add(loose == 1
-                    ? "One group of streets could not reach an existing road and is built on its own. Join it to the city with a road."
-                    : loose + " groups of streets could not reach an existing road and are built on their own. Join them to the city with a road.");
+            if (leftOut > 0)
+                plan.Messages.Add(leftOut == 1
+                    ? "One group of streets was left out: no gentle road could join it to the rest."
+                    : leftOut + " groups of streets were left out: no gentle road could join them to the rest.");
             if (plan.Roads.Count == 0)
             {
                 plan.Messages.Add("No street fits here. Draw a larger area, or lower the block depth.");
@@ -211,8 +211,54 @@ namespace SteppedStreets.Core.Neighbourhood
                 cancellation.ThrowIfCancellationRequested();
                 links.Connect(street => street < components.Length && components[street] == id, cancellation);
             }
+            JoinPieces(result, links, cancellation);
             return result;
         }
+
+        /// <summary>
+        /// Joins every piece of network the connection missed to the main one (the piece a connection reaches, else the
+        /// longest), longest first. A neighbourhood in separate pieces looks unfinished (owner's in-game test, 3 November 2026),
+        /// so pieces that can't be joined are left for <see cref="RoadNetwork.Prune"/> to drop.
+        /// </summary>
+        private static void JoinPieces(List<Street> streets, RoadLinks links, CancellationToken cancellation)
+        {
+            // A piece is known by its first street; a piece that failed is not tried again.
+            var failed = new HashSet<int>();
+            for (int round = 0; round < MostPieces; round++)
+            {
+                var component = RoadNetwork.Components(streets, out var lengths);
+                var first = new int[lengths.Count];
+                for (int id = 0; id < first.Length; id++) first[id] = -1;
+                for (int street = 0; street < component.Length; street++)
+                    if (component[street] >= 0 && first[component[street]] < 0) first[component[street]] = street;
+                var main = new bool[lengths.Count];
+                bool rooted = false;
+                for (int street = 0; street < component.Length; street++)
+                    if (component[street] >= 0 && (streets[street].Start.Existing || streets[street].End.Existing))
+                    {
+                        main[component[street]] = true;
+                        rooted = true;
+                    }
+                if (!rooted)
+                {
+                    int longest = -1;
+                    for (int id = 0; id < lengths.Count; id++) if (longest < 0 || lengths[id] > lengths[longest]) longest = id;
+                    if (longest < 0) return;
+                    main[longest] = true;
+                }
+                int next = -1;
+                for (int id = 0; id < lengths.Count; id++)
+                    if (!main[id] && lengths[id] >= SmallestPiece && !failed.Contains(first[id]) && (next < 0 || lengths[id] > lengths[next])) next = id;
+                if (next < 0) return;
+                bool joined = links.JoinPiece(street => street < component.Length && component[street] == next,
+                    street => street < component.Length && component[street] >= 0 && main[component[street]], cancellation);
+                if (!joined) failed.Add(first[next]);
+            }
+        }
+
+        private const int MostPieces = 12;
+        // Shorter pieces are a street or two the connection missed; pruning drops them anyway.
+        private const float SmallestPiece = 150f;
 
         /// <summary>The smoothed height inside the area nearest an existing road: the street through it gets a short connection.</summary>
         private static float EntryHeight(SiteSurvey survey, NeighbourhoodRequest request)
