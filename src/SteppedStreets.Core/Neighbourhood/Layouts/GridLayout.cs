@@ -121,7 +121,9 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 // irregular grid's jitter is per column for crossroads (per column and row when staggered).
                 float leanHere = (offsets[row] - offsets[0]) * lean;
                 var positions = new List<(float U, bool Collector)>();
-                for (int column = -1; uMin + phase + column * crossSpacing < uMax + crossSpacing; column++)
+                // The columns that fall on this row once leaned: a tall skewed grid's columns drift a long way along the rows.
+                int firstColumn = (int)math.floor((-phase - offset - leanHere) / crossSpacing) - 1;
+                for (int column = firstColumn; uMin + phase + column * crossSpacing + offset + leanHere < uMax + crossSpacing; column++)
                 {
                     float at = uMin + phase + column * crossSpacing + offset + leanHere;
                     if (style == NeighbourhoodStyle.IrregularGrid)
