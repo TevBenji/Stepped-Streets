@@ -240,6 +240,40 @@ namespace SteppedStreets.Tests.Neighbourhood
         }
 
         [Fact]
+        public void ServiceBuildingsGetLevelSitesBesideTheRoadsAndTheLotsGiveWay()
+        {
+            var plan = NeighbourhoodPlanner.Plan(SyntheticSites.Cone().Request(r => r.Services = new[]
+            {
+                new ServiceRequest { Name = "Police Station", WidthCells = 4, DepthCells = 4, Count = 2 },
+                new ServiceRequest { Name = "Hospital", WidthCells = 8, DepthCells = 6, Count = 1 },
+            }));
+            Assert.Equal(2, plan.Buildings.Count(building => building.Name == "Police Station"));
+            Assert.Single(plan.Buildings, building => building.Name == "Hospital");
+            foreach (var building in plan.Buildings)
+            {
+                var quad = building.Pad.Corners.Select(corner => corner.xz).ToArray();
+                // Its front lies at the kerb of the road it faces, and its forward points at that road.
+                float2 front = (quad[0] + quad[1]) * 0.5f;
+                var road = plan.Roads[building.Road].Points.Select(point => point.xz).ToList();
+                float kerb = Enumerable.Range(1, road.Count - 1).Min(index => Geometry.DistanceToSegment(front, road[index - 1], road[index]));
+                Assert.InRange(kerb, 4f, 9f);
+                Assert.True(math.dot(building.Forward, front - building.Position.xz) > 0f);
+                // Level enough to build on, no house lot under it, no other building on top of it.
+                float2 centre = building.Position.xz;
+                Assert.True(math.abs(plan.Ground.HeightAt(centre) - building.Pad.Height) <= 0.3f, "a building pad is not level");
+                foreach (var lot in plan.Lots)
+                    Assert.False(ServiceSites.Overlap(quad, lot.Pad.Corners.Select(corner => corner.xz).ToArray(), 0.5f), "a lot under a building");
+                foreach (var other in plan.Buildings)
+                    if (other != building) Assert.False(ServiceSites.Overlap(quad, other.Pad.Corners.Select(corner => corner.xz).ToArray(), 0f), "two buildings overlap");
+            }
+            // The mix text round-trips, and junk is skipped.
+            var read = ServiceRequest.ParseList(ServiceRequest.WriteList(new[] { new ServiceRequest { Name = "Fire \"Station\"", Count = 3 } }));
+            Assert.Equal("Fire \"Station\"", Assert.Single(read).Name);
+            Assert.Equal(3, read[0].Count);
+            Assert.Empty(ServiceRequest.ParseList("[{\"name\"\"x\"}]"));
+        }
+
+        [Fact]
         public void ARingOnBumpyGroundHasNoJumpAtItsSeam()
         {
             // A 200 m ring over bumps: fitted as an open line, its first and last heights came out metres apart.

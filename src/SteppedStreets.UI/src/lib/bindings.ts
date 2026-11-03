@@ -21,7 +21,7 @@ export function useToolState() {
 }
 
 export type Action = "toggleTool" | "close" | "clearArea" | "closeArea" | "undo" | "build" | "reroll";
-export type TextTrigger = "setStyle" | "setRoad" | "setMixPattern" | "setZoneMix";
+export type TextTrigger = "setStyle" | "setRoad" | "setMixPattern" | "setZoneMix" | "setServiceMix";
 export type NumberTrigger = "setBlockDepth" | "setMaxRoadGrade" | "setSteepestBuildable" | "setLotWidth" | "setLotDepth"
     | "setEarthworkLimit" | "setBankGrade" | "setLotSpacing" | "setTreeDensity" | "setSeed";
 export type ToggleTrigger = "setLevelLots" | "setRetainingWalls" | "setTrees" | "setSteepGround";

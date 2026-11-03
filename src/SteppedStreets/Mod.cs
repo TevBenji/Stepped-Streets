@@ -38,11 +38,11 @@ namespace SteppedStreets
             catch (Exception exception) { Logger.Error(exception, "Stepped Streets build tool registration failed"); }
             try { updateSystem.UpdateBefore<Build.ZoneBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
             catch (Exception exception) { Logger.Error(exception, "Stepped Streets zoning system registration failed"); }
-            // The road and tree builders hand their Apply to the build tool in the same frame, so they update just before it.
+            // The road and object builders hand their Apply to the build tool in the same frame, so they update just before it.
             try { updateSystem.UpdateBefore<Build.NetBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
             catch (Exception exception) { Logger.Error(exception, "Stepped Streets road builder registration failed"); }
-            try { updateSystem.UpdateBefore<Build.TreeBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
-            catch (Exception exception) { Logger.Error(exception, "Stepped Streets tree builder registration failed"); }
+            try { updateSystem.UpdateBefore<Build.ObjectBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
+            catch (Exception exception) { Logger.Error(exception, "Stepped Streets object builder registration failed"); }
             try
             {
                 updateSystem.UpdateAt<Build.TerrainBuildSystem>(SystemUpdatePhase.ToolUpdate);

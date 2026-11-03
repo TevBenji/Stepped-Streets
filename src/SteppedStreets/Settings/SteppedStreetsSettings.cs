@@ -60,6 +60,11 @@ namespace SteppedStreets.Settings
         [SettingsUISection(Section, Group)]
         public string ZoneMix { get; set; }
 
+        /// <summary>Service buildings mixed in, as the panel writes them: [{"name":"..","count":n},..].</summary>
+        [SettingsUITextInput]
+        [SettingsUISection(Section, Group)]
+        public string ServiceMix { get; set; }
+
         [SettingsUISection(Section, Group)]
         public MixPattern MixPattern { get; set; }
 
@@ -140,6 +145,7 @@ namespace SteppedStreets.Settings
             SteepestBuildablePercent = 15;
             SteepGround = false;
             ZoneMix = DefaultZoneMix;
+            ServiceMix = "[]";
             MixPattern = MixPattern.Clumps;
             LotWidthCells = 3;
             NarrowestWidthCells = 2;
@@ -200,6 +206,7 @@ namespace SteppedStreets.Settings
             Label(nameof(SteepGround), "Steep hills and mountains", "Build on ground up to 60% steep: links switch back in hairpins and banks reach further. Off: up to 30%.");
             Label(nameof(SteepestBuildablePercent), "Steepest buildable ground", "Steeper ground gets no roads or lots and is planted as forest (above 30% only with steep hills on).");
             Label(nameof(ZoneMix), "Zone mix", "The zones and their shares, as the panel writes them.");
+            Label(nameof(ServiceMix), "Services", "Service buildings mixed in (police, fire, clinic, school, park...) and how many of each, as the panel writes them.");
             Label(nameof(MixPattern), "Mix mode", "Random per lot, clumps of neighbouring lots, or an even split.");
             Label(nameof(LotWidthCells), "Lot width (cells)", "Cells along the kerb per lot.");
             Label(nameof(NarrowestWidthCells), "Narrowest width (cells)", "How far a lot may narrow on a climbing road to keep its step low.");

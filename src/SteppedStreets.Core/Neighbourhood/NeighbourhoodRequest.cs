@@ -66,6 +66,56 @@ namespace SteppedStreets.Core.Neighbourhood
         }
     }
 
+    /// <summary>A service building the player mixed in (a police station, a clinic, a park...), and how many.</summary>
+    public sealed class ServiceRequest
+    {
+        /// <summary>The game's prefab name; the planner only echoes it.</summary>
+        public string Name = "";
+
+        /// <summary>The building's lot in cells, along the kerb and back from it.</summary>
+        public int WidthCells = 4;
+        public int DepthCells = 4;
+
+        public int Count = 1;
+
+        private static readonly Regex Entry = new Regex(@"\{[^{}]*\}", RegexOptions.CultureInvariant);
+        private static readonly Regex NameField = new Regex(@"""name""\s*:\s*""((?:[^""\\]|\\.)*)""", RegexOptions.CultureInvariant);
+        private static readonly Regex CountField = new Regex(@"""count""\s*:\s*([0-9]+)", RegexOptions.CultureInvariant);
+        private static readonly Regex Escape = new Regex(@"\\(.)", RegexOptions.CultureInvariant);
+
+        /// <summary>Reads [{"name":"..","count":n},..] as the panel writes it (sizes come from the game); unreadable entries are skipped.</summary>
+        public static List<ServiceRequest> ParseList(string json)
+        {
+            var services = new List<ServiceRequest>();
+            foreach (Match entry in Entry.Matches(json ?? ""))
+            {
+                var name = NameField.Match(entry.Value);
+                if (!name.Success) continue;
+                var count = CountField.Match(entry.Value);
+                int value = count.Success && int.TryParse(count.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : 1;
+                string text = Escape.Replace(name.Groups[1].Value, "$1");
+                if (text.Length > 0 && value > 0 && !services.Exists(service => service.Name == text))
+                    services.Add(new ServiceRequest { Name = text, Count = Math.Min(value, MostEach) });
+            }
+            return services;
+        }
+
+        public static string WriteList(IEnumerable<ServiceRequest> services)
+        {
+            var json = new StringBuilder("[");
+            foreach (var service in services)
+            {
+                if (json.Length > 1) json.Append(',');
+                json.Append("{\"name\":\"").Append((service.Name ?? "").Replace("\\", "\\\\").Replace("\"", "\\\""))
+                    .Append("\",\"count\":").Append(service.Count.ToString(CultureInfo.InvariantCulture)).Append('}');
+            }
+            return json.Append(']').ToString();
+        }
+
+        /// <summary>The most of one building a plan places.</summary>
+        public const int MostEach = 20;
+    }
+
     /// <summary>One existing road edge near the area, to connect to.</summary>
     public sealed class ExistingRoad
     {
@@ -117,6 +167,9 @@ namespace SteppedStreets.Core.Neighbourhood
         public float LinkSpacing = 300f;
 
         public ZoneShare[] Mix = { new ZoneShare { Zone = "Residential Low", Share = 1f } };
+
+        /// <summary>Service buildings to place beside the new roads, each on a level pad of its own.</summary>
+        public ServiceRequest[] Services = new ServiceRequest[0];
         public MixPattern Pattern = MixPattern.Clumps;
 
         public int LotWidthCells = 3;

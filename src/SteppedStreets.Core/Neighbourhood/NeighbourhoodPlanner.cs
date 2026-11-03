@@ -123,8 +123,14 @@ namespace SteppedStreets.Core.Neighbourhood
                 roadsReady(roads);
             }
             var lots = LotLayout.Plan(plan, owners, survey, request, plan.Messages, cancellation);
+            plan.Buildings = ServiceSites.Place(plan, lots, survey, request, plan.Messages, cancellation);
             Stage("lots");
-            plan.Ground = GroundField.Build(request, plan, lots, cancellation);
+            // The buildings' pads are graded like the lots' and keep the trees off.
+            var buildingPads = new List<PlannedLot>();
+            foreach (var building in plan.Buildings) buildingPads.Add(new PlannedLot { Pad = building.Pad, Road = building.Road });
+            var pads = new List<PlannedLot>(lots);
+            pads.AddRange(buildingPads);
+            plan.Ground = GroundField.Build(request, plan, pads, cancellation);
             Stage("ground");
             int lostToBanks = 0;
             foreach (var lot in lots)
@@ -140,7 +146,9 @@ namespace SteppedStreets.Core.Neighbourhood
             if (lostToBanks > 0)
                 plan.Messages.Add(lostToBanks + (lostToBanks == 1 ? " lot was" : " lots were") + " left out: the banks between levels needed the room.");
             Stage("level cells");
-            plan.Trees = Landscaping.Trees(plan, plan.Lots, survey, request, cancellation);
+            var treeless = new List<PlannedLot>(plan.Lots);
+            treeless.AddRange(buildingPads);
+            plan.Trees = Landscaping.Trees(plan, treeless, survey, request, cancellation);
             plan.Walls = Landscaping.Walls(plan, plan.Lots, request);
             Stage("landscape");
             return Finish(plan, clock, request);
@@ -249,6 +257,14 @@ namespace SteppedStreets.Core.Neighbourhood
             request.LotWidthCells = math.clamp(request.LotWidthCells, StepPlanner.MinimumWidthCells, StepPlanner.MaximumRows);
             request.LotDepthCells = math.clamp(request.LotDepthCells, StepPlanner.MinimumRows, StepPlanner.MaximumRows);
             request.NarrowestWidthCells = math.clamp(request.NarrowestWidthCells, StepPlanner.MinimumWidthCells, request.LotWidthCells);
+            // The game's biggest service lots are about 16 cells; anything odd is clamped rather than refused.
+            foreach (var service in request.Services ?? new ServiceRequest[0])
+            {
+                if (service == null) continue;
+                service.WidthCells = math.clamp(service.WidthCells, 1, 20);
+                service.DepthCells = math.clamp(service.DepthCells, 1, 20);
+                service.Count = math.clamp(service.Count, 0, ServiceRequest.MostEach);
+            }
             request.EarthworkLimit = math.clamp(Finite(request.EarthworkLimit, 4f), 0.5f, 12f);
             request.BankGrade = math.clamp(Finite(request.BankGrade, 0.4f), 0.15f, 0.5f);
             request.HighestStep = math.clamp(Finite(request.HighestStep, 3.2f), 0.5f, 6f);

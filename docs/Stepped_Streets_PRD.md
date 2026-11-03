@@ -262,6 +262,7 @@ Draft 5, 2 November 2026. After a code review and the owner's request for steep 
 - §5.4: Steep hills setting; Steepest buildable and Most earth ranges widen with it.
 - §5.3 (after the owner's in-game test): the build no longer stops when the ground check falls short (it landed within 1 m, 95 % exact, and the check wanted 98 %); lots are zoned whole from the kerb back, because the game starts a house lot only at a zoned cell against the road (Game.Zones.LotSizeJobs) and zoning only dead-level cells grew nothing; Unzoned is no longer offered in the zone mix.
 - §5.1: areas up to 6.4 km on a side (ten times the area), with finer survey and ground grids so big areas keep their detail.
+- §5.2, §5.4 (owner: mix and match zones and services, as easy as possible): service buildings in the mix with counts; the planner gives each a level site its own size beside a new road, flattest first and spread out, and the house lots there give way; the build places them after zoning. The panel shows Style, What to build, Steep hills and Trees, with the rest under More settings; Reroll moved to the footer; a newly added row opens its list.
 
 Draft 4, 2 November 2026. The owner rejected the one-street tool after the first in-game look and asked for a generator that lays out a whole hillside neighbourhood from a drawn area (their v2 hand-off prompt, approved the same day; it supersedes the wave 5 spec in `docs/HILLSIDE-NEIGHBOURHOODS.md`).
 

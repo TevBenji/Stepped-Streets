@@ -70,7 +70,7 @@ namespace SteppedStreets.Tool
 
         private bool BuildSystemsBusy() =>
             World.GetOrCreateSystemManaged<TerrainBuildSystem>().Busy || World.GetOrCreateSystemManaged<NetBuildSystem>().Busy
-            || World.GetOrCreateSystemManaged<ZoneBuildSystem>().Busy || World.GetOrCreateSystemManaged<TreeBuildSystem>().Busy
+            || World.GetOrCreateSystemManaged<ZoneBuildSystem>().Busy || World.GetOrCreateSystemManaged<ObjectBuildSystem>().Busy
             || World.GetOrCreateSystemManaged<WallBuildSystem>().Busy;
 
         private void AfterGround(TerrainBuildReport report)
@@ -196,7 +196,7 @@ namespace SteppedStreets.Tool
                     buildReport.Add(Invariant($"{levelCells} cells zoned ({zonedRuns} of {requestedRuns} runs verified)"));
                     if (zonedRuns < requestedRuns) Message("Some zoning runs were not verified. The log lists the cells.");
                     ReportGrowth();
-                    PlantTrees();
+                    PlaceServices();
                     return;
                 }
                 var (zone, quads) = zoneQueue.Dequeue();
@@ -253,16 +253,54 @@ namespace SteppedStreets.Tool
             catch (Exception exception) { Mod.Logger.Warn("Stepped Streets: reading the demand after zoning failed: " + exception.Message); }
         }
 
-        private void PlantTrees()
+        /// <summary>The service buildings the player mixed in, on their graded pads, facing their roads; after zoning, so they
+        /// don't change the zone blocks the zoning was checked against.</summary>
+        private void PlaceServices()
         {
-            if (!buildRequest.Trees || buildPlan.Trees.Count == 0) { BuildWalls(null); return; }
-            State.Progress = 0.85f;
-            State.Summary = "Planting trees...";
-            Touch();
-            World.GetOrCreateSystemManaged<TreeBuildSystem>().Begin(buildPlan.Trees, BuildWalls);
+            try
+            {
+                if (State.Stage != ToolStage.Building) return;
+                var catalogue = ServiceCatalog.List(EntityManager, World.GetOrCreateSystemManaged<Game.Prefabs.PrefabSystem>(), null);
+                var placements = new List<ObjectBuildSystem.Placement>();
+                foreach (var building in buildPlan.Buildings)
+                {
+                    var entry = catalogue.Find(candidate => candidate.Name == building.Name);
+                    if (entry == null) { Log("services: " + building.Name + " is no longer available; skipped"); continue; }
+                    // A building's front (local +z) faces the road (Game.Buildings.BuildingUtils.CalculateFrontPosition).
+                    var forward = new float3(building.Forward.x, 0f, building.Forward.y);
+                    placements.Add(new ObjectBuildSystem.Placement
+                    {
+                        Prefab = entry.Prefab,
+                        Position = building.Position,
+                        Rotation = quaternion.LookRotationSafe(forward, math.up()),
+                        Seed = (int)(math.hash(building.Position) & 0x7FFFFFFF),
+                    });
+                }
+                if (placements.Count == 0) { PlantTrees(null); return; }
+                State.Progress = 0.82f;
+                State.Summary = "Placing the services...";
+                Touch();
+                World.GetOrCreateSystemManaged<ObjectBuildSystem>().BeginBuildings(placements, PlantTrees);
+            }
+            catch (Exception exception) { BuildFailed(exception, "Placing the services failed. The ground, roads and zones remain."); }
         }
 
-        private void BuildWalls(TreeBuildReport report)
+        private void PlantTrees(ObjectBuildReport services)
+        {
+            try
+            {
+                if (State.Stage != ToolStage.Building) return;
+                if (services != null) { Log("services: " + services.Summary); buildReport.Add(Invariant($"{services.Placed} service buildings")); }
+                if (!buildRequest.Trees || buildPlan.Trees.Count == 0) { BuildWalls(null); return; }
+                State.Progress = 0.87f;
+                State.Summary = "Planting trees...";
+                Touch();
+                World.GetOrCreateSystemManaged<ObjectBuildSystem>().Begin(buildPlan.Trees, BuildWalls);
+            }
+            catch (Exception exception) { BuildFailed(exception, "Planting trees failed. Everything else remains."); }
+        }
+
+        private void BuildWalls(ObjectBuildReport report)
         {
             try
             {

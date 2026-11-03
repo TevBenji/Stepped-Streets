@@ -36,6 +36,9 @@ running along the foot of a hill.
 - [ ] Try each style: Contour suburb, Terraced blocks, Mountain lane.
 - [ ] Try a zone mix of two or three zones with Clumps, Random and Even.
 - [ ] Draw an area away from any road: the plan still appears and says "Not connected".
+- [ ] **Add a service** (the list opens at once): pick a police station and a clinic, set two police stations. Blue pads with a
+      white front edge appear beside roads, spread over the area; the Plan list shows "2 buildings" and "1 building". After the
+      build the buildings stand on them, facing the road, connected (no "no road access" icon).
 - [ ] Turn on **Steep hills** and draw on a steep hill or mountain side: Steepest buildable jumps to 50 % and Most earth to
       8 m, the plan reaches higher up the slope, and connectors run long and shallow across it. Turn it off: both come back
       within 30 % and 8 m.
@@ -49,7 +52,8 @@ Press Build and confirm. Watch the panel's progress and the log.
 - [ ] Roads: the log's "roads:" line reports pieces built (N of N); junctions merged into real T-junctions (no gaps, no
       overlapping road ends); the connection joins the existing road.
 - [ ] Roads sit on the ground (no floating or sunken stretches, no concrete retaining walls along their sides).
-- [ ] Zoning: the zone colours appear on the lots; the log's "zoning:" lines show runs zoned per zone.
+- [ ] Zoning: the zone colours appear on the lots, right up to the road; the log's "zoning:" lines show runs zoned per zone.
+- [ ] With demand for the zone, houses start growing on the new lots without painting any zones by hand.
 - [ ] Trees appear on the steep ground and banks, not on lots or roads.
 - [ ] No freeze over about 2 seconds at any stage.
 - [ ] Start a second build and pick another tool (or press Esc) while it runs: the build still finishes (the panel shows

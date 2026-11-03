@@ -32,7 +32,9 @@ namespace SteppedStreets.Panel
         private EntityQuery _zoneQuery;
         private ValueBinding<string> _state;
         private readonly SortedDictionary<string, string> _zones = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        private string _zonesJson = "[]", _roadsJson = "[]";
+        private string _zonesJson = "[]", _roadsJson = "[]", _servicesJson = "[]";
+        private readonly HashSet<string> _services = new HashSet<string>(StringComparer.Ordinal);
+        private bool _servicesBuilt;
         private bool _zonesBuilt, _roadsBuilt, _published, _updateFailed;
         private int _version;
         private string _settingsJson = "";
@@ -80,6 +82,15 @@ namespace SteppedStreets.Panel
                     if (_zones.Count > 0) shares.RemoveAll(share => !_zones.ContainsKey(share.Zone));
                     if (shares.Count == 0) return false;
                     settings.ZoneMix = ZoneShare.WriteList(shares);
+                    return true;
+                }));
+                Trigger<string>("setServiceMix", value => ChangeSettings(settings =>
+                {
+                    if (value == null || value.Length > 4000) return false;
+                    var services = ServiceRequest.ParseList(value);
+                    // Only buildings the game offers; an empty list is fine (no services).
+                    if (_services.Count > 0) services.RemoveAll(service => !_services.Contains(service.Name));
+                    settings.ServiceMix = ServiceRequest.WriteList(services);
                     return true;
                 }));
                 NumberTrigger("setBlockDepth", 60, 200, (settings, value) => settings.BlockDepth = (int)Math.Round(value / 5.0) * 5);
@@ -148,7 +159,7 @@ namespace SteppedStreets.Panel
                 base.OnUpdate();
                 var settings = Mod.Settings;
                 if (settings == null || _state == null || _tool == null) return;
-                bool catalogueChanged = BuildZones() | BuildRoads();
+                bool catalogueChanged = BuildZones() | BuildRoads() | BuildServices();
                 string settingsJson = SettingsJson(settings);
                 var state = _tool.State;
                 if (_published && !catalogueChanged && _version == state.Version && settingsJson == _settingsJson) return;
@@ -166,11 +177,40 @@ namespace SteppedStreets.Panel
             }
         }
 
-        private string Localised(string name)
+        private string Localised(string name) => Localised("Assets.NAME[" + name + "]", name);
+
+        private static string Localised(string key, string fallback)
         {
             var dictionary = GameManager.instance?.localizationManager?.activeDictionary;
-            return dictionary != null && dictionary.TryGetValue("Assets.NAME[" + name + "]", out var localised) && !string.IsNullOrEmpty(localised)
-                ? localised : name;
+            return dictionary != null && dictionary.TryGetValue(key, out var localised) && !string.IsNullOrEmpty(localised) ? localised : fallback;
+        }
+
+        /// <summary>
+        /// The service buildings, read again each time the tool opens: milestones unlock more as the city grows.
+        /// </summary>
+        private bool BuildServices()
+        {
+            bool open = _tool.State.Stage != ToolStage.Closed;
+            if (!open) { _servicesBuilt = false; return false; }
+            if (_servicesBuilt) return false;
+            _servicesBuilt = true;
+            var buildings = ServiceCatalog.List(EntityManager, _prefabs, Localised);
+            _services.Clear();
+            var json = new StringBuilder("[");
+            foreach (var building in buildings)
+            {
+                if (!_services.Add(building.Name)) continue;
+                if (json.Length > 1) json.Append(',');
+                json.Append("{\"name\":"); String(json, building.Name);
+                json.Append(",\"label\":"); String(json, building.Label);
+                json.Append(",\"group\":"); String(json, building.Group);
+                json.Append(",\"width\":").Append(Integer(building.WidthCells));
+                json.Append(",\"depth\":").Append(Integer(building.DepthCells)).Append('}');
+            }
+            string next = json.Append(']').ToString();
+            if (next == _servicesJson) return false;
+            _servicesJson = next;
+            return true;
         }
 
         private bool BuildZones()
@@ -260,6 +300,14 @@ namespace SteppedStreets.Panel
                 json.Append("{\"zone\":"); String(json, shares[index].Zone);
                 json.Append(",\"share\":").Append(Number(shares[index].Share)).Append('}');
             }
+            json.Append("],\"serviceMix\":[");
+            var services = ServiceRequest.ParseList(settings.ServiceMix);
+            for (int index = 0; index < services.Count; index++)
+            {
+                if (index > 0) json.Append(',');
+                json.Append("{\"name\":"); String(json, services[index].Name);
+                json.Append(",\"count\":").Append(Integer(services[index].Count)).Append('}');
+            }
             json.Append("],\"mixPattern\":"); String(json, settings.MixPattern.ToString());
             json.Append(",\"lotWidthCells\":").Append(Integer(settings.LotWidthCells));
             json.Append(",\"lotDepthCells\":").Append(Integer(settings.DepthCells));
@@ -304,9 +352,17 @@ namespace SteppedStreets.Panel
                 json.Append("{\"zone\":"); String(json, state.ZoneCounts[index].Key);
                 json.Append(",\"lots\":").Append(Integer(state.ZoneCounts[index].Value)).Append('}');
             }
+            json.Append("],\"serviceCounts\":[");
+            for (int index = 0; index < state.ServiceCounts.Count; index++)
+            {
+                if (index > 0) json.Append(',');
+                json.Append("{\"name\":"); String(json, state.ServiceCounts[index].Key);
+                json.Append(",\"count\":").Append(Integer(state.ServiceCounts[index].Value)).Append('}');
+            }
             json.Append("],\"progress\":").Append(Number(state.Progress));
             json.Append(",\"settings\":").Append(settingsJson);
-            return json.Append(",\"zones\":").Append(_zonesJson).Append(",\"roads\":").Append(_roadsJson).Append('}').ToString();
+            return json.Append(",\"zones\":").Append(_zonesJson).Append(",\"roads\":").Append(_roadsJson)
+                .Append(",\"services\":").Append(_servicesJson).Append('}').ToString();
         }
 
         private static string Integer(int value) => value.ToString(CultureInfo.InvariantCulture);

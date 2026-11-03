@@ -30,8 +30,10 @@ Group: `SteppedStreets`. Value: `state`, a `ValueBinding<string>` carrying JSON,
 and read defensively by `src/lib/state.ts` (`readState` never throws and clamps every field):
 `stage` (Closed, Drawing, Planning, Planned, Building, Built, Failed), `corners`, `areaClosed`, `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
-`connected`, `trees`), `zoneCounts` (`zone`/`lots`), `progress` (0–1), `settings` (the trigger values below, plus `steepGround`),
-and the catalogues `zones` and `roads` (`name`/`label`). While Planning and Building, `summary` is the current step; once Built,
+`connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
+`settings` (the trigger values below, plus `steepGround` and `serviceMix` as `name`/`count` rows), and the catalogues `zones` and
+`roads` (`name`/`label`) and `services` (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read
+again each time the tool opens). While Planning and Building, `summary` is the current step; once Built,
 it is the build report (the panel shows it under the status line). The state is rebuilt only when ToolState.Version, a setting or a catalogue changes.
 
 | Trigger | Argument | Action |
@@ -44,6 +46,7 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setRoad` | string | A road `name` from the catalogue |
 | `setMixPattern` | string | Random / Clumps / Even |
 | `setZoneMix` | string | `[{"zone":"...","share":N},...]`; zones not in the catalogue are dropped |
+| `setServiceMix` | string | `[{"name":"...","count":N},...]` (N 1–20); buildings not in the `services` catalogue are dropped; `[]` is allowed |
 | `setBlockDepth` | double | 60–200 m, step 5 |
 | `setMaxRoadGrade`, `setSteepestBuildable` | double | 4–12 %, 8–60 % (C# caps the second at 30 % unless `steepGround`) |
 | `setLotWidth`, `setLotDepth` | double | 2–6 cells |

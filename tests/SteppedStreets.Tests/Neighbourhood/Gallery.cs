@@ -74,6 +74,17 @@ namespace SteppedStreets.Tests.Neighbourhood
                     image.Line(corners[corner], corners[(corner + 1) % 4], 0.35f, colour * 0.55f, 1f);
             }
 
+            // Service buildings: a blue pad with a darker outline and a mark at the front, where the door faces the road.
+            foreach (var building in plan.Buildings)
+            {
+                var corners = new float2[4];
+                for (int corner = 0; corner < 4; corner++) corners[corner] = building.Pad.Corners[corner].xz;
+                image.Polygon(corners, new float3(0.3f, 0.5f, 0.95f), 0.85f);
+                for (int corner = 0; corner < 4; corner++)
+                    image.Line(corners[corner], corners[(corner + 1) % 4], 0.8f, new float3(0.1f, 0.2f, 0.5f), 1f);
+                image.Disc((corners[0] + corners[1]) * 0.5f, 2.5f, new float3(1f, 1f, 1f), 1f);
+            }
+
             foreach (var tree in plan.Trees)
                 image.Disc(tree.Position.xz, 1.6f, tree.Kind == TreeKind.Conifer ? new float3(0.12f, 0.3f, 0.15f) : new float3(0.2f, 0.42f, 0.16f), 0.9f);
 

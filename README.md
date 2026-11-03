@@ -17,7 +17,10 @@ tested off-game on eight synthetic hillsides; the in-game test is next ([docs/IN
    The area does not have to touch a road: the mod connects to the nearest existing road within 400 m when it can, and
    otherwise builds the streets on their own. A group of streets the connection can't reach (often the hilltop) is built
    too, and the panel says so, so you can join it to the city with a road of your own.
-3. **Pick a style and settings.** The plan appears a moment after the area closes and refreshes after every change: roads
+3. **Pick a style and what to build.** Under **What to build**, **Add a zone** mixes in another zone with a share, and **Add a
+   service** mixes in a service building (police station, fire station, clinic or hospital, school, park, utilities: any
+   unlocked roadside service building) with a count; each gets a level site of its own size beside a new road, facing it.
+   **Steep hills** and **Trees** sit just below; everything else is under **More settings**. The plan appears a moment after the area closes and refreshes after every change: roads
    coloured by grade (grey under 3 %, yellow under 6 %, orange up to the maximum), lots coloured by zone, cut shaded brown
    and fill tan, trees as dots. The panel sums it up: road length, lots, zoned cells, earth moved, steepest road.
 4. **Reroll** gives another layout from a new seed. The same seed and settings give the same layout.
@@ -46,7 +49,8 @@ One cell is **8 m**.
 | Max road grade | 4–12 % | 8 % | No new road is steeper. Connectors bend across the slope to stay under it. |
 | Steep hills | on/off | off | Steep hills and mountains: buildable ground up to 60 % and earthwork up to 12 m; connectors may join at 35° and switch back. Turning it on lifts Steepest buildable to at least 50 % and Most earth to at least 8 m. |
 | Steepest buildable | 8–30 % (60 % with Steep hills) | 15 % | Steeper ground (judged on the hill, not its bumps) gets no roads or lots and is planted as forest. |
-| Zone mix | rows of zone and share | Residential Low | Each lot's zone; **Mix in another zone** adds a row. |
+| Zone mix | rows of zone and share | Residential Low | Each lot's zone; **Add a zone** adds a row. |
+| Services | rows of building and count (1–20) | none | Service buildings placed on level sites beside the new roads; **Add a service** adds a row. |
 | Mix mode | Random, Clumps, Even | Clumps | Random per lot, runs of 3–5 neighbouring lots, or an even split. |
 | Lot width, lot depth | 2–6 cells | 3, 3 | The lots along every road (a lot on steep ground may come out one cell shallower). |
 | Level the lots | on/off | on | Grade each lot into a level pad. Off: only the roads are graded. |

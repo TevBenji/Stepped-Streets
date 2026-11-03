@@ -536,6 +536,9 @@ namespace SteppedStreets.Tool
             State.Connected = plan.Connected;
             State.Trees = plan.Trees.Count;
             State.ZoneCounts = new List<KeyValuePair<string, int>>(plan.ZoneCounts);
+            var services = new SortedDictionary<string, int>(StringComparer.Ordinal);
+            foreach (var building in plan.Buildings) { services.TryGetValue(building.Name, out int count); services[building.Name] = count + 1; }
+            State.ServiceCounts = new List<KeyValuePair<string, int>>(services);
             State.Stage = plan.Buildable ? ToolStage.Planned : ToolStage.Drawing;
             if (!IsActive && State.Stage != ToolStage.Building) State.Stage = ToolStage.Closed;
             Touch();
@@ -560,6 +563,7 @@ namespace SteppedStreets.Tool
                 SteepGround = settings.SteepGround,
                 SteepestBuildable = math.min(settings.SteepestBuildablePercent, settings.SteepestBuildableLimit()) / 100f,
                 Mix = settings.ZoneShares().ToArray(),
+                Services = ServiceRequests(settings),
                 Pattern = settings.MixPattern,
                 LotWidthCells = settings.LotWidthCells,
                 NarrowestWidthCells = math.min(settings.NarrowestWidthCells, settings.LotWidthCells),
@@ -574,6 +578,24 @@ namespace SteppedStreets.Tool
                 TreeDensity = settings.TreeDensityPercent / 100f,
                 Seed = (uint)math.max(1, settings.Seed),
             };
+        }
+
+        /// <summary>The mixed-in service buildings with their lot sizes from the game; ones the game no longer has are left out.</summary>
+        private ServiceRequest[] ServiceRequests(Settings.SteppedStreetsSettings settings)
+        {
+            var wanted = ServiceRequest.ParseList(settings.ServiceMix);
+            if (wanted.Count == 0) return new ServiceRequest[0];
+            var catalogue = ServiceCatalog.List(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), null);
+            var services = new List<ServiceRequest>();
+            foreach (var service in wanted)
+            {
+                var entry = catalogue.Find(candidate => candidate.Name == service.Name);
+                if (entry == null) continue;
+                service.WidthCells = entry.WidthCells;
+                service.DepthCells = entry.DepthCells;
+                services.Add(service);
+            }
+            return services.ToArray();
         }
 
         private void RefreshStage()
@@ -605,6 +627,7 @@ namespace SteppedStreets.Tool
             State.EarthCubicMetres = State.SteepestRoadPercent = State.WildPercent = 0f;
             State.Connected = false;
             State.ZoneCounts = new List<KeyValuePair<string, int>>();
+            State.ServiceCounts = new List<KeyValuePair<string, int>>();
             State.Progress = 0f;
         }
 

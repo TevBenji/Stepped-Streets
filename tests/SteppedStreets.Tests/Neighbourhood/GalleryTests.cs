@@ -28,6 +28,12 @@ namespace SteppedStreets.Tests.Neighbourhood
             var cone = SyntheticSites.Cone();
             renders.Add((cone, "cone-terraced", request => request.Style = NeighbourhoodStyle.TerracedBlocks));
             renders.Add((cone, "cone-lane", request => request.Style = NeighbourhoodStyle.MountainLane));
+            renders.Add((cone, "cone-services", request => request.Services = new[]
+            {
+                new ServiceRequest { Name = "Police Station", WidthCells = 4, DepthCells = 4, Count = 2 },
+                new ServiceRequest { Name = "Hospital", WidthCells = 8, DepthCells = 6, Count = 1 },
+                new ServiceRequest { Name = "Elementary School", WidthCells = 6, DepthCells = 6, Count = 1 },
+            }));
             renders.Add((cone, "cone-mix", request =>
             {
                 request.Mix = new[]

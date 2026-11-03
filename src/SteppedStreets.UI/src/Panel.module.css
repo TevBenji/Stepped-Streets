@@ -412,9 +412,48 @@
 .addZone {
     align-self: flex-start;
     height: 28rem;
+    margin-right: 10rem;
     margin-bottom: 6rem;
     background-color: transparent;
     color: var(--accentColorNormal);
+}
+
+.addRow {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.serviceDot {
+    width: 10rem;
+    height: 10rem;
+    margin-right: 8rem;
+    border-radius: 2rem;
+    background-color: #4d84ff;
+    flex-shrink: 0;
+}
+
+.countLabel {
+    flex: 1 1 auto;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 12rem;
+}
+
+.countValue {
+    min-width: 28rem;
+    text-align: center;
+    color: #ffffff;
+    font-size: 13rem;
+    font-weight: bold;
+}
+
+.moreButton {
+    width: 100%;
+    height: 30rem;
+    margin-top: 12rem;
+    margin-bottom: 4rem;
+    justify-content: space-between;
+    background-color: rgba(255, 255, 255, 0.06);
 }
 
 .buttonIcon {

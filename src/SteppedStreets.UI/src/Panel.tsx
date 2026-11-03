@@ -5,7 +5,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./lib/bindings";
 import { ErrorBoundary } from "./lib/errorBoundary";
-import { formatArea, MixPattern, NeighbourhoodStyle, Option, statusDetail, statusLine, thousands, ToolState, zoneColour, ZoneShare } from "./lib/state";
+import {
+    formatArea, MixPattern, NeighbourhoodStyle, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, zoneColour, ZoneShare,
+} from "./lib/state";
 import { vanilla } from "./lib/vanilla";
 import icon from "./assets/stepped-streets.svg";
 import closeIcon from "./assets/close.svg";
@@ -121,10 +123,11 @@ function ToggleRow({ label, value, disabled, trigger }: { label: string; value: 
 }
 
 /** A button that opens an inline list. Without a label it spans the row, and children sit beside it. */
-function Picker({ label, options, value, disabled, onPick, children }: React.PropsWithChildren<{
-    label?: string; options: Option[]; value: string; disabled: boolean; onPick: (name: string) => void;
+function Picker({ label, options, value, disabled, onPick, initiallyOpen = false, children }: React.PropsWithChildren<{
+    label?: string; options: Option[]; value: string; disabled: boolean; onPick: (name: string) => void; initiallyOpen?: boolean;
 }>) {
-    const [open, setOpen] = useState(false);
+    // A row just added opens its list at once, so adding is one click to choose rather than two.
+    const [open, setOpen] = useState(initiallyOpen);
     // Disabling closes the list, so it doesn't pop back open after the build or the confirmation.
     useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
     // A saved choice the game no longer lists still shows, so the button never reads blank.
@@ -147,12 +150,59 @@ function Picker({ label, options, value, disabled, onPick, children }: React.Pro
     </>;
 }
 
-function ZoneMix({ mix, zones, disabled }: { mix: ZoneShare[]; zones: Option[]; disabled: boolean }) {
+/** What to build: zones with their shares and service buildings with their counts, in one list. */
+function Mix({ mix, zones, services, serviceOptions, disabled }: {
+    mix: ZoneShare[]; zones: Option[]; services: ServiceCount[]; serviceOptions: ServiceOption[]; disabled: boolean;
+}) {
+    const [justAdded, setJustAdded] = useState<string | null>(null);
+    const sendServices = (next: ServiceCount[]) => act("setServiceMix", JSON.stringify(next.map(({ name, count }) => ({ name, count }))));
+    const serviceLabel = (name: string) => serviceOptions.find(option => option.name === name)?.label ?? name;
+    const unusedService = serviceOptions.find(option => !services.some(entry => entry.name === option.name));
+    const unusedZone = zones.find(zone => !mix.some(entry => entry.zone === zone.name));
+    return <>
+        <ZoneMix mix={mix} zones={zones} disabled={disabled} justAdded={justAdded} />
+        {services.map((entry, index) => {
+            const replace = (change: Partial<ServiceCount>) => sendServices(services.map((other, at) => at === index ? { ...other, ...change } : other));
+            const label = serviceLabel(entry.name);
+            const options = serviceOptions.filter(option => option.name === entry.name || !services.some(other => other.name === option.name))
+                .map(option => ({ name: option.name, label: option.group ? `${option.label} (${option.group})` : option.label }));
+            return <div key={entry.name} className={styles.mixEntry}>
+                <Picker options={options} value={entry.name} disabled={disabled} initiallyOpen={entry.name === justAdded}
+                    onPick={name => { setJustAdded(null); replace({ name }); }}>
+                    <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled}
+                        onSelect={() => sendServices(services.filter((_, at) => at !== index))}>
+                        <img className={styles.closeIcon} src={closeIcon} />
+                    </Button>
+                </Picker>
+                <div className={styles.row}>
+                    <div className={styles.serviceDot} />
+                    <div className={styles.countLabel}>How many</div>
+                    <Button className={styles.stepButton} label={`Fewer ${label}`} disabled={disabled || entry.count <= 1}
+                        onSelect={() => replace({ count: entry.count - 1 })}>-</Button>
+                    <div className={styles.countValue}>{entry.count}</div>
+                    <Button className={styles.stepButton} label={`More ${label}`} disabled={disabled || entry.count >= 20}
+                        onSelect={() => replace({ count: entry.count + 1 })}>+</Button>
+                </div>
+            </div>;
+        })}
+        <div className={styles.addRow}>
+            {unusedZone ? <Button className={styles.addZone} disabled={disabled} onSelect={() => {
+                setJustAdded(unusedZone.name);
+                act("setZoneMix", JSON.stringify([...mix, { zone: unusedZone.name, share: 25 }]));
+            }}><img className={styles.buttonIcon} src={plusIcon} /><div>Add a zone</div></Button> : null}
+            {unusedService ? <Button className={styles.addZone} disabled={disabled} onSelect={() => {
+                setJustAdded(unusedService.name);
+                sendServices([...services, { name: unusedService.name, count: 1 }]);
+            }}><img className={styles.buttonIcon} src={plusIcon} /><div>Add a service</div></Button> : null}
+        </div>
+    </>;
+}
+
+function ZoneMix({ mix, zones, disabled, justAdded }: { mix: ZoneShare[]; zones: Option[]; disabled: boolean; justAdded: string | null }) {
     // The tool takes the whole mix at once, so every edit sends the full new list.
     const send = (next: ZoneShare[]) => act("setZoneMix", JSON.stringify(next.map(({ zone, share }) => ({ zone, share }))));
     const total = mix.reduce((sum, entry) => sum + entry.share, 0);
     const labelOf = (name: string) => zones.find(zone => zone.name === name)?.label ?? name;
-    const unused = zones.find(zone => !mix.some(entry => entry.zone === zone.name));
     // The tool drops zones the game doesn't have (a removed asset pack), so a mix of only those would be refused.
     const known = (name: string) => zones.length === 0 || zones.some(zone => zone.name === name);
     return <>
@@ -163,7 +213,7 @@ function ZoneMix({ mix, zones, disabled }: { mix: ZoneShare[]; zones: Option[]; 
             const lastKnown = !mix.some((other, at) => at !== index && known(other.zone));
             return <div key={entry.zone} className={styles.mixEntry}>
                 <Picker options={zones.filter(zone => zone.name === entry.zone || !mix.some(other => other.zone === zone.name))}
-                    value={entry.zone} disabled={disabled} onPick={zone => replace({ zone })}>
+                    value={entry.zone} disabled={disabled} initiallyOpen={entry.zone === justAdded} onPick={zone => replace({ zone })}>
                     <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled || mix.length === 1 || lastKnown}
                         onSelect={() => send(mix.filter((_, at) => at !== index))}>
                         <img className={styles.closeIcon} src={closeIcon} />
@@ -177,9 +227,6 @@ function ZoneMix({ mix, zones, disabled }: { mix: ZoneShare[]; zones: Option[]; 
                 </div>
             </div>;
         })}
-        {unused ? <Button className={styles.addZone} disabled={disabled} onSelect={() => send([...mix, { zone: unused.name, share: 25 }])}>
-            <img className={styles.buttonIcon} src={plusIcon} /><div>Mix in another zone</div>
-        </Button> : null}
     </>;
 }
 
@@ -216,9 +263,13 @@ function statusTone(state: ToolState) {
     return styles.toneIdle;
 }
 
+// The fine settings stay folded away unless the player opened them last time.
+let moreOpenMemory = false;
+
 function NeighbourhoodPanel() {
     const state = useToolState();
     const [confirmedPlan, setConfirmedPlan] = useState<ToolState | null>(null);
+    const [moreOpen, setMoreOpen] = useState(moreOpenMemory);
     if (state.stage === "Closed") return null;
     const { settings, stats } = state;
     const confirming = state.stage === "Planned" && confirmedPlan === state;
@@ -229,6 +280,7 @@ function NeighbourhoodPanel() {
     // The tool also lists its summary among the messages; showing it twice reads as noise.
     const messages = state.messages.filter(message => message !== state.summary);
     const zoneLabel = (name: string) => state.zones.find(zone => zone.name === name)?.label ?? name;
+    const serviceLabel = (name: string) => state.services.find(service => service.name === name)?.label ?? name;
     const buildLabel = building ? "Building..." : state.stage === "Built" ? "Built" : "Build";
 
     return <div className={styles.dock}>
@@ -253,10 +305,8 @@ function NeighbourhoodPanel() {
                         </div> : null}
                         {state.corners >= 3 ? <Measure className={styles.area} text={`Area ${formatArea(state.areaSquareMetres)}`} /> : null}
                         {!building && state.stage !== "Built" ? <div className={styles.hints}>
-                            <div>Drag a corner to reshape</div>
-                            <div>Right-click removes a corner</div>
-                            <div>Ctrl+Z undo</div>
-                            <div>Esc goes back</div>
+                            <div>{state.areaClosed ? "Drag a corner to reshape it; right-click removes one." : "Click the ground to add corners; click the first one to finish."}</div>
+                            <div>Ctrl+Z undoes, Esc goes back.</div>
                         </div> : null}
                         {state.corners > 0 ? <div className={styles.statusButtons}>
                             {state.stage === "Drawing" && state.corners >= 3 && !state.areaClosed
@@ -271,56 +321,61 @@ function NeighbourhoodPanel() {
                         </div>
                     </Section>
 
-                    <Section title="Roads">
-                        <Picker label="Road" options={state.roads} value={settings.road} disabled={disabled} onPick={road => act("setRoad", road)} />
-                        <NumberRow label="Block depth" value={settings.blockDepth} minimum={60} maximum={200} step={5}
-                            format={metres} trigger="setBlockDepth" disabled={disabled} />
-                        <NumberRow label="Max road grade" value={settings.maxRoadGradePercent} minimum={4} maximum={12} step={1}
-                            format={percent} trigger="setMaxRoadGrade" disabled={disabled} />
-                        <ToggleRow label="Steep hills" value={settings.steepGround} trigger="setSteepGround" disabled={disabled} />
-                        <NumberRow label="Steepest buildable" value={settings.steepestBuildablePercent} minimum={8}
-                            maximum={settings.steepGround ? 60 : 30} step={1} format={percent} trigger="setSteepestBuildable" disabled={disabled} />
-                    </Section>
-
-                    <Section title="Zones">
-                        <ZoneMix mix={settings.zoneMix} zones={state.zones} disabled={disabled} />
-                        <Row label="Mix mode">
+                    <Section title="What to build">
+                        <Mix mix={settings.zoneMix} zones={state.zones} services={settings.serviceMix} serviceOptions={state.services} disabled={disabled} />
+                        {settings.zoneMix.length > 1 ? <Row label="Mix mode">
                             <Segmented options={MIX_PATTERNS} value={settings.mixPattern} disabled={disabled}
                                 onChange={pattern => act("setMixPattern", pattern)} />
-                        </Row>
-                        <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
-                            format={cells} trigger="setLotWidth" disabled={disabled} />
-                        <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
-                            format={cells} trigger="setLotDepth" disabled={disabled} />
+                        </Row> : null}
                     </Section>
 
-                    <Section title="Grading">
-                        <ToggleRow label="Level the lots" value={settings.levelLots} trigger="setLevelLots" disabled={disabled} />
-                        <NumberRow label="Most earth" value={settings.earthworkLimit} minimum={1} maximum={settings.steepGround ? 12 : 8} step={0.5}
-                            format={tenthMetres} trigger="setEarthworkLimit" disabled={disabled} />
-                        <NumberRow label="Steepest bank" value={settings.bankGradePercent} minimum={20} maximum={50} step={5}
-                            format={percent} trigger="setBankGrade" disabled={disabled} />
-                        <Row label="Space between lots">
-                            <Segmented options={SPACINGS} value={String(settings.lotSpacing)} disabled={disabled}
-                                onChange={spacing => act("setLotSpacing", Number(spacing))} />
-                        </Row>
-                    </Section>
-
-                    <Section title="Landscape">
-                        <ToggleRow label="Retaining walls" value={settings.retainingWalls} trigger="setRetainingWalls" disabled={disabled} />
+                    <Section title="Ground">
+                        <ToggleRow label="Steep hills" value={settings.steepGround} trigger="setSteepGround" disabled={disabled} />
                         <ToggleRow label="Trees" value={settings.trees} trigger="setTrees" disabled={disabled} />
-                        {settings.trees ? <NumberRow label="Tree density" value={settings.treeDensityPercent} minimum={10} maximum={100}
-                            step={5} format={percent} trigger="setTreeDensity" disabled={disabled} /> : null}
                     </Section>
 
-                    <div className={styles.seed}>
-                        <Row label="Seed">
-                            <div className={styles.seedValue}>{settings.seed}</div>
-                            <Button disabled={disabled} onSelect={() => act("reroll")}>
-                                <img className={styles.buttonIcon} src={diceIcon} /><div>Reroll</div>
-                            </Button>
-                        </Row>
-                    </div>
+                    <Button className={styles.moreButton} selected={moreOpen} onSelect={() => { moreOpenMemory = !moreOpen; setMoreOpen(!moreOpen); }}>
+                        <div className={styles.pickerLabel}>{moreOpen ? "Fewer settings" : "More settings"}</div>
+                        <img className={classes(styles.chevron, moreOpen && styles.chevronOpen)} src={chevronIcon} />
+                    </Button>
+
+                    {moreOpen ? <>
+                        <Section title="Roads">
+                            <Picker label="Road" options={state.roads} value={settings.road} disabled={disabled} onPick={road => act("setRoad", road)} />
+                            <NumberRow label="Block depth" value={settings.blockDepth} minimum={60} maximum={200} step={5}
+                                format={metres} trigger="setBlockDepth" disabled={disabled} />
+                            <NumberRow label="Max road grade" value={settings.maxRoadGradePercent} minimum={4} maximum={12} step={1}
+                                format={percent} trigger="setMaxRoadGrade" disabled={disabled} />
+                            <NumberRow label="Steepest buildable" value={settings.steepestBuildablePercent} minimum={8}
+                                maximum={settings.steepGround ? 60 : 30} step={1} format={percent} trigger="setSteepestBuildable" disabled={disabled} />
+                        </Section>
+
+                        <Section title="Lots">
+                            <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
+                                format={cells} trigger="setLotWidth" disabled={disabled} />
+                            <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
+                                format={cells} trigger="setLotDepth" disabled={disabled} />
+                            <Row label="Space between lots">
+                                <Segmented options={SPACINGS} value={String(settings.lotSpacing)} disabled={disabled}
+                                    onChange={spacing => act("setLotSpacing", Number(spacing))} />
+                            </Row>
+                        </Section>
+
+                        <Section title="Grading">
+                            <ToggleRow label="Level the lots" value={settings.levelLots} trigger="setLevelLots" disabled={disabled} />
+                            <NumberRow label="Most earth" value={settings.earthworkLimit} minimum={1} maximum={settings.steepGround ? 12 : 8} step={0.5}
+                                format={tenthMetres} trigger="setEarthworkLimit" disabled={disabled} />
+                            <NumberRow label="Steepest bank" value={settings.bankGradePercent} minimum={20} maximum={50} step={5}
+                                format={percent} trigger="setBankGrade" disabled={disabled} />
+                        </Section>
+
+                        <Section title="Landscape">
+                            <ToggleRow label="Retaining walls" value={settings.retainingWalls} trigger="setRetainingWalls" disabled={disabled} />
+                            {settings.trees ? <NumberRow label="Tree density" value={settings.treeDensityPercent} minimum={10} maximum={100}
+                                step={5} format={percent} trigger="setTreeDensity" disabled={disabled} /> : null}
+                            <Row label="Seed"><div className={styles.seedValue}>{settings.seed}</div></Row>
+                        </Section>
+                    </> : null}
 
                     {hasPlan || messages.length > 0 ? <Section title={state.stage === "Built" ? "Result" : "Plan"}>
                         {hasPlan ? <div className={styles.card}>
@@ -338,6 +393,11 @@ function NeighbourhoodPanel() {
                             <div className={styles.zoneName}>{zoneLabel(count.zone)}</div>
                             <div className={styles.zoneLots}>{lots(count.lots)}</div>
                         </div>) : null}
+                        {hasPlan ? state.serviceCounts.map(count => <div key={count.name} className={styles.zoneCount}>
+                            <div className={classes(styles.zoneDot, styles.serviceDot)} />
+                            <div className={styles.zoneName}>{serviceLabel(count.name)}</div>
+                            <div className={styles.zoneLots}>{`${count.count} ${count.count === 1 ? "building" : "buildings"}`}</div>
+                        </div>) : null}
                         {messages.map((message, index) => <div key={index} className={styles.message}>
                             <div className={styles.messageDot} />
                             <div className={styles.messageText}>{message}</div>
@@ -348,6 +408,9 @@ function NeighbourhoodPanel() {
                 <div className={styles.footer}>
                     <Button className={styles.secondary} disabled={disabled || state.corners === 0}
                         onSelect={() => { setConfirmedPlan(null); act("clearArea"); }}>Clear</Button>
+                    <Button className={styles.secondary} label="Reroll: another layout" disabled={disabled} onSelect={() => act("reroll")}>
+                        <img className={styles.buttonIcon} src={diceIcon} /><div>Reroll</div>
+                    </Button>
                     <Button className={styles.primary} disabled={disabled || state.stage !== "Planned"}
                         onSelect={() => setConfirmedPlan(state)}>{buildLabel}</Button>
                 </div>

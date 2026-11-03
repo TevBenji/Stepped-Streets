@@ -34,5 +34,8 @@ namespace SteppedStreets.Tool
         public float Progress;
 
         public int Version;
+
+        /// <summary>The planned service buildings by prefab name.</summary>
+        public List<KeyValuePair<string, int>> ServiceCounts = new List<KeyValuePair<string, int>>();
     }
 }

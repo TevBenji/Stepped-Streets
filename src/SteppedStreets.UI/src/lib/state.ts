@@ -6,6 +6,10 @@ export type MixPattern = "Random" | "Clumps" | "Even";
 export interface Option { name: string; label: string }
 export interface ZoneShare { zone: string; share: number }
 export interface ZoneCount { zone: string; lots: number }
+/** A service building the game offers: its lot in cells and the city service it belongs to. */
+export interface ServiceOption { name: string; label: string; group: string; width: number; depth: number }
+/** How many of one service building: in the mix, or in the plan. */
+export interface ServiceCount { name: string; count: number }
 
 export interface Settings {
     style: NeighbourhoodStyle;
@@ -16,6 +20,7 @@ export interface Settings {
     /** Steep hills and mountains: buildable ground up to 60 % and earthwork up to 12 m. */
     steepGround: boolean;
     zoneMix: ZoneShare[];
+    serviceMix: ServiceCount[];
     mixPattern: MixPattern;
     lotWidthCells: number;
     lotDepthCells: number;
@@ -55,6 +60,8 @@ export interface ToolState {
     settings: Settings;
     zones: Option[];
     roads: Option[];
+    services: ServiceOption[];
+    serviceCounts: ServiceCount[];
 }
 
 // Counters and areas have no natural ceiling; this only keeps absurd values out of the layout.
@@ -89,6 +96,13 @@ const readOption = (row: Record<string, unknown>): Option | null =>
 const readShare = (row: Record<string, unknown>): ZoneShare | null =>
     typeof row.zone === "string" && row.zone.length > 0 && typeof row.share === "number" && Number.isFinite(row.share) && row.share > 0
         ? { zone: row.zone, share: Math.min(100, row.share) } : null;
+const readServiceCount = (row: Record<string, unknown>): ServiceCount | null =>
+    typeof row.name === "string" && row.name.length > 0 && typeof row.count === "number" && Number.isFinite(row.count) && row.count >= 1
+        ? { name: row.name, count: whole(row.count, 1, 1, 20) } : null;
+const readService = (row: Record<string, unknown>): ServiceOption | null =>
+    typeof row.name === "string" && row.name.length > 0
+        ? { name: row.name, label: text(row.label) || row.name, group: text(row.group), width: whole(row.width, 4, 1, 20), depth: whole(row.depth, 4, 1, 20) }
+        : null;
 const readCount = (row: Record<string, unknown>): ZoneCount | null =>
     typeof row.zone === "string" && row.zone.length > 0 && typeof row.lots === "number" && Number.isFinite(row.lots)
         ? { zone: row.zone, lots: whole(row.lots, 0, 0, LARGEST) } : null;
@@ -128,6 +142,7 @@ export function readState(raw: unknown): ToolState {
             steepestBuildablePercent: number(settings.steepestBuildablePercent, 15, 8, 60),
             steepGround: flag(settings.steepGround, false),
             zoneMix: zoneMix.length > 0 ? zoneMix : DEFAULT_MIX.map(share => ({ ...share })),
+            serviceMix: rows(settings.serviceMix, readServiceCount, service => service.name),
             mixPattern: choice(settings.mixPattern, ["Random", "Clumps", "Even"], "Clumps"),
             lotWidthCells: whole(settings.lotWidthCells, 3, 2, 6),
             lotDepthCells: whole(settings.lotDepthCells, 3, 2, 6),
@@ -142,6 +157,8 @@ export function readState(raw: unknown): ToolState {
         },
         zones: rows(state.zones, readOption, option => option.name),
         roads: rows(state.roads, readOption, option => option.name),
+        services: rows(state.services, readService, service => service.name),
+        serviceCounts: rows(state.serviceCounts, readServiceCount, service => service.name),
     };
 }
 

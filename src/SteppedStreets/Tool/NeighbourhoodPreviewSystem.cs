@@ -175,6 +175,17 @@ namespace SteppedStreets.Tool
                     lines.Add((corners[index], corners[(index + 1) % 4], 0.8f, new Color(colour.r * 0.6f, colour.g * 0.6f, colour.b * 0.6f, 0.9f)));
             }
 
+            // Service buildings: a solid blue pad with a bright outline and a bar along the front that faces the road.
+            var service = new Color(0.25f, 0.5f, 1f, 0.7f);
+            foreach (var building in plan.Buildings)
+            {
+                var corners = building.Pad.Corners;
+                lines.Add(((corners[0] + corners[1]) * 0.5f, (corners[3] + corners[2]) * 0.5f, math.distance(corners[0].xz, corners[1].xz), service));
+                for (int index = 0; index < 4; index++)
+                    lines.Add((corners[index], corners[(index + 1) % 4], 1.2f, new Color(0.75f, 0.88f, 1f, 1f)));
+                lines.Add((corners[0], corners[1], 3f, new Color(1f, 1f, 1f, 1f)));
+            }
+
             int stride = math.max(1, plan.Trees.Count / MostTrees);
             for (int index = 0; index < plan.Trees.Count; index += stride)
             {

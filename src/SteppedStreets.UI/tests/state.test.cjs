@@ -13,7 +13,7 @@ async function stateModule() {
 
 const DEFAULT_SETTINGS = {
     style: "ContourSuburb", road: "Small Road", blockDepth: 90, maxRoadGradePercent: 8, steepestBuildablePercent: 15,
-    steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 3,
+    steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 3,
     levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: true,
     treeDensityPercent: 50, seed: 1,
 };
@@ -197,6 +197,22 @@ test("status line follows the stage and the drawing progress", async () => {
     assert.equal(line({ stage: "Failed", summary: "The game refused the roads." }), "The game refused the roads.");
     assert.equal(line({ stage: "Failed" }), "Failed");
     assert.equal(line({ stage: "Closed" }), "");
+});
+
+test("services: catalogue and counts keep valid rows, clamp counts and drop repeats", async () => {
+    const { readState } = await stateModule();
+    const state = readState({
+        services: [{ name: "Police Station", label: "Police station", group: "Police", width: 4, depth: 5 }, { name: "" }, 7,
+            { name: "Police Station" }, { name: "Clinic", width: 99 }],
+        serviceCounts: [{ name: "Police Station", count: 2 }, { name: "Clinic", count: 0 }],
+        settings: { serviceMix: [{ name: "Clinic", count: 50 }, { name: "Clinic", count: 1 }, { name: "Park", count: NaN }] },
+    });
+    assert.deepEqual(state.services, [
+        { name: "Police Station", label: "Police station", group: "Police", width: 4, depth: 5 },
+        { name: "Clinic", label: "Clinic", group: "", width: 20, depth: 4 },
+    ]);
+    assert.deepEqual(state.serviceCounts, [{ name: "Police Station", count: 2 }]);
+    assert.deepEqual(state.settings.serviceMix, [{ name: "Clinic", count: 20 }]);
 });
 
 test("the detail line shows the tool's step while it works and the build report after", async () => {

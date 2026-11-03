@@ -51,9 +51,24 @@ namespace SteppedStreets.Core.Neighbourhood
 
         public string Zone = "";
 
-        /// <summary>The pad's cells (column, row) that come out level on the planned ground and get zoned.</summary>
         /// <summary>The cells to zone: every cell of a kept lot, front row included.</summary>
         public List<int2> LevelCells = new List<int2>();
+    }
+
+    /// <summary>A service building on its level pad, facing its road.</summary>
+    public sealed class PlannedBuilding
+    {
+        public string Name = "";
+        public Pad Pad;
+
+        /// <summary>Index into <see cref="NeighbourhoodPlan.Roads"/> of the road the building faces.</summary>
+        public int Road;
+
+        /// <summary>The middle of the lot, at the pad height.</summary>
+        public float3 Position;
+
+        /// <summary>Unit direction from the back of the lot to its front (the road): the building's forward.</summary>
+        public float2 Forward;
     }
 
     public enum TreeKind { Conifer, Broadleaf }
@@ -72,6 +87,7 @@ namespace SteppedStreets.Core.Neighbourhood
         public List<PlannedNode> Nodes = new List<PlannedNode>();
         public List<PlannedRoad> Roads = new List<PlannedRoad>();
         public List<PlannedLot> Lots = new List<PlannedLot>();
+        public List<PlannedBuilding> Buildings = new List<PlannedBuilding>();
         public List<PlannedTree> Trees = new List<PlannedTree>();
         public List<WallSegment> Walls = new List<WallSegment>();
 
