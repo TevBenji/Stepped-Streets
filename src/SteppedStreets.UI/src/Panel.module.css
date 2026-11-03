@@ -874,3 +874,21 @@
     margin-right: 8rem;
     flex-shrink: 0;
 }
+
+/* -- layouts: a group heading in a list, and the chosen layout's description under the picker -- */
+.listGroup {
+    flex-shrink: 0;
+    padding: 8rem 10rem 3rem 10rem;
+    font-size: 11rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(240, 251, 255, 0.5);
+}
+
+.layoutTip {
+    margin: 2rem 2rem 8rem 2rem;
+    font-size: 12rem;
+    line-height: 1.4;
+    color: rgba(240, 251, 255, 0.7);
+}

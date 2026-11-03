@@ -5,7 +5,18 @@ using Unity.Mathematics;
 
 namespace SteppedStreets.Core.Neighbourhood
 {
-    public enum RoadKind { Contour, Link, Connection, Lane }
+    /// <summary>
+    /// Contour: a street along the hill, held near level. Street: a layout's main street on flat or gentle ground, which may
+    /// climb up to the max road grade. Both carry the junctions that links and connections make. Link: joins two streets.
+    /// Connection: joins the network to an existing road. Lane: the Mountain lane.
+    /// </summary>
+    public enum RoadKind { Contour, Link, Connection, Lane, Street }
+
+    public static class RoadKinds
+    {
+        /// <summary>A street others join at its points: a contour street or a layout's main street.</summary>
+        public static bool IsMain(this RoadKind kind) => kind == RoadKind.Contour || kind == RoadKind.Street;
+    }
 
     public sealed class PlannedNode
     {

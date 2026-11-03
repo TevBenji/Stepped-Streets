@@ -21,9 +21,11 @@ Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets doe
 
 1. Click **Stepped Streets** in the bottom toolbar beside Zones, or press **Ctrl+Shift+S**.
 2. Click corners on the ground; click the first corner to close the area. Drag corners to reshape, right-click removes one, Ctrl+Z undoes.
-3. Pick a **style** (Contour suburb, Terraced blocks or Mountain lane) and **what to build**: add zones with their shares and services with how many of each.
+3. Pick a **layout** and **what to build**: add zones with their shares and services with how many of each.
 4. The plan appears on the ground. **Reroll** for another layout.
 5. Press **Build**.
+
+**Layouts**: Contour suburb, Terraced blocks and Mountain lane follow the hill; Square, Rectangular, Irregular, Skewed and Fragmented grids suit flat or gentle ground, with **crossroads**, **staggered** T-junctions or a **traffic**-optimised through road. Untick **Shape the ground** to leave the terrain exactly as it is.
 
 Turn on **Steep hills** for steep slopes and mountain sides. Everything else (road type, block depth, grades, lot size, grading, trees) is under **More settings**.
 
@@ -51,9 +53,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/06.png" />
 	<Screenshot Value="Properties/Screenshots/07.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.1.1" />
+	<ModVersion Value="2.2.0" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- Fixed: junctions overlapping the road pieces beside them. Roads are no longer cut close to a junction.&#10;- Fixed: zoning reached past the levelled lot, so deeper houses sat on the bank behind it. Only the levelled lot is zoned now, and lots are 4 cells deep by default so every low-density house fits.&#10;- Fixed: zone cells sitting across two lot steps. Road pieces now end on the lot grid, so the game's cells line up with the levelled lots.&#10;- Fixed: Mountain lane dropped entirely when a hairpin came back too close. The lane now ends before the clash.&#10;- Fixed: two roads far apart across a big height difference could leave a cliff between them.&#10;- If another tool is opened while building, the panel now says the build stopped and what was done." />
+	<ChangeLog Value="- New: grid layouts for flat or gentle ground: Square, Rectangular, Irregular, Skewed and Fragmented grids. Pick one from the new Layout list.&#10;- New: Junctions for the grids: crossroads, staggered T-junctions, or traffic-optimised, where one through road is the only road that meets yours.&#10;- New: Shape the ground. Untick it to leave the terrain exactly as it is.&#10;- A grid lines up with your nearest road and meets it the way a real grid does, every street that runs towards it in a T.&#10;- On flat ground, the hillside layouts now point you to the grids instead of stopping." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />

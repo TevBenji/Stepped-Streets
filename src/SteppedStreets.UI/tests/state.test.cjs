@@ -14,6 +14,7 @@ async function stateModule() {
 const DEFAULT_SETTINGS = {
     style: "ContourSuburb", road: "Small Road", blockDepth: 90, maxRoadGradePercent: 8, steepestBuildablePercent: 15,
     steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 4,
+    shapeGround: true, junctions: "Staggered",
     levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: true,
     treeDensityPercent: 50, seed: 1,
 };
@@ -154,6 +155,18 @@ test("zone mix keeps valid rows, drops duplicates and falls back to the default"
     ]);
     for (const empty of [[], [{ zone: "Office", share: 0 }], "Residential Low", null, {}])
         assert.deepEqual(mix(empty), [{ zone: "Residential Low", share: 100 }]);
+});
+
+test("layouts, junctions and the terrain option read leniently", async () => {
+    const { readState } = await stateModule();
+    const good = readState({ settings: { style: "SkewedGrid", junctions: "TrafficOptimised", shapeGround: false } });
+    assert.equal(good.settings.style, "SkewedGrid");
+    assert.equal(good.settings.junctions, "TrafficOptimised");
+    assert.equal(good.settings.shapeGround, false);
+    const bad = readState({ settings: { style: "Hexagons", junctions: 3, shapeGround: "no" } });
+    assert.equal(bad.settings.style, "ContourSuburb");
+    assert.equal(bad.settings.junctions, "Staggered");
+    assert.equal(bad.settings.shapeGround, true);
 });
 
 test("catalogue icons pass through when they are text and are left out otherwise", async () => {

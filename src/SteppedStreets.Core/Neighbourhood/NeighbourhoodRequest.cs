@@ -18,6 +18,43 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>One winding road that climbs the hill with hairpins, sparse lots, forest elsewhere.</summary>
         MountainLane,
+
+        // Grid layouts, for flat or gentle ground (appended, so saved settings keep their meaning).
+
+        /// <summary>Straight streets at right angles, blocks as long as they are deep.</summary>
+        SquareGrid,
+
+        /// <summary>Straight streets at right angles, long blocks.</summary>
+        RectangularGrid,
+
+        /// <summary>A grid with varied street spacing and block lengths.</summary>
+        IrregularGrid,
+
+        /// <summary>Long blocks whose cross streets lean, so the blocks are parallelograms.</summary>
+        SkewedGrid,
+
+        /// <summary>Parallel streets with gaps: some cross streets left out and some streets broken, so T-junctions and L-turns.</summary>
+        FragmentedGrid,
+    }
+
+    public static class NeighbourhoodStyles
+    {
+        /// <summary>The hillside layouts, which follow the contours and so need a slope.</summary>
+        public static bool FollowsContours(this NeighbourhoodStyle style) => style == NeighbourhoodStyle.ContourSuburb
+            || style == NeighbourhoodStyle.TerracedBlocks || style == NeighbourhoodStyle.MountainLane;
+    }
+
+    /// <summary>How the cross streets of a grid meet its main streets.</summary>
+    public enum JunctionPattern
+    {
+        /// <summary>Cross streets line up: four-way junctions.</summary>
+        Crossroads,
+
+        /// <summary>Cross streets offset like brickwork: every junction a T.</summary>
+        Staggered,
+
+        /// <summary>Staggered T-junctions for the local streets, and one through road that is the only road meeting the city's.</summary>
+        TrafficOptimised,
     }
 
     public enum MixPattern { Random, Clumps, Even }
@@ -178,6 +215,12 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Grade the lots into level pads with banks. Off: only the roads are graded and every lot cell is zoned.</summary>
         public bool LevelLots = true;
+
+        /// <summary>Change the terrain at all. Off: no grading, roads follow the ground as the game builds them, lots aren't levelled.</summary>
+        public bool ShapeGround = true;
+
+        /// <summary>How a grid's cross streets meet its main streets.</summary>
+        public JunctionPattern Junctions = JunctionPattern.Staggered;
 
         /// <summary>The most cut or fill, in metres, under a lot or a road.</summary>
         public float EarthworkLimit = 4f;

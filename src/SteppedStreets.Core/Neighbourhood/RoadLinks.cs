@@ -151,7 +151,7 @@ namespace SteppedStreets.Core.Neighbourhood
             for (int from = 0; from < count; from++)
             {
                 var piece = streets[from];
-                if (piece.Removed || piece.Kind != RoadKind.Contour || !inPiece(from)) continue;
+                if (piece.Removed || !piece.Kind.IsMain() || !inPiece(from)) continue;
                 // Every 32 m along the street: closer starts would only repeat the same search.
                 for (int point = 0; point < piece.Points.Count; point += 8)
                 {
@@ -159,7 +159,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     for (int to = 0; to < count; to++)
                     {
                         var main = streets[to];
-                        if (main.Removed || main.Kind != RoadKind.Contour || !inMain(to)) continue;
+                        if (main.Removed || !main.Kind.IsMain() || !inMain(to)) continue;
                         float distance = math.distance(piece.Points[point], main.Points[NearestPoint(main, piece.Points[point])]);
                         if (distance <= reach) tries.Add((from, point, to, distance));
                     }

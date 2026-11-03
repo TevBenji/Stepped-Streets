@@ -73,15 +73,15 @@ namespace SteppedStreets.Core.Neighbourhood
                     request.SteepestBuildable * 100f));
                 return Finish(plan, clock);
             }
-            if (survey.MedianSlope < 0.03f)
+            if (survey.MedianSlope < 0.03f && request.Style.FollowsContours())
             {
-                plan.Messages.Add("This area is nearly flat. Draw it on a hillside.");
+                plan.Messages.Add("This area is nearly flat. Pick a grid layout, or draw it on a hillside.");
                 return Finish(plan, clock);
             }
 
             float radius = MinimumRadius(request.Style);
-            var streets = request.Style == NeighbourhoodStyle.MountainLane
-                ? Lane(survey, request, radius, cancellation)
+            var streets = request.Style == NeighbourhoodStyle.MountainLane ? Lane(survey, request, radius, cancellation)
+                : Layouts.GridLayout.Handles(request.Style) ? Grid(survey, request, cancellation, Stage)
                 : Contours(survey, request, radius, cancellation, Stage);
 
             Stage("connection");
@@ -130,12 +130,13 @@ namespace SteppedStreets.Core.Neighbourhood
             foreach (var building in plan.Buildings) buildingPads.Add(new PlannedLot { Pad = building.Pad, Road = building.Road });
             var pads = new List<PlannedLot>(lots);
             pads.AddRange(buildingPads);
-            plan.Ground = GroundField.Build(request, plan, pads, cancellation);
+            // Shape the ground off: nothing is graded, and the game lays its roads on the ground as it is.
+            plan.Ground = request.ShapeGround ? GroundField.Build(request, plan, pads, cancellation) : null;
             Stage("ground");
             int lostToBanks = 0;
             foreach (var lot in lots)
             {
-                lot.LevelCells = request.LevelLots ? StepPlanner.LevelCells(lot.Pad, plan.Ground.HeightAt, 0.3f) : AllCells(lot.Pad);
+                lot.LevelCells = request.LevelLots && plan.Ground != null ? StepPlanner.LevelCells(lot.Pad, plan.Ground.HeightAt, 0.3f) : AllCells(lot.Pad);
                 if (lot.LevelCells.Count == 0) { lostToBanks++; continue; }
                 // Zoned whole, from the kerb back: the game starts a house lot only at a zoned cell in the row against the road
                 // (Game.Zones.LotSizeJobs), and that row often sits on the little bank between the shoulder and the pad.
@@ -199,7 +200,17 @@ namespace SteppedStreets.Core.Neighbourhood
             stage("links");
             if (request.Style == NeighbourhoodStyle.ContourSuburb) links.JoinEnds(request.BlockDepth * 0.8f, cancellation);
             stage("joins");
-            // Connect the largest piece of network first, then any other piece big enough to be a neighbourhood of its own.
+            Connect(result, links, null, cancellation);
+            return result;
+        }
+
+        /// <summary>
+        /// Joins the network to the city's roads, the largest piece first, then any other piece big enough to be a
+        /// neighbourhood of its own, then every piece left apart to the main one. <paramref name="joinable"/>, when set,
+        /// limits the streets a road from the city may join.
+        /// </summary>
+        private static void Connect(List<Street> result, RoadLinks links, Func<int, bool> joinable, CancellationToken cancellation)
+        {
             var components = RoadNetwork.Components(result, out var lengths);
             var order = new List<int>();
             int largest = 0;
@@ -209,9 +220,20 @@ namespace SteppedStreets.Core.Neighbourhood
             foreach (int id in order)
             {
                 cancellation.ThrowIfCancellationRequested();
-                links.Connect(street => street < components.Length && components[street] == id, cancellation);
+                links.Connect(street => street < components.Length && components[street] == id && (joinable == null || joinable(street)), cancellation);
             }
             JoinPieces(result, links, cancellation);
+        }
+
+        /// <summary>A grid layout's streets, joined to the city's roads (traffic-optimised: only by its through road).</summary>
+        private static List<Street> Grid(SiteSurvey survey, NeighbourhoodRequest request, CancellationToken cancellation, Action<string> stage)
+        {
+            var result = Layouts.GridLayout.Plan(survey, request, out var through, out bool joined, cancellation);
+            stage("grid");
+            var links = new RoadLinks(survey, request, result, LinkRadius(request));
+            // Met the city's road straight on: no winding connection is needed, only pieces left apart are joined.
+            if (joined) JoinPieces(result, links, cancellation);
+            else Connect(result, links, through.Count > 0 ? street => through.Contains(street) : (Func<int, bool>)null, cancellation);
             return result;
         }
 
@@ -316,6 +338,8 @@ namespace SteppedStreets.Core.Neighbourhood
             request.HighestStep = math.clamp(Finite(request.HighestStep, 3.2f), 0.5f, 6f);
             request.LotSpacingCells = math.clamp(request.LotSpacingCells, -1, 3);
             request.TreeDensity = math.clamp(Finite(request.TreeDensity, 0.5f), 0.1f, 1f);
+            // Without shaping the ground there are no level pads to make.
+            if (!request.ShapeGround) request.LevelLots = false;
         }
 
         private static float Finite(float value, float fallback) => math.isfinite(value) ? value : fallback;

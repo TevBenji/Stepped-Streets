@@ -263,7 +263,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 for (int road = 0; road < plan.Roads.Count; road++) order.Add(road);
                 order.Sort((first, second) =>
                 {
-                    int kind = (plan.Roads[first].Kind == RoadKind.Contour ? 0 : 1).CompareTo(plan.Roads[second].Kind == RoadKind.Contour ? 0 : 1);
+                    int kind = (plan.Roads[first].Kind.IsMain() ? 0 : 1).CompareTo(plan.Roads[second].Kind.IsMain() ? 0 : 1);
                     return kind != 0 ? kind : first.CompareTo(second);
                 });
                 var held = new List<int>();

@@ -556,6 +556,8 @@ namespace SteppedStreets.Tool
                 Blocked = snapshot.Blocked,
                 ExistingRoads = snapshot.ExistingRoads,
                 Style = settings.Style,
+                Junctions = settings.Junctions,
+                ShapeGround = settings.ShapeGround,
                 RoadHalfWidth = road?.HalfWidth ?? 6f,
                 BlockDepth = settings.BlockDepth,
                 MaxRoadGrade = settings.MaxRoadGradePercent / 100f,

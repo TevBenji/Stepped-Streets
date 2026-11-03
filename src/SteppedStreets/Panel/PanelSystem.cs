@@ -65,6 +65,12 @@ namespace SteppedStreets.Panel
                     settings.Style = style;
                     return true;
                 }));
+                Trigger<string>("setJunctions", value => ChangeSettings(settings =>
+                {
+                    if (!Enum.TryParse(value, out JunctionPattern pattern) || !Enum.IsDefined(typeof(JunctionPattern), pattern)) return false;
+                    settings.Junctions = pattern;
+                    return true;
+                }));
                 Trigger<string>("setMixPattern", value => ChangeSettings(settings =>
                 {
                     if (!Enum.TryParse(value, out MixPattern pattern) || !Enum.IsDefined(typeof(MixPattern), pattern)) return false;
@@ -110,6 +116,7 @@ namespace SteppedStreets.Panel
                 BoolTrigger("setRetainingWalls", (settings, value) => settings.RetainingWalls = value);
                 BoolTrigger("setTrees", (settings, value) => settings.Trees = value);
                 BoolTrigger("setSteepGround", (settings, value) => settings.SetSteepGround(value));
+                BoolTrigger("setShapeGround", (settings, value) => settings.ShapeGround = value);
             }
             catch (Exception exception)
             {
@@ -312,6 +319,8 @@ namespace SteppedStreets.Panel
             json.Append(",\"maxRoadGradePercent\":").Append(Integer(settings.MaxRoadGradePercent));
             json.Append(",\"steepestBuildablePercent\":").Append(Integer(settings.SteepestBuildablePercent));
             json.Append(",\"steepGround\":").Append(settings.SteepGround ? "true" : "false");
+            json.Append(",\"shapeGround\":").Append(settings.ShapeGround ? "true" : "false");
+            json.Append(",\"junctions\":"); String(json, settings.Junctions.ToString());
             json.Append(",\"zoneMix\":[");
             var shares = settings.ZoneShares();
             for (int index = 0; index < shares.Count; index++)

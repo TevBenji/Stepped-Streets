@@ -36,6 +36,10 @@ namespace SteppedStreets.Settings
         [SettingsUISection(Section, Group)]
         public NeighbourhoodStyle Style { get; set; }
 
+        /// <summary>How a grid layout's cross streets meet its main streets.</summary>
+        [SettingsUISection(Section, Group)]
+        public JunctionPattern Junctions { get; set; }
+
         [SettingsUITextInput]
         [SettingsUISection(Section, Group)]
         public string RoadName { get; set; }
@@ -51,6 +55,10 @@ namespace SteppedStreets.Settings
         /// <summary>Steep hills and mountains: buildable ground up to 60 % and earthwork up to 12 m. Off: 30 % and 8 m.</summary>
         [SettingsUISection(Section, Group)]
         public bool SteepGround { get; set; }
+
+        /// <summary>Change the terrain at all. Off: nothing is graded and roads follow the ground as the game builds them.</summary>
+        [SettingsUISection(Section, Group)]
+        public bool ShapeGround { get; set; }
 
         [SettingsUISlider(min = 8, max = 60, step = 1, scalarMultiplier = 1, unit = Game.UI.Unit.kPercentage)]
         [SettingsUISection(Section, Group)]
@@ -139,6 +147,8 @@ namespace SteppedStreets.Settings
         public override void SetDefaults()
         {
             Style = NeighbourhoodStyle.ContourSuburb;
+            Junctions = JunctionPattern.Staggered;
+            ShapeGround = true;
             RoadName = DefaultRoad;
             BlockDepth = 90;
             MaxRoadGradePercent = 8;
@@ -190,6 +200,14 @@ namespace SteppedStreets.Settings
                 [GetEnumValueLocaleID(NeighbourhoodStyle.ContourSuburb)] = "Contour suburb",
                 [GetEnumValueLocaleID(NeighbourhoodStyle.TerracedBlocks)] = "Terraced blocks",
                 [GetEnumValueLocaleID(NeighbourhoodStyle.MountainLane)] = "Mountain lane",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.SquareGrid)] = "Square grid",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.RectangularGrid)] = "Rectangular grid",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.IrregularGrid)] = "Irregular grid",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.SkewedGrid)] = "Skewed grid",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.FragmentedGrid)] = "Fragmented grid",
+                [GetEnumValueLocaleID(JunctionPattern.Crossroads)] = "Crossroads",
+                [GetEnumValueLocaleID(JunctionPattern.Staggered)] = "Staggered",
+                [GetEnumValueLocaleID(JunctionPattern.TrafficOptimised)] = "Traffic-optimised",
                 [GetEnumValueLocaleID(MixPattern.Random)] = "Random",
                 [GetEnumValueLocaleID(MixPattern.Clumps)] = "Clumps",
                 [GetEnumValueLocaleID(MixPattern.Even)] = "Even",
@@ -200,7 +218,9 @@ namespace SteppedStreets.Settings
                 labels[GetOptionDescLocaleID(property)] = description;
             }
 
-            Label(nameof(Style), "Style", "Contour suburb, terraced blocks or one winding mountain lane.");
+            Label(nameof(Style), "Layout", "Hillside layouts follow the contours: contour suburb, terraced blocks or one winding mountain lane. Grid layouts suit flat or gentle ground.");
+            Label(nameof(Junctions), "Junctions", "For grid layouts: crossroads, staggered T-junctions, or traffic-optimised, where one through road carries the traffic and is the only road that meets yours.");
+            Label(nameof(ShapeGround), "Shape the ground", "Grade roads and lots into the hill. Off: no terrain changes at all; roads follow the ground as the game builds them and lots aren't levelled.");
             Label(nameof(RoadName), "Road type", "The road prefab for new streets, by name (for example Small Road).");
             Label(nameof(BlockDepth), "Block depth (m)", "Road spacing on the ground between neighbouring contour streets.");
             Label(nameof(MaxRoadGradePercent), "Max road grade", "No new road is steeper than this.");

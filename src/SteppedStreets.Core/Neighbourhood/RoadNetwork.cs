@@ -26,7 +26,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 changed = false;
                 foreach (var street in streets)
                 {
-                    if (street.Removed || street.Kind == RoadKind.Contour) continue;
+                    if (street.Removed) continue;
                     bool lost = (street.Start.Street >= 0 && streets[street.Start.Street].Removed)
                         || (street.End.Street >= 0 && streets[street.End.Street].Removed);
                     if (lost) { street.Pruned = true; changed = true; }
@@ -118,7 +118,7 @@ namespace SteppedStreets.Core.Neighbourhood
             long Key(int street, int point)
             {
                 var owner = streets[street];
-                if (owner.Kind != RoadKind.Contour)
+                if (!owner.Closed)
                 {
                     var attachment = point == 0 ? owner.Start : point == owner.Points.Count - 1 ? owner.End : Attachment.None;
                     if (attachment.Existing) return -1 - street;
@@ -204,7 +204,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (planned.SteepestGrade > limit + 0.003f) Flag(road, $"a {planned.Kind} road was steeper than {limit:P0}");
                 var plan2 = new List<float2>(planned.Points.Length);
                 foreach (var point in planned.Points) plan2.Add(point.xz);
-                float minimumRadius = planned.Kind == RoadKind.Contour ? streetRadius : linkRadius;
+                float minimumRadius = planned.Kind.IsMain() ? streetRadius : linkRadius;
                 if (plan2.Count >= 7 && Geometry.TightestRadius(plan2, 12f, out _) < minimumRadius * 0.95f)
                     Flag(road, $"a {planned.Kind} road turned tighter than {minimumRadius:0} m");
             }
@@ -229,7 +229,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         float angle = math.degrees(math.acos(math.clamp(math.dot(list[first].Direction, list[second].Direction), -1f, 1f)));
                         float heading = math.degrees(math.acos(math.clamp(math.dot(list[first].Heading, list[second].Heading), -1f, 1f)));
                         if (angle >= SharpestJunction(request) - 1f && heading >= SharpestHeading - 1f) continue;
-                        int blamed = streets[owners[list[first].Road]].Kind == RoadKind.Contour ? list[second].Road : list[first].Road;
+                        int blamed = streets[owners[list[first].Road]].Kind.IsMain() ? list[second].Road : list[first].Road;
                         Flag(blamed, "a junction was too sharp");
                     }
             }
@@ -239,7 +239,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     float distance = math.distance(plan.Nodes[junctions[first]].Position.xz, plan.Nodes[junctions[second]].Position.xz);
                     if (distance >= RoadLinks.JunctionSpacing - 1f) continue;
                     foreach (var end in ends[junctions[second]])
-                        if (streets[owners[end.Road]].Kind != RoadKind.Contour) { Flag(end.Road, "two junctions were closer than 40 m"); break; }
+                        if (!streets[owners[end.Road]].Kind.IsMain()) { Flag(end.Road, "two junctions were closer than 40 m"); break; }
                 }
 
             // Clearance between roads away from the nodes they share: both corridors (road and shoulders), and room for a bank
@@ -290,7 +290,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         if (other.x != road && NearShared(planned, otherRoad, plan, position, nodeReach)) continue;
                         // Two connections clashing: the later one goes, as the first serves the largest network.
                         var kind = streets[owners[road]].Kind;
-                        int blamed = kind == RoadKind.Contour || (kind == RoadKind.Connection && streets[owners[other.x]].Kind == RoadKind.Connection)
+                        int blamed = kind.IsMain() || (kind == RoadKind.Connection && streets[owners[other.x]].Kind == RoadKind.Connection)
                             ? other.x : road;
                         Flag(blamed, "two roads came too close");
                     }
