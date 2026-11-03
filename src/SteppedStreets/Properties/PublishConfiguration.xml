@@ -1,0 +1,60 @@
+<Publish>
+	<!--Empty for the first upload. The publisher prints "Mod published with Id=NNNNNN": it goes here, or the next upload makes a second listing-->
+	<ModId Value="" />
+	<DisplayName Value="Stepped Streets" />
+	<ShortDescription Value="Draw an area on a hill and get a whole neighbourhood: streets that follow the contours, gentle connectors, level stepped lots, zoning, service buildings and trees. Preview it, reroll it, build it." />
+	<!--Every upload sends exactly this page: change it here, not on the website, or the next upload overwrites the website-->
+	<LongDescription>
+Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets does it for you: draw an area on a hillside and it lays out a whole neighbourhood the way a careful builder would.
+
+### What it builds
+
+- **Streets that follow the contours**, so they stay nearly level along the hill
+- **Gentle connectors** that climb across the slope, never steeper than the grade you set (8 % by default)
+- **A connection to your nearest road** within 400 m, or a neighbourhood of its own when there is none
+- **Level lots stepped down the hill** with soft banks, graded before anything is zoned
+- **Zoning that grows**: the game's own zone cells along the new roads, full depth, in the mix you choose
+- **Service buildings** mixed in: police, fire, clinics and hospitals, schools, parks, utilities, any unlocked roadside service building, each on a level site of its own facing the road
+- **Forest** on ground too steep to build, trees on the banks, optional garden walls
+
+### How to use it
+
+1. Click **Stepped Streets** in the bottom toolbar beside Zones, or press **Ctrl+Shift+S**.
+2. Click corners on the ground; click the first corner to close the area. Drag corners to reshape, right-click removes one, Ctrl+Z undoes.
+3. Pick a **style** (Contour suburb, Terraced blocks or Mountain lane) and **what to build**: add zones with their shares and services with how many of each.
+4. The plan appears on the ground. **Reroll** for another layout.
+5. Press **Build**.
+
+Turn on **Steep hills** for steep slopes and mountain sides. Everything else (road type, block depth, grades, lot size, grading, trees) is under **More settings**.
+
+### Good to know
+
+- **Ground changes are permanent**, like the game's terrain tools. **Back up your save** before a big build.
+- Houses grow where the city has demand for that zone.
+- Big areas (up to 6.4 km across) take a while to plan and lay a lot of road at once.
+- Early release: expect rough edges and tell me what you find.
+
+Built for game version **1.6.***.
+
+### Credits
+
+Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.0), which in turn credits ParkManager and Grid Road Generator. Stepped Streets is GPL-3.0 too; the full source is on GitHub (link on this page).
+	</LongDescription>
+	<!--A missing picture is silently replaced by a default one-->
+	<Thumbnail Value="Properties/Thumbnail.png" />
+	<!--At most 10: Paradox Mods refuses more-->
+	<Screenshot Value="Properties/Screenshots/01.png" />
+	<Screenshot Value="Properties/Screenshots/02.png" />
+	<Screenshot Value="Properties/Screenshots/03.png" />
+	<Screenshot Value="Properties/Screenshots/04.png" />
+	<Screenshot Value="Properties/Screenshots/05.png" />
+	<Screenshot Value="Properties/Screenshots/06.png" />
+	<Screenshot Value="Properties/Screenshots/07.png" />
+	<Tag Value="Code Mod" />
+	<ModVersion Value="2.0.0" />
+	<GameVersion Value="1.6.*" />
+	<ChangeLog Value="- First release of the hillside neighbourhood generator: contour streets, connectors, stepped lots, zoning, service buildings, trees, steep hills mode." />
+	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
+	<!--Public, Unlisted or Private, exactly as written-->
+	<AccessLevel Value="Public" />
+</Publish>
