@@ -1,6 +1,7 @@
 // Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
 using System.Collections.Generic;
 using System.Threading;
+using SteppedStreets.Core.Planning;
 using SteppedStreets.Core.Terrain;
 using Unity.Mathematics;
 
@@ -90,6 +91,24 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             // Cross streets between each pair of neighbouring rows.
             float phase = Geometry.Hash01(seed, 2, 0) * crossSpacing;
             float collector = (uMin + uMax) * 0.5f;
+            // The through road's place: the middle, or the nearest place within 64 m where its straight join to the city's road
+            // lands clear of the junctions already on it.
+            if (traffic && offsets.Count > 0)
+            {
+                int last = offsets.Count - 1;
+                for (int step = 0; step <= 8; step++)
+                {
+                    bool found = false;
+                    foreach (float sign in new[] { 1f, -1f })
+                    {
+                        float u = (uMin + uMax) * 0.5f + sign * step * StepPlanner.CellSize;
+                        float uLast = u + (offsets[last] - offsets[0]) * lean;
+                        if (Hit(request, along * u + across * offsets[0], -across, out _, out _, out _)
+                            || Hit(request, along * uLast + across * offsets[last], across, out _, out _, out _)) { collector = u; found = true; break; }
+                    }
+                    if (found) break;
+                }
+            }
             var collectorLinks = new List<int>();
             for (int row = 0; row + 1 < rows.Count; row++)
             {
@@ -98,12 +117,16 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 float offset = staggered && row % 2 == 1 ? crossSpacing * 0.5f : 0f;
                 // The through road leans with the cross streets, so it runs on unbroken from row to row.
                 float collectorHere = collector + (offsets[row] - offsets[0]) * lean;
+                // Columns are counted from the first row and lean with a skewed grid, so crossroads line up from row to row; the
+                // irregular grid's jitter is per column for crossroads (per column and row when staggered).
+                float leanHere = (offsets[row] - offsets[0]) * lean;
                 var positions = new List<(float U, bool Collector)>();
-                for (float u = uMin + phase + offset - crossSpacing; u < uMax + crossSpacing; u += crossSpacing)
+                for (int column = -1; uMin + phase + column * crossSpacing < uMax + crossSpacing; column++)
                 {
-                    float at = u;
-                    if (style == NeighbourhoodStyle.IrregularGrid) at += (Geometry.Hash01(seed, 20 + row, (int)(u / crossSpacing)) - 0.5f) * crossSpacing * 0.5f;
-                    if (style == NeighbourhoodStyle.FragmentedGrid && Geometry.Hash01(seed, 40 + row, (int)(u / crossSpacing)) < 0.3f) continue;
+                    float at = uMin + phase + column * crossSpacing + offset + leanHere;
+                    if (style == NeighbourhoodStyle.IrregularGrid)
+                        at += (Geometry.Hash01(seed, staggered ? 20 + row : 20, column + 1000) - 0.5f) * crossSpacing * 0.5f;
+                    if (style == NeighbourhoodStyle.FragmentedGrid && Geometry.Hash01(seed, 40 + row, column + 1000) < 0.3f) continue;
                     // Traffic-optimised: locals keep clear of the through road, which lines up across every row.
                     if (traffic && math.abs(at - collectorHere) < crossSpacing * 0.35f) continue;
                     positions.Add((at, false));
@@ -164,31 +187,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         /// </summary>
         private static bool Reach(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, int host, int point, float2 direction)
         {
-            if (math.lengthsq(direction) < 0.5f) return false;
             float2 origin = streets[host].Points[point];
-            float best = ReachLength;
-            float3 hit = default;
-            ExistingRoad target = null;
-            float targetT = 0f;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                for (int index = 1; index < (road?.Points?.Length ?? 0); index++)
-                {
-                    float3 a = road.Points[index - 1], b = road.Points[index];
-                    float2 edge = b.xz - a.xz;
-                    float cross = direction.x * edge.y - direction.y * edge.x;
-                    if (math.abs(cross) < 1e-4f) continue;
-                    float2 offset = a.xz - origin;
-                    float along = (offset.x * edge.y - offset.y * edge.x) / cross;
-                    float share = (offset.x * direction.y - offset.y * direction.x) / cross;
-                    if (along <= Step || along >= best || share < 0f || share > 1f) continue;
-                    // Square enough to the city's road for a clean junction.
-                    if (math.abs(math.dot(direction, math.normalizesafe(edge))) > 0.5f) continue;
-                    best = along;
-                    hit = math.lerp(a, b, share);
-                    target = road;
-                    targetT = (index - 1 + share) / (road.Points.Length - 1);
-                }
-            if (target == null) return false;
+            if (!Hit(request, origin, direction, out float3 hit, out ExistingRoad target, out float targetT)) return false;
             var line = Line(origin, hit.xz);
             // Clear of buildings and water all the way, and of the area's own streets until it nears the city's road.
             for (int index = 1; index < line.Count - 1; index++)
@@ -211,6 +211,38 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             if (point > 0 && point < count - 1) streets[host].Junctions.Add(point);
             streets.Add(street);
             return true;
+        }
+
+        /// <summary>
+        /// Where a straight line from a point meets the city's road within reach: square enough for a clean junction (60° or
+        /// more) and clear of the junctions at the ends of the road's edges.
+        /// </summary>
+        private static bool Hit(NeighbourhoodRequest request, float2 origin, float2 direction, out float3 hit, out ExistingRoad target, out float targetT)
+        {
+            hit = default;
+            target = null;
+            targetT = 0f;
+            if (math.lengthsq(direction) < 0.5f) return false;
+            float best = ReachLength;
+            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
+                for (int index = 1; index < (road?.Points?.Length ?? 0); index++)
+                {
+                    float3 a = road.Points[index - 1], b = road.Points[index];
+                    float2 edge = b.xz - a.xz;
+                    float cross = direction.x * edge.y - direction.y * edge.x;
+                    if (math.abs(cross) < 1e-4f) continue;
+                    float2 offset = a.xz - origin;
+                    float along = (offset.x * edge.y - offset.y * edge.x) / cross;
+                    float share = (offset.x * direction.y - offset.y * direction.x) / cross;
+                    if (along <= Step || along >= best || share < 0f || share > 1f) continue;
+                    // Square enough to the city's road for a clean junction, and clear of the junctions at its edge's ends.
+                    if (math.abs(math.dot(direction, math.normalizesafe(edge))) > 0.5f || !road.ClearOfEnds(index - 1, share)) continue;
+                    best = along;
+                    hit = math.lerp(a, b, share);
+                    target = road;
+                    targetT = (index - 1 + share) / (road.Points.Length - 1);
+                }
+            return target != null;
         }
 
         /// <summary>How far past the grid a street may run on to meet the city's road.</summary>

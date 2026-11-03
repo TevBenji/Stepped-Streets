@@ -26,9 +26,13 @@ namespace SteppedStreets.Core.Neighbourhood
                 changed = false;
                 foreach (var street in streets)
                 {
+                    // A link or connection goes with a street it joins, and so does a main street that hangs off another (a grid's
+                    // through-road end). A main street stays when a link or connection joined to its end goes: it may record that
+                    // road at its end (a connection extending it), and other links may still hold it.
                     if (street.Removed) continue;
-                    bool lost = (street.Start.Street >= 0 && streets[street.Start.Street].Removed)
-                        || (street.End.Street >= 0 && streets[street.End.Street].Removed);
+                    bool Lost(Attachment attachment) => attachment.Street >= 0 && streets[attachment.Street].Removed
+                        && (!street.Kind.IsMain() || streets[attachment.Street].Kind.IsMain());
+                    bool lost = Lost(street.Start) || Lost(street.End);
                     if (lost) { street.Pruned = true; changed = true; }
                 }
             }
@@ -115,6 +119,27 @@ namespace SteppedStreets.Core.Neighbourhood
                     if (attachment.Street >= 0 && !streets[attachment.Street].Removed) cuts[attachment.Street].Add(attachment.Point);
             }
 
+            // A join makes two points one node, whichever end records it: a connection arriving at a street's open end and that
+            // end may each point at the other. Every join merges its two points into one group, and each group is one node.
+            var parent = new Dictionary<long, long>();
+            long Raw(int street, int point) => ((long)street << 20) | (uint)point;
+            long Find(long key)
+            {
+                while (parent.TryGetValue(key, out long up) && up != key) key = up;
+                return key;
+            }
+            for (int index = 0; index < streets.Count; index++)
+            {
+                var street = streets[index];
+                if (street.Removed || street.Closed) continue;
+                foreach (var (attachment, point) in new[] { (street.Start, 0), (street.End, street.Points.Count - 1) })
+                {
+                    if (attachment.Existing || attachment.Street < 0 || streets[attachment.Street].Removed) continue;
+                    long a = Find(Raw(index, point)), b = Find(Raw(attachment.Street, attachment.Point));
+                    if (a != b) parent[a > b ? a : b] = a > b ? b : a;
+                }
+            }
+
             long Key(int street, int point)
             {
                 var owner = streets[street];
@@ -122,9 +147,8 @@ namespace SteppedStreets.Core.Neighbourhood
                 {
                     var attachment = point == 0 ? owner.Start : point == owner.Points.Count - 1 ? owner.End : Attachment.None;
                     if (attachment.Existing) return -1 - street;
-                    if (attachment.Street >= 0) return ((long)attachment.Street << 20) | (uint)attachment.Point;
                 }
-                return ((long)street << 20) | (uint)point;
+                return Find(Raw(street, point));
             }
             int Node(int street, int point)
             {

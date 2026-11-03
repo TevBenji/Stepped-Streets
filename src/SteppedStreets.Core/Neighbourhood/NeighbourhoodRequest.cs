@@ -163,6 +163,27 @@ namespace SteppedStreets.Core.Neighbourhood
         public float3[] Points = new float3[0];
 
         public float HalfWidth = 6f;
+
+        /// <summary>
+        /// How far along the edge from either end a new road may join it. An edge ends at a node of the player's network,
+        /// often a junction; a new junction closer than this crowds it and the game's shapes for the two overlap (owner's
+        /// in-game test of 2.1.1, 3 November 2026).
+        /// </summary>
+        public const float EndClearance = 20f;
+
+        /// <summary>Whether a point a share of the way along one of the edge's segments is clear of both its ends.</summary>
+        public bool ClearOfEnds(int segment, float share)
+        {
+            float along = 0f, total = 0f;
+            for (int index = 1; index < Points.Length; index++)
+            {
+                float length = math.distance(Points[index - 1].xz, Points[index].xz);
+                if (index - 1 < segment) along += length;
+                else if (index - 1 == segment) along += length * share;
+                total += length;
+            }
+            return along >= EndClearance && total - along >= EndClearance;
+        }
     }
 
     /// <summary>The drawn area, the site and the player's settings.</summary>

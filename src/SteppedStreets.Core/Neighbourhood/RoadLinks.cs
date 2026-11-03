@@ -61,7 +61,9 @@ namespace SteppedStreets.Core.Neighbourhood
         private float Exempt => (Clearance + 2f) / 0.88f;
 
         // As far as the validation looks for a road too close (its clearance plus 20 m).
-        private void Stamp(Street street) => ContourStreets.Stamp(survey, street.Points, Clearance + 20f, roadDistance, street.Heights, roadHeight);
+        // As far as the road check looks (RoadNetwork.ClearanceReach): a shorter reach here let through connections the check
+        // then dropped, with no second try, leaving a neighbourhood unconnected beside a city road split into edges.
+        private void Stamp(Street street) => ContourStreets.Stamp(survey, street.Points, RoadNetwork.ClearanceReach(request), roadDistance, street.Heights, roadHeight);
 
         internal sealed class Candidate
         {
@@ -261,6 +263,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     if (point > 0) travelled += math.distance(points[point].xz, points[point - 1].xz);
                     if (travelled < 12f && point != points.Length - 1) continue;
                     travelled = 0f;
+                    if (!roads[road].ClearOfEnds(point, 0f)) continue;
                     float2 position = points[point].xz;
                     if (!survey.InsideGrid(position, 24f)) continue;
                     float distance = Poly.Contains(survey.Boundary, position) ? 0f : Poly.DistanceToBoundary(survey.Boundary, position);
@@ -609,7 +612,7 @@ namespace SteppedStreets.Core.Neighbourhood
             {
                 if (stations[index] < fromStart || length - stations[index] < fromEnd) continue;
                 float distance = survey.Sample(roadDistance, path[index]);
-                if (distance > Clearance + 20f) continue;
+                if (distance > RoadNetwork.ClearanceReach(request)) continue;
                 if (distance < Clearance + math.abs(heights[index] - roadHeight[NearestNode(path[index])]) / bank) return null;
             }
             // Clean ramps over squiggles: every degree the road turns costs half a metre.
