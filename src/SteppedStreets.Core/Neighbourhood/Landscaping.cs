@@ -114,8 +114,11 @@ namespace SteppedStreets.Core.Neighbourhood
                 Poly.Bounds(corners, out var low, out var high);
                 pads.Add(low - 6f, high + 6f, lot.Pad);
             }
-            var junctionNodes = new List<float2>();
-            foreach (var node in plan.Nodes) if (node.Degree >= 3 || node.ExistingRoadId != 0) junctionNodes.Add(node.Position.xz);
+            // In buckets: a 6.4 km area has thousands of junctions and every shoulder segment asks about them.
+            float junctionReach = halfWidth + 12f;
+            var junctionNodes = new SpatialBuckets<float2>(32f);
+            foreach (var node in plan.Nodes)
+                if (node.Degree >= 3 || node.ExistingRoadId != 0) junctionNodes.Add(node.Position.xz - junctionReach, node.Position.xz + junctionReach, node.Position.xz);
 
             foreach (var road in plan.Roads)
             {
@@ -141,7 +144,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         float cut = plan.Ground.HeightAt(middle + outward * 3.5f) - roadHeight;
                         bool clear = true;
                         foreach (var pad in pads.Near(middle)) if (LotLayout.InsidePad(pad, middle, -4f)) { clear = false; break; }
-                        foreach (var node in junctionNodes) if (math.distance(node, middle) < halfWidth + 12f) { clear = false; break; }
+                        foreach (var node in junctionNodes.Near(middle)) if (math.distance(node, middle) < junctionReach) { clear = false; break; }
                         if (clear && cut >= 0.8f && cut <= 3f) run.Add((start, end, roadHeight));
                         else Flush();
                     }

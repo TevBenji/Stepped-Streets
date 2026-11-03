@@ -52,7 +52,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 mark = now;
                 plan.Timings = stages.ToString().TrimEnd(',', ' ');
             }
-            var survey = new SiteSurvey(request);
+            var survey = new SiteSurvey(request, cancellation);
             Stage("survey");
             plan.AreaSquareMetres = survey.AreaSquareMetres;
             plan.WildShare = survey.WildShare;

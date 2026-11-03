@@ -260,14 +260,26 @@ namespace SteppedStreets.Core.Neighbourhood
             for (int road = 0; road < plan.Roads.Count; road++)
             {
                 var planned = plan.Roads[road];
+                // A road against itself too: the legs of a hairpin (the Mountain lane is one road) need the same room. Points
+                // closer along the road than three times the room are the bend itself; a ring's seam joins its two ends.
+                var along = new float[planned.Points.Length];
+                for (int point = 1; point < along.Length; point++) along[point] = along[point - 1] + math.distance(planned.Points[point - 1].xz, planned.Points[point].xz);
+                float length = along[along.Length - 1];
+                bool ring = planned.StartNode == planned.EndNode;
                 for (int point = 0; point < planned.Points.Length; point++)
                 {
                     float2 position = planned.Points[point].xz;
                     foreach (var other in buckets.Near(position))
                     {
-                        if (other.x <= road) continue;
+                        if (other.x < road || (other.x == road && other.y <= point)) continue;
                         var otherRoad = plan.Roads[other.x];
                         float needed = clearance + math.abs(otherRoad.Points[other.y].y - planned.Points[point].y) / bank;
+                        if (other.x == road)
+                        {
+                            float apart = along[other.y] - along[point];
+                            if (ring) apart = math.min(apart, length - apart);
+                            if (apart < needed * 3f) continue;
+                        }
                         if (math.distance(otherRoad.Points[other.y].xz, position) >= needed) continue;
                         if (NearShared(planned, otherRoad, plan, position, nodeReach)) continue;
                         // Two connections clashing: the later one goes, as the first serves the largest network.

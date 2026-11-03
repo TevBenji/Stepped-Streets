@@ -140,7 +140,8 @@ namespace SteppedStreets.Core.Neighbourhood
                 lowest = survey.Smooth[index];
                 start = survey.Position(index);
             }
-            if (start.HasValue) heading = survey.UphillAt(start.Value);
+            // On dead flat ground there is no uphill: head for the middle of the area instead.
+            if (start.HasValue) heading = math.normalizesafe(survey.UphillAt(start.Value), math.normalizesafe(centre - start.Value, new float2(1f, 0f)));
             return start;
         }
 
