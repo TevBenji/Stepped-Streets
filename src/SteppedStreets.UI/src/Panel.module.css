@@ -431,24 +431,24 @@
     white-space: nowrap;
 }
 
-/* Adding to the mix: green outlined pills with a circled plus. */
+/* Adding to the mix: the same green pill as the main action, smaller, with a circled plus. */
 .addZone {
     align-self: flex-start;
-    height: 30rem;
-    padding: 0 5rem 0 14rem;
+    height: 34rem;
+    padding: 0 7rem 0 14rem;
     margin-right: 10rem;
     margin-bottom: 6rem;
-    border: 2rem solid #5abe41;
-    border-radius: 15rem;
-    background-color: transparent;
-    color: #7bcb67;
+    border: 2rem solid #2d9640;
+    border-radius: 17rem;
+    background-color: #35be4f;
+    color: #2c2c2c;
     font-size: 12rem;
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
 
-.addZone:hover { background-color: rgba(90, 190, 65, 0.16); }
+.addZone:hover { background-color: #48c960; }
 
 .addRow {
     display: flex;
@@ -660,30 +660,30 @@
 
 /* A circled icon at a pill's right end. */
 .pillIcon {
-    width: 20rem;
-    height: 20rem;
-    margin-left: 12rem;
+    width: 22rem;
+    height: 22rem;
+    margin-left: 14rem;
     flex-shrink: 0;
 }
 
-/* The main action: the game's own primary button (.primary-button in the game's UI, as on Paradox Mods), a green pill
-   in dark capitals, with a circled icon at its right. */
+/* The main action, as Paradox Mods' "Add to playsets": a green pill with a darker green edge, near-black capitals and a
+   circled icon at its right (colours measured from the game's mod browser). */
 .primary {
     flex: 1 1 auto;
-    height: 38rem;
-    padding: 0 8rem 0 20rem;
+    height: 44rem;
+    padding: 0 10rem 0 20rem;
     justify-content: space-between;
-    border: 1rem solid #5abe41;
-    border-radius: 20rem;
-    background-color: #5abe41;
-    color: #262d3f;
+    border: 2rem solid #2d9640;
+    border-radius: 22rem;
+    background-color: #35be4f;
+    color: #2c2c2c;
     font-size: var(--fontSizeS);
     font-weight: bold;
     text-transform: uppercase;
 }
 
-.primary:hover { background-color: #7bcb67; }
-.primary:active { background-color: #9cd88d; }
+.primary:hover { background-color: #48c960; }
+.primary:active { background-color: #2fa846; }
 
 .primary.disabled {
     opacity: 1;
