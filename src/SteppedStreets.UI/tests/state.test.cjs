@@ -13,7 +13,7 @@ async function stateModule() {
 
 const DEFAULT_SETTINGS = {
     style: "ContourSuburb", road: "Small Road", blockDepth: 90, maxRoadGradePercent: 8, steepestBuildablePercent: 15,
-    steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 3,
+    steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 4,
     levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: true,
     treeDensityPercent: 50, seed: 1,
 };

@@ -83,6 +83,15 @@ namespace SteppedStreets.Core.Neighbourhood
             line = Geometry.Resample(line, ContourStreets.Spacing);
             var heights = RoadProfile.Fit(line, survey.GroundAt, request.MaxRoadGrade, attachment.Existing ? startHeight : (float?)null, null);
             if (heights == null) return null;
+            // A hairpin that comes back too close to the lane below ends the lane there: the road check would otherwise drop
+            // the whole lane, and with it the only road of the plan (code review, 3 November 2026).
+            int clash = RoadNetwork.FirstSelfClash(line, heights, request);
+            if (clash >= 0)
+            {
+                if (clash * ContourStreets.Spacing < ContourStreets.ShortestStreet) return null;
+                line = line.GetRange(0, clash);
+                heights = SubArray(heights, clash);
+            }
             return new Street(RoadKind.Lane, line, heights) { Start = attachment };
         }
 
@@ -143,6 +152,13 @@ namespace SteppedStreets.Core.Neighbourhood
             // On dead flat ground there is no uphill: head for the middle of the area instead.
             if (start.HasValue) heading = math.normalizesafe(survey.UphillAt(start.Value), math.normalizesafe(centre - start.Value, new float2(1f, 0f)));
             return start;
+        }
+
+        private static float[] SubArray(float[] values, int count)
+        {
+            var result = new float[count];
+            System.Array.Copy(values, result, count);
+            return result;
         }
 
         private static float SignedAngle(float2 from, float2 to) =>

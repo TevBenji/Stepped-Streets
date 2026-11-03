@@ -18,7 +18,7 @@ export const SETTING_TIPS: Record<string, string> = {
     "Max road grade": "No new road is steeper than this.",
     "Steepest buildable": "Ground steeper than this gets no roads or lots and becomes forest.",
     "Lot width": "How wide each lot is, in zone cells of 8 m.",
-    "Lot depth": "How deep each lot is, in zone cells of 8 m.",
+    "Lot depth": "How deep each lot is, in zone cells of 8 m. Only this depth is levelled and zoned. Low-density houses are 2 or 4 cells deep, so 4 fits them all.",
     "Space between lots": "Empty cells between lots. Auto leaves planted gaps on steeper ground.",
     "Level the lots": "Grade each lot into a level pad before it is zoned. Off grades only the roads.",
     "Most earth": "The most ground a lot may cut or fill. A lot that needs more is left out.",

@@ -175,7 +175,7 @@ namespace SteppedStreets.Build
             try
             {
                 int frame = UnityEngine.Time.frameCount;
-                if (!_tool.IsActive && _applyFrame < 0) { Finish("interrupted by a tool change"); return; }
+                if (!_tool.IsActive && _applyFrame < 0) { _tool.Interrupted = true; Finish("interrupted by a tool change"); return; }
                 if (_emittedFrame < 0)
                 {
                     if (!_tool.Ready)

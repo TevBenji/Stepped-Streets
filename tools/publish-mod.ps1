@@ -11,8 +11,7 @@ param(
     [switch]$Update,
     [switch]$PageOnly,
     [switch]$DryRun,
-    [string]$Email,
-    [string]$Password
+    [string]$Email
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -66,10 +65,15 @@ Write-Host '== Uploading to Paradox Mods'
 # The publisher targets .NET 6; a newer runtime runs it.
 $env:DOTNET_ROLL_FORWARD = 'Major'
 $arguments = @($command, $page, '-c', $content, '-v')
-if ($Email) { $arguments += @('--noAutoLogin', '-e', $Email, '-p', $Password) }
+# Asked at a hidden prompt, so the password never lands in the shell's history.
+if ($Email) {
+    $secure = Read-Host -AsSecureString "Paradox password for $Email"
+    $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+    $arguments += @('--noAutoLogin', '-e', $Email, '-p', $password)
+}
 Push-Location $project  # the page file names its pictures relative to the project
 try { & $publisher @arguments 2>&1 | Tee-Object -Variable log } finally { Pop-Location }
-if ($LASTEXITCODE -ne 0) { throw 'The upload failed: the lines above say why (if it could not log in, add -Email and -Password).' }
+if ($LASTEXITCODE -ne 0) { throw 'The upload failed: the lines above say why (if it could not log in, add -Email and type the password when asked).' }
 
 $found = [regex]::Match(($log -join "`n"), 'Id\s*=\s*(\d+)')
 if ($command -eq 'Publish' -and $found.Success) {
