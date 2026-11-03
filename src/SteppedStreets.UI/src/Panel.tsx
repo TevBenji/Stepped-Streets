@@ -1,7 +1,8 @@
 // Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
-// The look follows Placemaker's panel (jackwrichards, GPL-3.0): a dark panel docked on the right, small-caps sections,
-// label-left rows, segmented choices and one accent button in the footer. Plain elements rather than cs2/ui components,
-// so nothing depends on the vanilla themes, which left the first version unstyled.
+// The layout follows Placemaker's panel (jackwrichards, GPL-3.0): docked on the right, small-caps sections, label-left
+// rows. The look is the game's own: its panel colours, its green primary pill, tick boxes and pill-shaped choices.
+// Plain elements rather than cs2/ui components, so nothing depends on the vanilla themes, which left the first version
+// unstyled; the game's slider and text box are used where the registry has them.
 import React, { useEffect, useRef, useState } from "react";
 import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./lib/bindings";
 import { ErrorBoundary } from "./lib/errorBoundary";
@@ -14,7 +15,9 @@ import icon from "./assets/stepped-streets.svg";
 import closeIcon from "./assets/close.svg";
 import chevronIcon from "./assets/chevron.svg";
 import diceIcon from "./assets/dice.svg";
-import plusIcon from "./assets/plus.svg";
+import circlePlusIcon from "./assets/circle-plus.svg";
+import circleGoIcon from "./assets/circle-go.svg";
+import checkIcon from "./assets/check.svg";
 import styles from "./Panel.module.css";
 
 const classes = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
@@ -117,8 +120,9 @@ function ToggleRow({ label, value, disabled, trigger }: { label: string; value: 
     return <Row label={label}>
         <Button className={styles.toggle} label={label} selected={value} disabled={disabled}
             sound={value ? "toggle-off" : "toggle-on"} onSelect={() => act(trigger, !value)}>
-            <div className={classes(styles.toggleTrack, value && styles.toggleOn)}><div className={styles.toggleKnob} /></div>
-            <div className={styles.toggleText}>{value ? "On" : "Off"}</div>
+            <div className={classes(styles.toggleTrack, value && styles.toggleOn)}>
+                {value ? <img className={styles.toggleTick} src={checkIcon} /> : null}
+            </div>
         </Button>
     </Row>;
 }
@@ -129,11 +133,17 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
 }>) {
     // A row just added opens its list at once, so adding is one click to choose rather than two.
     const [open, setOpen] = useState(initiallyOpen);
+    const [query, setQuery] = useState("");
     // Disabling closes the list, so it doesn't pop back open after the build or the confirmation.
     useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
+    useEffect(() => { if (!open) setQuery(""); }, [open]);
     // A saved choice the game no longer lists still shows, so the button never reads blank.
     const shown = options.some(option => option.name === value) ? options : [{ name: value, label: value }, ...options];
     const current = shown.find(option => option.name === value)?.label ?? value;
+    // A long list (zones from other mods, every service building) gets a search box at its top.
+    const searchable = vanilla.TextInput !== undefined && shown.length > SEARCH_FROM;
+    const needle = query.trim().toLowerCase();
+    const listed = needle ? shown.filter(option => option.label.toLowerCase().includes(needle)) : shown;
     // An inline list instead of a popup: the panel scrolls, and a popup would be clipped by it.
     return <>
         <SettingTip label={label}><div className={styles.row}>
@@ -145,11 +155,16 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
             {children}
         </div></SettingTip>
         {open && !disabled ? <div className={classes(styles.list, !label && styles.listFull)}>
-            {shown.map(option => <Button key={option.name} className={styles.listItem} selected={option.name === value}
+            {searchable && vanilla.TextInput ? <vanilla.TextInput className={styles.search} value={query} placeholder="Search"
+                onChange={event => setQuery(event.target.value)} /> : null}
+            {listed.map(option => <Button key={option.name} className={styles.listItem} selected={option.name === value}
                 onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>{option.label}</Button>)}
+            {listed.length === 0 ? <div className={styles.noMatch}>Nothing matches "{query.trim()}"</div> : null}
         </div> : null}
     </>;
 }
+
+const SEARCH_FROM = 6;
 
 /** What to build: zones with their shares and service buildings with their counts, in one list. */
 function Mix({ mix, zones, services, serviceOptions, disabled }: {
@@ -190,11 +205,11 @@ function Mix({ mix, zones, services, serviceOptions, disabled }: {
             {unusedZone ? <Button className={styles.addZone} disabled={disabled} onSelect={() => {
                 setJustAdded(unusedZone.name);
                 act("setZoneMix", JSON.stringify([...mix, { zone: unusedZone.name, share: 25 }]));
-            }}><img className={styles.buttonIcon} src={plusIcon} /><div>Add a zone</div></Button> : null}
+            }}><div>Add a zone</div><img className={styles.pillIcon} src={circlePlusIcon} /></Button> : null}
             {unusedService ? <Button className={styles.addZone} disabled={disabled} onSelect={() => {
                 setJustAdded(unusedService.name);
                 sendServices([...services, { name: unusedService.name, count: 1 }]);
-            }}><img className={styles.buttonIcon} src={plusIcon} /><div>Add a service</div></Button> : null}
+            }}><div>Add a service</div><img className={styles.pillIcon} src={circlePlusIcon} /></Button> : null}
         </div>
     </>;
 }
@@ -237,6 +252,23 @@ function Measure({ text, className }: { text: string; className?: string }) {
     return <div className={classes(styles.measure, className)}>
         <div>{power ? power[1] : text}</div>
         {power ? <div className={styles.power}>{power[2]}</div> : null}
+    </div>;
+}
+
+const STEPS = ["Draw", "Choose", "Build"];
+
+/** Where the player is: draw the area, choose what to build, build. A finished step shows a tick. */
+function Steps({ state }: { state: ToolState }) {
+    const current = state.stage === "Building" || state.stage === "Built" ? 2 : state.areaClosed ? 1 : 0;
+    const finished = state.stage === "Built";
+    return <div className={styles.steps}>
+        {STEPS.map((name, index) => {
+            const done = index < current || finished;
+            return <div key={name} className={classes(styles.step, done ? styles.stepDone : index === current && styles.stepCurrent)}>
+                <div className={styles.stepNumber}>{done ? <img className={styles.stepTick} src={checkIcon} /> : index + 1}</div>
+                <div>{name}</div>
+            </div>;
+        })}
     </div>;
 }
 
@@ -298,6 +330,7 @@ function NeighbourhoodPanel() {
                 </div>
 
                 <div className={styles.content}>
+                    <Steps state={state} />
                     <div className={classes(styles.status, statusTone(state))} aria-live="polite">
                         <div className={styles.statusText}>{statusLine(state)}</div>
                         {statusDetail(state) ? <div className={styles.statusDetail}>{statusDetail(state)}</div> : null}
@@ -413,7 +446,10 @@ function NeighbourhoodPanel() {
                         <img className={styles.buttonIcon} src={diceIcon} /><div>Reroll</div>
                     </Button>
                     <Button className={styles.primary} disabled={disabled || state.stage !== "Planned"}
-                        onSelect={() => setConfirmedPlan(state)}>{buildLabel}</Button>
+                        onSelect={() => setConfirmedPlan(state)}>
+                        <div>{buildLabel}</div>
+                        {!disabled && state.stage === "Planned" ? <img className={styles.pillIcon} src={circleGoIcon} /> : null}
+                    </Button>
                 </div>
 
                 {confirming ? <div className={styles.backdrop}>
@@ -426,7 +462,7 @@ function NeighbourhoodPanel() {
                             <Button className={styles.primary} onSelect={() => {
                                 if (confirmedPlan === state && state.stage === "Planned") act("build");
                                 setConfirmedPlan(null);
-                            }}>Build</Button>
+                            }}><div>Build</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
                         </div>
                     </div>
                 </div> : null}
