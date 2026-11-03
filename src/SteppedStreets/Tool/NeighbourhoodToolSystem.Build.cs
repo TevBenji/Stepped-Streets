@@ -160,24 +160,86 @@ namespace SteppedStreets.Tool
         {
             try
             {
-                var byZone = new Dictionary<string, List<float2[]>>();
-                levelCells = 0;
-                foreach (var lot in buildPlan.Lots)
-                {
-                    // Every cell of the lot, front row included, like the game's fill: the game starts a house lot only at a
-                    // zoned cell against the road, so zoning just the cells that came out dead level grew nothing.
-                    var cells = lot.LevelCells;
-                    if (cells.Count == 0) continue;
-                    levelCells += cells.Count;
-                    if (!byZone.TryGetValue(lot.Zone, out var quads)) byZone[lot.Zone] = quads = new List<float2[]>();
-                    quads.AddRange(StepPlanPatches.CellQuads(lot.Pad, cells));
-                }
+                var byZone = ZoneCells();
                 zoneQueue = new Queue<(string, List<float2[]>)>(byZone.Select(pair => (pair.Key, pair.Value)));
                 zonedRuns = requestedRuns = 0;
                 Log(Invariant($"zoning: {levelCells} cells in {byZone.Count} zones"));
                 ZoneNext(null);
             }
             catch (Exception exception) { BuildFailed(exception, "Zoning failed. The ground and roads remain."); }
+        }
+
+        // The game's zone blocks reach six cells back from the road; its houses need lots that deep to choose from.
+        private const float ZoneDepth = 6f * 8f;
+
+        /// <summary>
+        /// The game's own zone cells to zone, by zone: every free cell of the blocks along the new roads, full depth, wherever a
+        /// lot is planned, like the zone tool's fill. Zoning the planner's own lot grid instead left patches two or three cells
+        /// deep that sat across the game's grid, so hardly any house fitted (Game.Simulation.ZoneSpawnSystem.SelectBuilding needs
+        /// the house's lot to fit the vacant lot) and nothing grew until the player zoned by hand.
+        /// </summary>
+        private Dictionary<string, List<float2[]>> ZoneCells()
+        {
+            var byZone = new Dictionary<string, List<float2[]>>();
+            levelCells = 0;
+            var lots = buildPlan.Lots;
+            if (lots.Count == 0) return byZone;
+            // Each lot's frontage, carried back to the blocks' full depth.
+            var reaches = new float2[lots.Count][];
+            var backs = new float2[lots.Count];
+            var buckets = new SpatialBuckets<int>(64f);
+            float2 low = float.MaxValue, high = float.MinValue;
+            for (int index = 0; index < lots.Count; index++)
+            {
+                var corners = lots[index].Pad.Corners;
+                float2 start = corners[0].xz, end = corners[1].xz, back = math.normalizesafe(corners[3].xz - start);
+                var reach = new[] { start, end, end + back * ZoneDepth, start + back * ZoneDepth };
+                reaches[index] = reach;
+                backs[index] = back;
+                float2 min = math.min(math.min(reach[0], reach[1]), math.min(reach[2], reach[3]));
+                float2 max = math.max(math.max(reach[0], reach[1]), math.max(reach[2], reach[3]));
+                buckets.Add(min, max, index);
+                low = math.min(low, min);
+                high = math.max(high, max);
+            }
+            using (var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Block>(), ComponentType.ReadOnly<Cell>(),
+                ComponentType.Exclude<Game.Tools.Temp>(), ComponentType.Exclude<Game.Common.Deleted>()))
+            using (var blocks = query.ToEntityArray(Unity.Collections.Allocator.Temp))
+                foreach (var entity in blocks)
+                {
+                    var block = EntityManager.GetComponentData<Block>(entity);
+                    float extent = math.length((float2)block.m_Size) * 4f;
+                    if (math.any(block.m_Position.xz < low - extent) || math.any(block.m_Position.xz > high + extent)) continue;
+                    var cells = EntityManager.GetBuffer<Cell>(entity, true);
+                    if (cells.Length < block.m_Size.x * block.m_Size.y) continue;
+                    var area = EntityManager.HasComponent<ValidArea>(entity) ? EntityManager.GetComponentData<ValidArea>(entity).m_Area
+                        : new int4(0, block.m_Size.x, 0, block.m_Size.y);
+                    // Row 0 lies against the road, at the end the block's direction points to.
+                    float2 forward = block.m_Direction, right = new float2(forward.y, -forward.x);
+                    for (int row = area.z; row < area.w; row++)
+                        for (int column = area.x; column < area.y; column++)
+                        {
+                            var cell = cells[row * block.m_Size.x + column];
+                            // Free cells only: the player's zoning, buildings and cells the game blocked stay as they are.
+                            if ((cell.m_State & (CellFlags.Blocked | CellFlags.Occupied)) != 0 || (cell.m_State & CellFlags.Visible) == 0) continue;
+                            if (!cell.m_Zone.Equals(ZoneType.None)) continue;
+                            float2 centre = ZoneUtils.GetCellPosition(block, new int2(column, row)).xz;
+                            string zone = null;
+                            foreach (int index in buckets.Near(centre))
+                                // The lot must face the same road: its back points away from the road, as the block does.
+                                if (math.dot(backs[index], forward) < -0.5f && SiteGeometry.Inside(centre, reaches[index])) { zone = lots[index].Zone; break; }
+                            if (zone == null) continue;
+                            if (!byZone.TryGetValue(zone, out var quads)) byZone[zone] = quads = new List<float2[]>();
+                            // The cell's own square, pulled in a metre so the marquee takes this cell and no neighbour.
+                            quads.Add(new[]
+                            {
+                                centre - right * 3f + forward * 3f, centre + right * 3f + forward * 3f,
+                                centre + right * 3f - forward * 3f, centre - right * 3f - forward * 3f,
+                            });
+                            levelCells++;
+                        }
+                }
+            return byZone;
         }
 
         private void ZoneNext(ZoneBuildReport report)

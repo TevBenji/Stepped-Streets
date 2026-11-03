@@ -291,11 +291,10 @@ namespace SteppedStreets.Core.Neighbourhood
             request.SteepGround ? 1.5f : NeighbourhoodPlanner.EffectiveBankGrade(request) / 1.1f;
 
         /// <summary>
-        /// The sharpest junction angle, in degrees. On steep ground a link meeting a street square would have to climb straight
-        /// up the slope for its first and last 30 m, which no gentle road can do, so steep mode lets links join at 35°, as
-        /// switchback roads in hill towns do.
+        /// The sharpest junction angle, in degrees, in every mode: steep mode once allowed 35°, and the game built those junctions
+        /// as long overlapping wedges and flagged hundreds of road pieces (owner's in-game test, 2 November 2026).
         /// </summary>
-        internal static float SharpestJunction(NeighbourhoodRequest request) => request.SteepGround ? 35f : 60f;
+        internal static float SharpestJunction(NeighbourhoodRequest request) => 60f;
 
         /// <summary>How far from a node two roads that share it are let off the clearance.</summary>
         internal static float SharedNodeReach(NeighbourhoodRequest request) => request.RoadHalfWidth * 2f + 22f;

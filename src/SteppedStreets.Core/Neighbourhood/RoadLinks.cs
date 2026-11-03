@@ -382,10 +382,9 @@ namespace SteppedStreets.Core.Neighbourhood
             float2 travel = a.Tangent(fromPoint) * side;
             float2 normal = Geometry.Left(a.Tangent(fromPoint));
             if (math.dot(normal, survey.UphillAt(start)) * climb < 0f) normal = -normal;
-            // Steep mode: leave and arrive at a sharper angle (see RoadNetwork.SharpestJunction), so the ends need not climb the fall line.
-            float lean = math.radians(request.SteepGround ? 55f : RampLean), arrivalLean = math.radians(request.SteepGround ? 55f : 18f);
-            // Where the ramp starts turning in to meet the street: on steep ground only close by, or the turn climbs the slope.
-            float arrival = request.SteepGround ? 14f : 34f;
+            float lean = math.radians(RampLean), arrivalLean = math.radians(18f);
+            // Where the ramp starts turning in to meet the street.
+            const float arrival = 34f;
             // The length the rise needs (a little over, more for the gentler share), for steep mode's adaptive climb below.
             float needed = ShortestFor(math.abs(b.Heights[NearestPoint(b, start)] - a.Heights[fromPoint])) * (0.95f / gradeShare);
             float2 heading = math.normalize(normal * math.cos(lean) + travel * math.sin(lean));

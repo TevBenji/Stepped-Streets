@@ -25,8 +25,8 @@ tested off-game on eight synthetic hillsides; the in-game test is next ([docs/IN
    and fill tan, trees as dots. The panel sums it up: road length, lots, zoned cells, earth moved, steepest road.
 4. **Reroll** gives another layout from a new seed. The same seed and settings give the same layout.
 5. **Build**, after **"Ground changes are permanent, like the game's terrain tools. Build?"**. The build grades the ground,
-   lays the roads, waits for the game's zone blocks, zones each lot from the kerb back (the game only grows a house on a lot
-   whose front row is zoned), then plants trees and adds walls. The roads are built even where the last few patches of
+   lays the roads, waits for the game's zone blocks, zones the game's own zone cells along the new roads, the full six cells
+   deep wherever a lot is planned (as the zone tool's fill does, so the game's houses fit), then plants trees and adds walls. The roads are built even where the last few patches of
    ground land a little off the plan.
 
 ## Styles
@@ -47,7 +47,7 @@ One cell is **8 m**.
 | Road type | the game's ground roads that zone | Small Road | The road prefab for every new street. |
 | Block depth | 60–200 m | 90 m | Road spacing on the ground between neighbouring contour streets. |
 | Max road grade | 4–12 % | 8 % | No new road is steeper. Connectors bend across the slope to stay under it. |
-| Steep hills | on/off | off | Steep hills and mountains: buildable ground up to 60 % and earthwork up to 12 m; connectors may join at 35° and switch back. Turning it on lifts Steepest buildable to at least 50 % and Most earth to at least 8 m. |
+| Steep hills | on/off | off | Steep hills and mountains: buildable ground up to 60 % and earthwork up to 12 m; connectors may switch back. Turning it on lifts Steepest buildable to at least 50 % and Most earth to at least 8 m. |
 | Steepest buildable | 8–30 % (60 % with Steep hills) | 15 % | Steeper ground (judged on the hill, not its bumps) gets no roads or lots and is planted as forest. |
 | Zone mix | rows of zone and share | Residential Low | Each lot's zone; **Add a zone** adds a row. |
 | Services | rows of building and count (1–20) | none | Service buildings placed on level sites beside the new roads; **Add a service** adds a row. |
