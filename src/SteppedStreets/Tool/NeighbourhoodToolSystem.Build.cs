@@ -101,6 +101,7 @@ namespace SteppedStreets.Tool
             {
                 if (State.Stage != ToolStage.Building) return;
                 Log("roads: " + report.Summary);
+                if (StoppedByAnotherTool("laying the roads")) return;
                 buildReport.Add(Invariant($"{report.Built} of {report.Pieces} road pieces"));
                 if (report.Built == 0)
                 {
@@ -121,6 +122,7 @@ namespace SteppedStreets.Tool
 
         private void ResetBuild()
         {
+            World.GetOrCreateSystemManaged<BuildToolSystem>().Interrupted = false;
             waitingForBlocks = false;
             zoneQueue = null;
             idleBuildFrames = 0;
@@ -169,14 +171,12 @@ namespace SteppedStreets.Tool
             catch (Exception exception) { BuildFailed(exception, "Zoning failed. The ground and roads remain."); }
         }
 
-        // The game's zone blocks reach six cells back from the road; its houses need lots that deep to choose from.
-        private const float ZoneDepth = 6f * 8f;
-
         /// <summary>
-        /// The game's own zone cells to zone, by zone: every free cell of the blocks along the new roads, full depth, wherever a
-        /// lot is planned, like the zone tool's fill. Zoning the planner's own lot grid instead left patches two or three cells
-        /// deep that sat across the game's grid, so hardly any house fitted (Game.Simulation.ZoneSpawnSystem.SelectBuilding needs
-        /// the house's lot to fit the vacant lot) and nothing grew until the player zoned by hand.
+        /// The game's own zone cells to zone, by zone: every free cell of the blocks along the new roads that lies on a planned
+        /// lot, as deep as the lot is levelled. Zoning the planner's own lot grid instead left patches across the game's grid, so
+        /// hardly any house fitted (Game.Simulation.ZoneSpawnSystem.SelectBuilding needs the house's lot to fit the vacant lot).
+        /// Zoning the blocks' full six cells put the deeper houses half on the bank behind the levelled lot (code review,
+        /// 3 November 2026). The game's low-density houses are 2 or 4 cells deep, so the default 4-cell lot fits them all.
         /// </summary>
         private Dictionary<string, List<float2[]>> ZoneCells()
         {
@@ -184,6 +184,7 @@ namespace SteppedStreets.Tool
             levelCells = 0;
             var lots = buildPlan.Lots;
             if (lots.Count == 0) return byZone;
+            float zoneDepth = buildRequest.LotDepthCells * StepPlanner.CellSize;
             // Each lot's frontage, carried back to the blocks' full depth.
             var reaches = new float2[lots.Count][];
             var backs = new float2[lots.Count];
@@ -193,7 +194,7 @@ namespace SteppedStreets.Tool
             {
                 var corners = lots[index].Pad.Corners;
                 float2 start = corners[0].xz, end = corners[1].xz, back = math.normalizesafe(corners[3].xz - start);
-                var reach = new[] { start, end, end + back * ZoneDepth, start + back * ZoneDepth };
+                var reach = new[] { start, end, end + back * zoneDepth, start + back * zoneDepth };
                 reaches[index] = reach;
                 backs[index] = back;
                 float2 min = math.min(math.min(reach[0], reach[1]), math.min(reach[2], reach[3]));
@@ -247,6 +248,7 @@ namespace SteppedStreets.Tool
             try
             {
                 if (State.Stage != ToolStage.Building) return;
+                if (report != null && StoppedByAnotherTool("zoning")) return;
                 if (report != null)
                 {
                     Log("zoning: " + report.Summary);
@@ -353,6 +355,7 @@ namespace SteppedStreets.Tool
             try
             {
                 if (State.Stage != ToolStage.Building) return;
+                if (services != null && StoppedByAnotherTool("placing the services")) return;
                 if (services != null)
                 {
                     Log("services: " + services.Summary);
@@ -374,6 +377,7 @@ namespace SteppedStreets.Tool
             try
             {
                 if (State.Stage != ToolStage.Building) return;
+                if (report != null && StoppedByAnotherTool("planting trees")) return;
                 if (report != null) { Log("trees: " + report.Summary); buildReport.Add(Invariant($"{report.Placed} trees")); }
                 if (buildPlan.Walls.Count == 0) { FinishBuild(null); return; }
                 State.Progress = 0.93f;
@@ -387,6 +391,7 @@ namespace SteppedStreets.Tool
         private void FinishBuild(WallBuildReport report)
         {
             if (State.Stage != ToolStage.Building) return;
+            if (report != null && StoppedByAnotherTool("building the walls")) return;
             if (report != null) { Log("walls: " + report.Summary); buildReport.Add(Invariant($"{report.Placed} wall pieces")); }
             State.Stage = ToolStage.Built;
             State.Progress = 1f;
@@ -399,6 +404,20 @@ namespace SteppedStreets.Tool
             // The new streets are snapping targets for the next area.
             RefreshRoadSnap();
             Touch();
+        }
+
+        /// <summary>
+        /// True, once the build is stopped with a plain message, when another tool was opened while a stage waited to apply:
+        /// carrying on would build the rest around the gap and say nothing (code review, 3 November 2026).
+        /// </summary>
+        private bool StoppedByAnotherTool(string doing)
+        {
+            var tool = World.GetOrCreateSystemManaged<BuildToolSystem>();
+            if (!tool.Interrupted) return false;
+            tool.Interrupted = false;
+            string done = buildReport.Count > 0 ? " Done before that: " + string.Join(", ", buildReport) + "." : "";
+            Stop("The build stopped while " + doing + " because another tool was opened." + done);
+            return true;
         }
 
         private void Stop(string message)

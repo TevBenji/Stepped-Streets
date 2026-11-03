@@ -8,7 +8,7 @@
 
 <p>
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods" src="https://img.shields.io/badge/Paradox%20Mods-Subscribe-1f6feb?style=for-the-badge"></a>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.1.0-2ea44f?style=for-the-badge"></a>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.1.1-2ea44f?style=for-the-badge"></a>
 <img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490?style=for-the-badge">
 <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c?style=for-the-badge"></a>
 </p>
@@ -48,7 +48,8 @@ builder would, previews it on the ground, and builds it when you say so.
 - **Gentle connectors** that climb across the slope, never steeper than the grade you set (8 % by default).
 - **A connection to your road network** within 400 m, or a neighbourhood of its own when there is none.
 - **Level lots stepped down the hill**, graded with soft banks before anything is zoned.
-- **Zoning that grows**: the game's own zone cells along the new roads, full depth, in the mix of zones you choose.
+- **Zoning that grows**: the game's own zone cells along the new roads, as deep as each levelled lot, in the mix of zones
+  you choose. Lots are 4 cells deep by default, so every low-density house fits on level ground.
 - **Service buildings in the mix**: police, fire, health, schools, parks, utilities, any unlocked roadside service building,
   each on a level site of its own, facing the road.
 - **Forest** on ground too steep to build, trees on the banks, and optional garden walls.
@@ -141,7 +142,7 @@ The panel shows the essentials; everything else is under **More settings**. One 
 | Block depth | 60–200 m | 90 m | The distance between neighbouring contour streets. |
 | Max road grade | 4–12 % | 8 % | No new road is steeper. |
 | Steepest buildable | 8–30 % (60 % with Steep hills) | 15 % | Steeper ground gets no roads or lots and becomes forest. |
-| Lot width, lot depth | 2–6 cells | 3 × 3 | The size of each lot. |
+| Lot width, lot depth | 2–6 cells | 3 × 4 | The size of each lot. Only the lot's depth is levelled and zoned; low-density houses are 2 or 4 cells deep. |
 | Space between lots | Auto, 0, 1, 2 cells | Auto | Auto leaves planted gaps on steeper ground. |
 | Level the lots | on / off | on | Grade each lot into a level pad. Off grades only the roads. |
 | Most earth | 1–8 m (12 m with Steep hills) | 4 m | A lot that needs more cut or fill is left out. |

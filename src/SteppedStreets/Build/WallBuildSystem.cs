@@ -138,7 +138,7 @@ namespace SteppedStreets.Build
             if (!Busy) return;
             try
             {
-                if (!_tool.IsActive) { Finish("interrupted by a tool change; no further Apply requested"); return; }
+                if (!_tool.IsActive) { _tool.Interrupted = true; Finish("interrupted by a tool change; no further Apply requested"); return; }
                 int frame = UnityEngine.Time.frameCount;
                 if (_emitFrame < 0)
                 {

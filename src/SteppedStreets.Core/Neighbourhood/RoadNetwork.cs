@@ -244,17 +244,20 @@ namespace SteppedStreets.Core.Neighbourhood
 
             // Clearance between roads away from the nodes they share: both corridors (road and shoulders), and room for a bank
             // no steeper than the bank grade across their difference in height.
-            float clearance = (request.RoadHalfWidth + 1.5f) * 2f + 1f;
+            float clearance = Clearance(request);
             // In steep mode the step between two roads may be a retaining wall (the game's road builds one where the ground
             // cannot be banked), so roads may sit closer above one another than a clean bank would allow.
             float bank = BankBetweenRoads(request);
-            var buckets = new SpatialBuckets<int2>(48f);
-            float reach = clearance + 20f;
+            // Every pair that can need more room than it has is looked at, the same for every pair wherever it lies. A fixed
+            // 20 m beyond the clearance missed pairs further apart across a big height difference, and a cliff came of one
+            // (code review, 3 November 2026).
+            float reach = ClearanceReach(request);
+            var buckets = new SpatialBuckets<int2>(reach);
             for (int road = 0; road < plan.Roads.Count; road++)
                 for (int point = 0; point < plan.Roads[road].Points.Length; point++)
                 {
                     float2 position = plan.Roads[road].Points[point].xz;
-                    buckets.Add(position - reach, position + reach, new int2(road, point));
+                    buckets.Add(position, position, new int2(road, point));
                 }
             float nodeReach = SharedNodeReach(request);
             for (int road = 0; road < plan.Roads.Count; road++)
@@ -269,7 +272,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 for (int point = 0; point < planned.Points.Length; point++)
                 {
                     float2 position = planned.Points[point].xz;
-                    foreach (var other in buckets.Near(position))
+                    foreach (var other in buckets.Within(position, reach))
                     {
                         if (other.x < road || (other.x == road && other.y <= point)) continue;
                         var otherRoad = plan.Roads[other.x];
@@ -280,7 +283,8 @@ namespace SteppedStreets.Core.Neighbourhood
                             if (ring) apart = math.min(apart, length - apart);
                             if (apart < needed * 3f) continue;
                         }
-                        if (math.distance(otherRoad.Points[other.y].xz, position) >= needed) continue;
+                        float distance = math.distance(otherRoad.Points[other.y].xz, position);
+                        if (distance >= needed) continue;
                         // Only two different roads share a node: a road is let off near its own ends by the along-road test above,
                         // so a lane that comes back past its start is still checked there.
                         if (other.x != road && NearShared(planned, otherRoad, plan, position, nodeReach)) continue;
@@ -293,6 +297,42 @@ namespace SteppedStreets.Core.Neighbourhood
                 }
             }
             return bad;
+        }
+
+        /// <summary>Both corridors side by side, road and shoulders, with a metre between.</summary>
+        internal static float Clearance(NeighbourhoodRequest request) => (request.RoadHalfWidth + 1.5f) * 2f + 1f;
+
+        /// <summary>
+        /// How far apart two roads can be and still need more room than that: each road is graded at most the earthwork limit
+        /// off ground no steeper than the steepest buildable, so across a distance d their heights differ by at most
+        /// slope * d + 2 * earthwork, and the room needed, clearance + difference / bank, outgrows d beyond this. Where the hill
+        /// is nearly as steep as the bank the bound runs away, so it stops at 200 m past the clearance.
+        /// </summary>
+        internal static float ClearanceReach(NeighbourhoodRequest request)
+        {
+            float clearance = Clearance(request), bank = BankBetweenRoads(request);
+            float slope = math.min(request.SteepestBuildable, bank * 0.8f);
+            float reach = (clearance + 2f * request.EarthworkLimit / bank) / (1f - slope / bank);
+            return math.clamp(reach, clearance + 20f, clearance + 200f);
+        }
+
+        /// <summary>
+        /// The first point of a road that comes too close to an earlier stretch of itself (the legs of a hairpin), or -1. Points
+        /// closer along the road than three times the room are the bend itself, as in <see cref="Violations"/>.
+        /// </summary>
+        internal static int FirstSelfClash(IReadOnlyList<float2> line, IReadOnlyList<float> heights, NeighbourhoodRequest request)
+        {
+            float clearance = Clearance(request), bank = BankBetweenRoads(request);
+            var along = new float[line.Count];
+            for (int index = 1; index < line.Count; index++) along[index] = along[index - 1] + math.distance(line[index - 1], line[index]);
+            for (int later = 1; later < line.Count; later++)
+                for (int earlier = 0; earlier < later; earlier++)
+                {
+                    float needed = clearance + math.abs(heights[later] - heights[earlier]) / bank;
+                    if (along[later] - along[earlier] < needed * 3f) continue;
+                    if (math.distance(line[later], line[earlier]) < needed) return later;
+                }
+            return -1;
         }
 
         /// <summary>

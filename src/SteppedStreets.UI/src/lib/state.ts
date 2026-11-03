@@ -148,7 +148,7 @@ export function readState(raw: unknown): ToolState {
             serviceMix: rows(settings.serviceMix, readServiceCount, service => service.name),
             mixPattern: choice(settings.mixPattern, ["Random", "Clumps", "Even"], "Clumps"),
             lotWidthCells: whole(settings.lotWidthCells, 3, 2, 6),
-            lotDepthCells: whole(settings.lotDepthCells, 3, 2, 6),
+            lotDepthCells: whole(settings.lotDepthCells, 4, 2, 6),
             levelLots: flag(settings.levelLots, true),
             earthworkLimit: number(settings.earthworkLimit, 4, 1, 12),
             bankGradePercent: number(settings.bankGradePercent, 40, 20, 50),

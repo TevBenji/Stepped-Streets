@@ -13,7 +13,7 @@ Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets doe
 - **Gentle connectors** that climb across the slope, never steeper than the grade you set (8 % by default)
 - **A connection to your nearest road** within 400 m, or a neighbourhood of its own when there is none
 - **Level lots stepped down the hill** with soft banks, graded before anything is zoned
-- **Zoning that grows**: the game's own zone cells along the new roads, full depth, in the mix you choose
+- **Zoning that grows**: the game's own zone cells along the new roads, as deep as each levelled lot, in the mix you choose
 - **Service buildings** mixed in: police, fire, clinics and hospitals, schools, parks, utilities, any unlocked roadside service building, each on a level site of its own facing the road
 - **Forest** on ground too steep to build, trees on the banks, optional garden walls
 
@@ -51,9 +51,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/06.png" />
 	<Screenshot Value="Properties/Screenshots/07.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.1.0" />
+	<ModVersion Value="2.1.1" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- New: the panel looks like the game's own, with Draw, Choose and Build steps to guide you.&#10;- New: rest the pointer on any setting to see what it does.&#10;- New: long lists of zones and services have a search box, and each entry shows the game's icon.&#10;- Fixed: service buildings from DLC or content packs you don't have are no longer offered. If the game refuses to place one, the panel says which.&#10;- Fixed: Mountain lane found no street on a flat valley floor.&#10;- Fixed: a winding road could pass too close to itself.&#10;- Faster garden walls, and Cancel stops sooner on big areas." />
+	<ChangeLog Value="- Fixed: junctions overlapping the road pieces beside them. Roads are no longer cut close to a junction.&#10;- Fixed: zoning reached past the levelled lot, so deeper houses sat on the bank behind it. Only the levelled lot is zoned now, and lots are 4 cells deep by default so every low-density house fits.&#10;- Fixed: zone cells sitting across two lot steps. Road pieces now end on the lot grid, so the game's cells line up with the levelled lots.&#10;- Fixed: Mountain lane dropped entirely when a hairpin came back too close. The lane now ends before the clash.&#10;- Fixed: two roads far apart across a big height difference could leave a cliff between them.&#10;- If another tool is opened while building, the panel now says the build stopped and what was done." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />

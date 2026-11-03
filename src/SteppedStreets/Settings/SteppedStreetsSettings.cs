@@ -149,7 +149,8 @@ namespace SteppedStreets.Settings
             MixPattern = MixPattern.Clumps;
             LotWidthCells = 3;
             NarrowestWidthCells = 2;
-            DepthCells = 3;
+            // The game's low-density houses are 2 or 4 cells deep: 4 fits them all on the levelled lot.
+            DepthCells = 4;
             LevelLots = true;
             EarthworkLimit = 4f;
             // Placemaker's sloped car parks settled on 0.4 after curtains at 0.46.
@@ -210,7 +211,7 @@ namespace SteppedStreets.Settings
             Label(nameof(MixPattern), "Mix mode", "Random per lot, clumps of neighbouring lots, or an even split.");
             Label(nameof(LotWidthCells), "Lot width (cells)", "Cells along the kerb per lot.");
             Label(nameof(NarrowestWidthCells), "Narrowest width (cells)", "How far a lot may narrow on a climbing road to keep its step low.");
-            Label(nameof(DepthCells), "Lot depth (cells)", "Cells back from the road.");
+            Label(nameof(DepthCells), "Lot depth (cells)", "Cells back from the road. Only this depth is levelled and zoned; low-density houses are 2 or 4 cells deep, so 4 fits them all.");
             Label(nameof(LevelLots), "Level the lots", "Grade each lot into a level pad with soft banks before zoning.");
             Label(nameof(EarthworkLimit), "Most earth (m)", "A lot that needs more cut or fill than this is left out (above 8 m only with steep hills on).");
             Label(nameof(BankGrade), "Steepest bank", "Rise over run of the steepest bank the grading makes; 0.4 is 40%.");

@@ -23,6 +23,8 @@ namespace SteppedStreets.Build
         private int _clearedFrame = -1;
 
         internal ApplyMode Requested = ApplyMode.None;
+        /// <summary>Set by a build stage that lost this tool to another before its Apply; the build reads and clears it.</summary>
+        internal bool Interrupted;
         internal int LastAppliedFrame { get; private set; } = -1;
         internal bool IsActive => m_ToolSystem.activeTool == this;
         // Clear the previous tool's pending preview once, before any zoning definitions exist, then let it settle.

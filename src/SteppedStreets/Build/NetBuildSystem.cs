@@ -34,9 +34,6 @@ namespace SteppedStreets.Build
 
     public sealed partial class NetBuildSystem : GameSystemBase
     {
-        // A piece is at most this long and turns at most this much, so a cubic matches the planned curve within centimetres.
-        private const float LongestPiece = 48f;
-        private const float MostTurnDegrees = 25f;
         private const float AttachReach = 6f;
         private const int SettleFrames = 3;
         private const int MostWaitFrames = 90;
@@ -105,7 +102,7 @@ namespace SteppedStreets.Build
             if (!Busy) return;
             try
             {
-                if (!_tool.IsActive && _applyFrame < 0) { Finish("interrupted by a tool change before the roads were applied"); return; }
+                if (!_tool.IsActive && _applyFrame < 0) { _tool.Interrupted = true; Finish("interrupted by a tool change before the roads were applied"); return; }
                 int frame = UnityEngine.Time.frameCount;
                 if (_emitFrame < 0)
                 {
@@ -142,7 +139,7 @@ namespace SteppedStreets.Build
             int pieceTotal = 0;
             var pieces = new List<(PlannedRoad Road, int First, int Last)>();
             foreach (var road in _plan.Roads)
-                foreach (var (first, last) in Pieces(road.Points)) { pieces.Add((road, first, last)); pieceTotal++; }
+                foreach (var (first, last) in RoadPieces.Cut(road.Points)) { pieces.Add((road, first, last)); pieceTotal++; }
             // Room in the terrain's road cull list before our nets come (TerrainCullGuard.cs: the CullForCascades crash).
             TerrainCullGuard.Reserve(_terrain, pieceTotal);
             var random = new Unity.Mathematics.Random(0x5EED1234u);
@@ -177,33 +174,6 @@ namespace SteppedStreets.Build
             }
             _emitFrame = frame;
             Mod.Logger.Info($"Stepped Streets roads: emitted {pieceTotal} courses for {_plan.Roads.Count} roads as '{_roadName}' in one frame.");
-        }
-
-        /// <summary>Cuts a road's points into pieces no longer than 48 m and turning no more than 25°, end to end.</summary>
-        internal static List<(int First, int Last)> Pieces(float3[] points)
-        {
-            var pieces = new List<(int, int)>();
-            int first = 0;
-            float length = 0f, turn = 0f;
-            for (int index = 1; index < points.Length; index++)
-            {
-                length += math.distance(points[index].xz, points[index - 1].xz);
-                if (index > 1)
-                {
-                    float2 before = math.normalizesafe(points[index - 1].xz - points[index - 2].xz), after = math.normalizesafe(points[index].xz - points[index - 1].xz);
-                    turn += math.degrees(math.acos(math.clamp(math.dot(before, after), -1f, 1f)));
-                }
-                bool last = index == points.Length - 1;
-                float2 nextStep = last ? float2.zero : points[index + 1].xz - points[index].xz;
-                if (last || length + math.length(nextStep) > LongestPiece || turn > MostTurnDegrees)
-                {
-                    pieces.Add((first, index));
-                    first = index;
-                    length = 0f;
-                    turn = 0f;
-                }
-            }
-            return pieces;
         }
 
         // The road's direction at a point, from its neighbours; one-sided at the ends, so the pieces of a street that meet at a

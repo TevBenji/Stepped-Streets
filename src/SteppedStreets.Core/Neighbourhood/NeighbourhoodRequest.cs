@@ -174,7 +174,7 @@ namespace SteppedStreets.Core.Neighbourhood
 
         public int LotWidthCells = 3;
         public int NarrowestWidthCells = 3;
-        public int LotDepthCells = 3;
+        public int LotDepthCells = 4;
 
         /// <summary>Grade the lots into level pads with banks. Off: only the roads are graded and every lot cell is zoned.</summary>
         public bool LevelLots = true;
