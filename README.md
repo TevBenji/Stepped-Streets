@@ -70,6 +70,11 @@ builder would, previews it on the ground, and builds it when you say so.
 <td><img src="src/SteppedStreets/Properties/Screenshots/06.png" alt="Forest on steep ground"></td>
 <td><img src="src/SteppedStreets/Properties/Screenshots/07.png" alt="Mountain lane"></td>
 </tr>
+<tr>
+<td><img src="src/SteppedStreets/Properties/Screenshots/08.png" alt="Grids for flat ground"></td>
+<td><img src="src/SteppedStreets/Properties/Screenshots/09.png" alt="Traffic-optimised grid"></td>
+<td><img src="src/SteppedStreets/Properties/Screenshots/10.png" alt="Crossroads, staggered or skewed"></td>
+</tr>
 </table>
 
 ## Installation

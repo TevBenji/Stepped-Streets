@@ -52,6 +52,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/05.png" />
 	<Screenshot Value="Properties/Screenshots/06.png" />
 	<Screenshot Value="Properties/Screenshots/07.png" />
+	<Screenshot Value="Properties/Screenshots/08.png" />
+	<Screenshot Value="Properties/Screenshots/09.png" />
+	<Screenshot Value="Properties/Screenshots/10.png" />
 	<Tag Value="Code Mod" />
 	<ModVersion Value="2.2.0" />
 	<GameVersion Value="1.6.*" />
