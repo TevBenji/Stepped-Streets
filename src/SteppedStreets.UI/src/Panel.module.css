@@ -470,11 +470,11 @@
 
 .moreButton {
     width: 100%;
-    height: 30rem;
+    height: 36rem;
     padding: 0 14rem;
     margin-top: 12rem;
     margin-bottom: 4rem;
-    border-radius: 15rem;
+    border-radius: 18rem;
     justify-content: space-between;
     background-color: rgba(255, 255, 255, 0.06);
 }

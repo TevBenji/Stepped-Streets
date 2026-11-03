@@ -281,7 +281,9 @@ namespace SteppedStreets.Core.Neighbourhood
                             if (apart < needed * 3f) continue;
                         }
                         if (math.distance(otherRoad.Points[other.y].xz, position) >= needed) continue;
-                        if (NearShared(planned, otherRoad, plan, position, nodeReach)) continue;
+                        // Only two different roads share a node: a road is let off near its own ends by the along-road test above,
+                        // so a lane that comes back past its start is still checked there.
+                        if (other.x != road && NearShared(planned, otherRoad, plan, position, nodeReach)) continue;
                         // Two connections clashing: the later one goes, as the first serves the largest network.
                         var kind = streets[owners[road]].Kind;
                         int blamed = kind == RoadKind.Contour || (kind == RoadKind.Connection && streets[owners[other.x]].Kind == RoadKind.Connection)

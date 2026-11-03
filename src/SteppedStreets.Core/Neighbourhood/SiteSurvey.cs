@@ -88,9 +88,9 @@ namespace SteppedStreets.Core.Neighbourhood
             StampExistingRoads(request.ExistingRoads, obstacle);
 
             cancellation.ThrowIfCancellationRequested();
-            Smooth = Gaussian(Ground, Columns, Rows, SmoothingSigma / cell);
+            Smooth = Gaussian(Ground, Columns, Rows, SmoothingSigma / cell, cancellation);
             // Steepness is judged on the hill, not its bumps: grading flattens a 40 m lump, it cannot flatten a hillside.
-            var broad = Gaussian(Ground, Columns, Rows, SlopeSigma / cell);
+            var broad = Gaussian(Ground, Columns, Rows, SlopeSigma / cell, cancellation);
             Slope = new float[count];
             Wild = new bool[count];
             var slopes = new List<float>();
@@ -211,7 +211,7 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>Chamfer distance (metres) from every node to the nearest seed node; large where there is none.</summary>
         public float[] Distances(bool[] seeds) => Geometry.Chamfer(seeds, Columns, Rows, Cell);
 
-        private static float[] Gaussian(float[] values, int columns, int rows, float sigmaCells)
+        private static float[] Gaussian(float[] values, int columns, int rows, float sigmaCells, CancellationToken cancellation)
         {
             int radius = math.max(1, (int)math.ceil(sigmaCells * 3f));
             var kernel = new float[radius * 2 + 1];
@@ -222,6 +222,9 @@ namespace SteppedStreets.Core.Neighbourhood
             var across = new float[values.Length];
             var result = new float[values.Length];
             for (int row = 0; row < rows; row++)
+            {
+                // Each pass is the size of the whole grid: a cancel is honoured between rows.
+                cancellation.ThrowIfCancellationRequested();
                 for (int column = 0; column < columns; column++)
                 {
                     float sum = 0f;
@@ -229,7 +232,10 @@ namespace SteppedStreets.Core.Neighbourhood
                         sum += kernel[offset + radius] * values[row * columns + math.clamp(column + offset, 0, columns - 1)];
                     across[row * columns + column] = sum;
                 }
+            }
             for (int row = 0; row < rows; row++)
+            {
+                cancellation.ThrowIfCancellationRequested();
                 for (int column = 0; column < columns; column++)
                 {
                     float sum = 0f;
@@ -237,6 +243,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         sum += kernel[offset + radius] * across[math.clamp(row + offset, 0, rows - 1) * columns + column];
                     result[row * columns + column] = sum;
                 }
+            }
             return result;
         }
 
