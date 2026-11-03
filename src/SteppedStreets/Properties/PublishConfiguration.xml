@@ -51,9 +51,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/06.png" />
 	<Screenshot Value="Properties/Screenshots/07.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.0.2" />
+	<ModVersion Value="2.1.0" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- Fixed: groups of streets built apart from the rest. Every group is now joined to your roads, or left out with a message when no gentle road can join it.&#10;- Fixed: squeezed junctions where a road bent back alongside the street it joined, or joined right next to a dead end." />
+	<ChangeLog Value="- New: the panel looks like the game's own, with Draw, Choose and Build steps to guide you.&#10;- New: rest the pointer on any setting to see what it does.&#10;- New: long lists of zones and services have a search box, and each entry shows the game's icon.&#10;- Fixed: service buildings from DLC or content packs you don't have are no longer offered. If the game refuses to place one, the panel says which.&#10;- Fixed: Mountain lane found no street on a flat valley floor.&#10;- Fixed: a winding road could pass too close to itself.&#10;- Faster garden walls, and Cancel stops sooner on big areas." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
