@@ -303,18 +303,13 @@ namespace SteppedStreets.Core.Neighbourhood
         internal static float Clearance(NeighbourhoodRequest request) => (request.RoadHalfWidth + 1.5f) * 2f + 1f;
 
         /// <summary>
-        /// How far apart two roads can be and still need more room than that: each road is graded at most the earthwork limit
-        /// off ground no steeper than the steepest buildable, so across a distance d their heights differ by at most
-        /// slope * d + 2 * earthwork, and the room needed, clearance + difference / bank, outgrows d beyond this. Where the hill
-        /// is nearly as steep as the bank the bound runs away, so it stops at 200 m past the clearance.
+        /// How far apart two roads can be and still have their banks meet: the grading changes the ground only within
+        /// <see cref="GroundField.BankReach"/> of a road and holds the hillside beyond, so two roads further apart than their
+        /// corridors and two bank reaches have untouched hillside between them, however steep, and cannot fight over it.
+        /// Closer than that, the bank between them must take their whole difference in height, which the rule asks room for.
         /// </summary>
-        internal static float ClearanceReach(NeighbourhoodRequest request)
-        {
-            float clearance = Clearance(request), bank = BankBetweenRoads(request);
-            float slope = math.min(request.SteepestBuildable, bank * 0.8f);
-            float reach = (clearance + 2f * request.EarthworkLimit / bank) / (1f - slope / bank);
-            return math.clamp(reach, clearance + 20f, clearance + 200f);
-        }
+        internal static float ClearanceReach(NeighbourhoodRequest request) =>
+            Clearance(request) + 2f * GroundField.BankReach(request);
 
         /// <summary>
         /// The first point of a road that comes too close to an earlier stretch of itself (the legs of a hairpin), or -1. Points

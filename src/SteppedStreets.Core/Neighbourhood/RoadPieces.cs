@@ -20,25 +20,25 @@ namespace SteppedStreets.Core.Neighbourhood
         public const float MostTurnDegrees = 25f;
         private const float Grid = StepPlanner.CellSize;
 
-        public static List<(int First, int Last)> Cut(float3[] points)
+        /// <summary>
+        /// Cuts a road into pieces. <paramref name="cutPoints"/> is the road's points with one put in at every 8 m mark the
+        /// samples miss (they are spread to fit the road's length, so a 101 m road samples every 4.04 m); the pieces index it.
+        /// </summary>
+        public static List<(int First, int Last)> Cut(float3[] points, out float3[] cutPoints)
         {
             var pieces = new List<(int, int)>();
+            cutPoints = OnGrid(points);
+            points = cutPoints;
             int count = points.Length;
             if (count < 2) return pieces;
             var stations = new float[count];
             for (int index = 1; index < count; index++) stations[index] = stations[index - 1] + math.distance(points[index - 1].xz, points[index].xz);
             float length = stations[count - 1];
 
-            // The point nearest each multiple of 8 m: the only places a cut may go.
+            // The points on a multiple of 8 m: the only places a cut may go.
             var candidates = new List<int>();
-            int at = 1;
-            for (float mark = Grid; mark < length - 1f && count > 2; mark += Grid)
-            {
-                while (at < count - 2 && stations[at + 1] <= mark) at++;
-                int best = at + 1 < count - 1 && math.abs(stations[at + 1] - mark) < math.abs(stations[at] - mark) ? at + 1 : at;
-                if (math.abs(stations[best] - mark) <= 2.5f && (candidates.Count == 0 || candidates[candidates.Count - 1] < best))
-                    candidates.Add(best);
-            }
+            for (int index = 1; index < count - 1; index++)
+                if (math.abs(stations[index] - math.round(stations[index] / Grid) * Grid) <= Snap) candidates.Add(index);
 
             int first = 0;
             while (true)
@@ -64,6 +64,33 @@ namespace SteppedStreets.Core.Neighbourhood
             }
             pieces.Add((first, count - 1));
             return pieces;
+        }
+
+        private const float Snap = 0.05f;
+
+        /// <summary>The road's points with one put in, its height between its neighbours', at every 8 m mark along it.</summary>
+        internal static float3[] OnGrid(float3[] points)
+        {
+            if (points.Length < 2) return points;
+            float total = 0f;
+            for (int index = 1; index < points.Length; index++) total += math.distance(points[index - 1].xz, points[index].xz);
+            var result = new List<float3>(points.Length + (int)(total / Grid) + 1) { points[0] };
+            float travelled = 0f, mark = Grid;
+            for (int index = 1; index < points.Length; index++)
+            {
+                float3 from = points[index - 1], to = points[index];
+                float step = math.distance(from.xz, to.xz);
+                float end = travelled + step;
+                while (mark < end - Snap && mark < total - Snap)
+                {
+                    if (mark > travelled + Snap) result.Add(math.lerp(from, to, (mark - travelled) / step));
+                    mark += Grid;
+                }
+                result.Add(to);
+                if (math.abs(mark - end) <= Snap) mark += Grid;
+                travelled = end;
+            }
+            return result.ToArray();
         }
 
         /// <summary>How far the road turns, in degrees, between two of its points.</summary>

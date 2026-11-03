@@ -184,7 +184,6 @@ namespace SteppedStreets.Tool
             levelCells = 0;
             var lots = buildPlan.Lots;
             if (lots.Count == 0) return byZone;
-            float zoneDepth = buildRequest.LotDepthCells * StepPlanner.CellSize;
             // Each lot's frontage, carried back to the blocks' full depth.
             var reaches = new float2[lots.Count][];
             var backs = new float2[lots.Count];
@@ -194,7 +193,9 @@ namespace SteppedStreets.Tool
             {
                 var corners = lots[index].Pad.Corners;
                 float2 start = corners[0].xz, end = corners[1].xz, back = math.normalizesafe(corners[3].xz - start);
-                var reach = new[] { start, end, end + back * zoneDepth, start + back * zoneDepth };
+                // The lot itself, front to its own back edge: a lot shortened to keep within the earthwork limit is zoned only
+                // as deep as it was levelled.
+                var reach = new[] { start, end, corners[2].xz, corners[3].xz };
                 reaches[index] = reach;
                 backs[index] = back;
                 float2 min = math.min(math.min(reach[0], reach[1]), math.min(reach[2], reach[3]));

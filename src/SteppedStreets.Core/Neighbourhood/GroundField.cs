@@ -116,15 +116,23 @@ namespace SteppedStreets.Core.Neighbourhood
             return raster;
         }
 
+        /// <summary>
+        /// How far from a road or lot the ground may change; beyond it the ground is held at the hillside. A bank meets
+        /// hillside that itself rises at up to the steepest buildable grade, so the steeper the buildable ground, the further
+        /// a cut must reach to meet it.
+        /// </summary>
+        internal static float BankReach(NeighbourhoodRequest request)
+        {
+            float climb = math.max(0.08f, NeighbourhoodPlanner.EffectiveBankGrade(request) / 1.082f - request.SteepestBuildable);
+            return math.clamp((request.EarthworkLimit + 1f) / climb + 4f, 16f, request.SteepGround ? 96f : 48f);
+        }
+
         internal static GroundField Build(NeighbourhoodRequest request, NeighbourhoodPlan plan, List<PlannedLot> lots, CancellationToken cancellation)
         {
             if (plan.Roads.Count == 0) return null;
             float halfWidth = request.RoadHalfWidth;
-            // A bank meets hillside that itself rises at up to the steepest buildable grade, so the steeper the buildable
-            // ground, the further a cut must reach to meet it.
             float bankGrade = NeighbourhoodPlanner.EffectiveBankGrade(request);
-            float climb = math.max(0.08f, bankGrade / 1.082f - request.SteepestBuildable);
-            float bankReach = math.clamp((request.EarthworkLimit + 1f) / climb + 4f, 16f, request.SteepGround ? 96f : 48f);
+            float bankReach = BankReach(request);
             float2 minimum = float.MaxValue, maximum = float.MinValue;
             foreach (var road in plan.Roads)
                 foreach (var point in road.Points) { minimum = math.min(minimum, point.xz); maximum = math.max(maximum, point.xz); }

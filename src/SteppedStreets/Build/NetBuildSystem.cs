@@ -137,15 +137,17 @@ namespace SteppedStreets.Build
         private void Emit(int frame)
         {
             int pieceTotal = 0;
-            var pieces = new List<(PlannedRoad Road, int First, int Last)>();
+            var pieces = new List<(PlannedRoad Road, float3[] Points, int First, int Last)>();
             foreach (var road in _plan.Roads)
-                foreach (var (first, last) in RoadPieces.Cut(road.Points)) { pieces.Add((road, first, last)); pieceTotal++; }
+            {
+                var cut = RoadPieces.Cut(road.Points, out var cutPoints);
+                foreach (var (first, last) in cut) { pieces.Add((road, cutPoints, first, last)); pieceTotal++; }
+            }
             // Room in the terrain's road cull list before our nets come (TerrainCullGuard.cs: the CullForCascades crash).
             TerrainCullGuard.Reserve(_terrain, pieceTotal);
             var random = new Unity.Mathematics.Random(0x5EED1234u);
-            foreach (var (road, first, last) in pieces)
+            foreach (var (road, points, first, last) in pieces)
             {
-                var points = road.Points;
                 float3 a = points[first], d = points[last];
                 float3 startTangent = Tangent(points, first), endTangent = Tangent(points, last);
                 float third = math.distance(a, d) / 3f;
