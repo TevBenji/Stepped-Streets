@@ -29,6 +29,8 @@ namespace SteppedStreets.Panel
         private const string Group = "SteppedStreets";
         private NeighbourhoodToolSystem _tool;
         private PrefabSystem _prefabs;
+        private ImageSystem _images;
+        private readonly Dictionary<string, string> _zoneIcons = new Dictionary<string, string>(StringComparer.Ordinal);
         private EntityQuery _zoneQuery;
         private ValueBinding<string> _state;
         private readonly SortedDictionary<string, string> _zones = new SortedDictionary<string, string>(StringComparer.Ordinal);
@@ -47,6 +49,7 @@ namespace SteppedStreets.Panel
                 base.OnCreate();
                 _tool = World.GetOrCreateSystemManaged<NeighbourhoodToolSystem>();
                 _prefabs = World.GetOrCreateSystemManaged<PrefabSystem>();
+                _images = World.GetOrCreateSystemManaged<ImageSystem>();
                 _zoneQuery = GetEntityQuery(ComponentType.ReadOnly<ZoneData>(), ComponentType.ReadOnly<PrefabData>());
                 AddBinding(_state = new ValueBinding<string>(Group, "state", "{}"));
                 Trigger("toggleTool", () => _tool.Toggle());
@@ -204,6 +207,7 @@ namespace SteppedStreets.Panel
                 json.Append("{\"name\":"); String(json, building.Name);
                 json.Append(",\"label\":"); String(json, building.Label);
                 json.Append(",\"group\":"); String(json, building.Group);
+                Icon(json, building.Prefab);
                 json.Append(",\"width\":").Append(Integer(building.WidthCells));
                 json.Append(",\"depth\":").Append(Integer(building.DepthCells)).Append('}');
             }
@@ -211,6 +215,20 @@ namespace SteppedStreets.Panel
             if (next == _servicesJson) return false;
             _servicesJson = next;
             return true;
+        }
+
+        /// <summary>The game's own menu icon for a prefab (its group's when it has none), or "" when there is neither.</summary>
+        private string IconOf(Entity prefab)
+        {
+            try { return _images?.GetIconOrGroupIcon(prefab) ?? ""; }
+            catch (Exception exception) { Mod.Logger.Warn("Stepped Streets: reading an icon failed: " + exception.Message); return ""; }
+        }
+
+        private void Icon(StringBuilder json, Entity prefab)
+        {
+            string icon = IconOf(prefab);
+            if (string.IsNullOrEmpty(icon)) return;
+            json.Append(",\"icon\":"); String(json, icon);
         }
 
         private bool BuildZones()
@@ -224,6 +242,7 @@ namespace SteppedStreets.Panel
                     var prefab = _prefabs.GetPrefab<ZonePrefab>(EntityManager.GetComponentData<PrefabData>(entity));
                     if (prefab == null || string.IsNullOrEmpty(prefab.name)) continue;
                     _zones[prefab.name] = Localised(prefab.name);
+                    _zoneIcons[prefab.name] = IconOf(entity);
                 }
             if (_zones.Count == 0) return false;
             var json = new StringBuilder("[");
@@ -232,6 +251,7 @@ namespace SteppedStreets.Panel
                 if (json.Length > 1) json.Append(',');
                 json.Append("{\"name\":"); String(json, zone.Key);
                 json.Append(",\"label\":"); String(json, zone.Value);
+                if (_zoneIcons.TryGetValue(zone.Key, out var icon) && !string.IsNullOrEmpty(icon)) { json.Append(",\"icon\":"); String(json, icon); }
                 json.Append('}');
             }
             _zonesJson = json.Append(']').ToString();

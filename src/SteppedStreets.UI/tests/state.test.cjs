@@ -156,6 +156,17 @@ test("zone mix keeps valid rows, drops duplicates and falls back to the default"
         assert.deepEqual(mix(empty), [{ zone: "Residential Low", share: 100 }]);
 });
 
+test("catalogue icons pass through when they are text and are left out otherwise", async () => {
+    const { readState } = await stateModule();
+    const state = readState({
+        zones: [{ name: "A", label: "A", icon: "Media/Game/Icons/ZoneResidential.svg" }, { name: "B", label: "B", icon: 7 }, { name: "C", icon: "" }],
+        services: [{ name: "Police", label: "Police", icon: "Media/Game/Icons/Police.svg" }, { name: "Fire", icon: null }],
+    });
+    assert.deepEqual(state.zones, [{ name: "A", label: "A", icon: "Media/Game/Icons/ZoneResidential.svg" }, { name: "B", label: "B" }, { name: "C", label: "C" }]);
+    assert.equal(state.services[0].icon, "Media/Game/Icons/Police.svg");
+    assert.equal("icon" in state.services[1], false);
+});
+
 test("zone catalogue, roads and zone counts drop invalid and repeated rows", async () => {
     const { readState } = await stateModule();
     const state = readState({

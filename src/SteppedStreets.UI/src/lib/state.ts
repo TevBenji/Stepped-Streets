@@ -3,11 +3,12 @@ export type ToolStage = "Closed" | "Drawing" | "Planning" | "Planned" | "Buildin
 export type NeighbourhoodStyle = "ContourSuburb" | "TerracedBlocks" | "MountainLane";
 export type MixPattern = "Random" | "Clumps" | "Even";
 
-export interface Option { name: string; label: string }
+/** A catalogue entry; icon is the game's own menu icon for it, when the game has one. */
+export interface Option { name: string; label: string; icon?: string }
 export interface ZoneShare { zone: string; share: number }
 export interface ZoneCount { zone: string; lots: number }
 /** A service building the game offers: its lot in cells and the city service it belongs to. */
-export interface ServiceOption { name: string; label: string; group: string; width: number; depth: number }
+export interface ServiceOption { name: string; label: string; group: string; width: number; depth: number; icon?: string }
 /** How many of one service building: in the mix, or in the plan. */
 export interface ServiceCount { name: string; count: number }
 
@@ -91,8 +92,10 @@ function rows<T>(value: unknown, read: (row: Record<string, unknown>) => T | nul
     return result;
 }
 
+// Only present when sent, so a catalogue without icons reads exactly as before.
+const withIcon = <T extends object>(value: T, icon: unknown): T => (text(icon) ? { ...value, icon: text(icon) } : value);
 const readOption = (row: Record<string, unknown>): Option | null =>
-    typeof row.name === "string" && row.name.length > 0 ? { name: row.name, label: text(row.label) || row.name } : null;
+    typeof row.name === "string" && row.name.length > 0 ? withIcon({ name: row.name, label: text(row.label) || row.name }, row.icon) : null;
 const readShare = (row: Record<string, unknown>): ZoneShare | null =>
     typeof row.zone === "string" && row.zone.length > 0 && typeof row.share === "number" && Number.isFinite(row.share) && row.share > 0
         ? { zone: row.zone, share: Math.min(100, row.share) } : null;
@@ -101,7 +104,7 @@ const readServiceCount = (row: Record<string, unknown>): ServiceCount | null =>
         ? { name: row.name, count: whole(row.count, 1, 1, 20) } : null;
 const readService = (row: Record<string, unknown>): ServiceOption | null =>
     typeof row.name === "string" && row.name.length > 0
-        ? { name: row.name, label: text(row.label) || row.name, group: text(row.group), width: whole(row.width, 4, 1, 20), depth: whole(row.depth, 4, 1, 20) }
+        ? withIcon({ name: row.name, label: text(row.label) || row.name, group: text(row.group), width: whole(row.width, 4, 1, 20), depth: whole(row.depth, 4, 1, 20) }, row.icon)
         : null;
 const readCount = (row: Record<string, unknown>): ZoneCount | null =>
     typeof row.zone === "string" && row.zone.length > 0 && typeof row.lots === "number" && Number.isFinite(row.lots)
