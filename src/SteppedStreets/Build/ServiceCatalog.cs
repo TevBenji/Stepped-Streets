@@ -40,6 +40,7 @@ namespace SteppedStreets.Build
             using (var list = query.ToEntityArray(Allocator.Temp))
                 foreach (var entity in list)
                 {
+                    if (!Available(entities, prefabs, entity)) continue;
                     var placeable = entities.GetComponentData<PlaceableObjectData>(entity);
                     if ((placeable.m_Flags & PlacementFlags.RoadSide) == 0 || (placeable.m_Flags & Excluded) != 0) continue;
                     var lot = entities.GetComponentData<BuildingData>(entity).m_LotSize;
@@ -65,6 +66,25 @@ namespace SteppedStreets.Build
             buildings.Sort((first, second) => first.Group != second.Group ? string.CompareOrdinal(first.Group, second.Group)
                 : string.CompareOrdinal(first.Label, second.Label));
             return buildings;
+        }
+
+        /// <summary>
+        /// A building from a DLC or content pack the player doesn't have stays among the game's prefabs, but the game refuses to
+        /// place it (owner's in-game test, 3 November 2026): it is left off the list, as the game's own menus grey it out.
+        /// </summary>
+        private static bool Available(EntityManager entities, PrefabSystem prefabs, Entity building)
+        {
+            var contents = new[]
+            {
+                entities.HasComponent<ContentPrerequisiteData>(building) ? entities.GetComponentData<ContentPrerequisiteData>(building).m_ContentPrerequisite : Entity.Null,
+                entities.HasComponent<ModPrerequisiteData>(building) ? entities.GetComponentData<ModPrerequisiteData>(building).m_ContentPrerequisite : Entity.Null,
+            };
+            foreach (var content in contents)
+                if (content != Entity.Null && entities.HasComponent<PrefabData>(content)
+                    && prefabs.TryGetPrefab<ContentPrefab>(entities.GetComponentData<PrefabData>(content), out var prefab) && prefab != null
+                    && !prefab.IsAvailable())
+                    return false;
+            return true;
         }
     }
 }

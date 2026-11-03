@@ -179,7 +179,7 @@ namespace SteppedStreets.Panel
 
         private string Localised(string name) => Localised("Assets.NAME[" + name + "]", name);
 
-        private static string Localised(string key, string fallback)
+        internal static string Localised(string key, string fallback)
         {
             var dictionary = GameManager.instance?.localizationManager?.activeDictionary;
             return dictionary != null && dictionary.TryGetValue(key, out var localised) && !string.IsNullOrEmpty(localised) ? localised : fallback;

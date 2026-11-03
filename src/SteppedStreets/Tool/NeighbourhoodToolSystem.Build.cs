@@ -322,7 +322,7 @@ namespace SteppedStreets.Tool
             try
             {
                 if (State.Stage != ToolStage.Building) return;
-                var catalogue = ServiceCatalog.List(EntityManager, World.GetOrCreateSystemManaged<Game.Prefabs.PrefabSystem>(), null);
+                var catalogue = ServiceCatalog.List(EntityManager, World.GetOrCreateSystemManaged<Game.Prefabs.PrefabSystem>(), Panel.PanelSystem.Localised);
                 var placements = new List<ObjectBuildSystem.Placement>();
                 foreach (var building in buildPlan.Buildings)
                 {
@@ -336,6 +336,7 @@ namespace SteppedStreets.Tool
                         Position = building.Position,
                         Rotation = quaternion.LookRotationSafe(forward, math.up()),
                         Seed = (int)(math.hash(building.Position) & 0x7FFFFFFF),
+                        Label = entry.Label,
                     });
                 }
                 if (placements.Count == 0) { PlantTrees(null); return; }
@@ -352,7 +353,13 @@ namespace SteppedStreets.Tool
             try
             {
                 if (State.Stage != ToolStage.Building) return;
-                if (services != null) { Log("services: " + services.Summary); buildReport.Add(Invariant($"{services.Placed} service buildings")); }
+                if (services != null)
+                {
+                    Log("services: " + services.Summary);
+                    buildReport.Add(Invariant($"{services.Placed} service buildings"));
+                    if (services.Missing.Count > 0)
+                        Message("The game would not place " + string.Join(", ", services.Missing) + " here. The rest of the neighbourhood is built.");
+                }
                 if (!buildRequest.Trees || buildPlan.Trees.Count == 0) { BuildWalls(null); return; }
                 State.Progress = 0.87f;
                 State.Summary = "Planting trees...";

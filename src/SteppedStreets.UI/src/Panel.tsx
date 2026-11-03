@@ -5,6 +5,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./lib/bindings";
 import { ErrorBoundary } from "./lib/errorBoundary";
+import { SettingTip } from "./lib/tips";
 import {
     formatArea, MixPattern, NeighbourhoodStyle, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, zoneColour, ZoneShare,
 } from "./lib/state";
@@ -34,10 +35,10 @@ function Button({ children, onSelect, disabled = false, selected = false, classN
 }
 
 function Row({ label, children }: React.PropsWithChildren<{ label: string }>) {
-    return <div className={styles.row}>
+    return <SettingTip label={label}><div className={styles.row}>
         <div className={styles.label}>{label}</div>
         <div className={styles.editor}>{children}</div>
-    </div>;
+    </div></SettingTip>;
 }
 
 function Section({ title, children }: React.PropsWithChildren<{ title: string }>) {
@@ -135,14 +136,14 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
     const current = shown.find(option => option.name === value)?.label ?? value;
     // An inline list instead of a popup: the panel scrolls, and a popup would be clipped by it.
     return <>
-        <div className={styles.row}>
+        <SettingTip label={label}><div className={styles.row}>
             {label ? <div className={styles.label}>{label}</div> : null}
             <Button className={styles.picker} disabled={disabled} selected={open} onSelect={() => setOpen(!open)}>
                 <div className={styles.pickerLabel}>{current}</div>
                 <img className={classes(styles.chevron, open && styles.chevronOpen)} src={chevronIcon} />
             </Button>
             {children}
-        </div>
+        </div></SettingTip>
         {open && !disabled ? <div className={classes(styles.list, !label && styles.listFull)}>
             {shown.map(option => <Button key={option.name} className={styles.listItem} selected={option.name === value}
                 onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>{option.label}</Button>)}
@@ -316,9 +317,9 @@ function NeighbourhoodPanel() {
                     </div>
 
                     <Section title="Style">
-                        <div className={styles.row}>
+                        <SettingTip label="Style"><div className={styles.row}>
                             <Segmented options={STYLES} value={settings.style} disabled={disabled} onChange={style => act("setStyle", style)} />
-                        </div>
+                        </div></SettingTip>
                     </Section>
 
                     <Section title="What to build">
