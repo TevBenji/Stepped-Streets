@@ -1,4 +1,4 @@
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: minimal TypeScript/CSS bundle, isolated output and Stepped Streets assets; no deployment.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: minimal TypeScript/CSS bundle, isolated output and Stepped Streets assets; no deployment.
 const path = require("path");
 const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");

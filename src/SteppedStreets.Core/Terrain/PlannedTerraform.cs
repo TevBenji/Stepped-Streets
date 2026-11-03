@@ -4,7 +4,7 @@
 // That keeps generators runnable off the main thread and testable without the game.
 // The game layer (Game/) turns an AreaPlan into CreationDefinitions; generators never
 // touch ECS.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: extracted TerraformKind and PlannedTerraform from Core/Contracts.cs:849-872; namespace changed; water fields and Apron removed.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: extracted TerraformKind and PlannedTerraform from Core/Contracts.cs:849-872; namespace changed; water fields and Apron removed.
 
 using System;
 using Unity.Mathematics;

@@ -2,7 +2,7 @@
 // vanilla.ts, or cs2/ui Tooltip) with the vanilla DescriptionTooltip title/description styling.
 // Adapted from Grid Road Generator (Ti4goc). Note: a plain HTML title attribute shows nothing in
 // Gameface, so every hint must go through <Tip>.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: one toolbar tooltip with a hotkey footer, using cs2/ui.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: one toolbar tooltip with a hotkey footer, using cs2/ui.
 import React from "react";
 import * as ui from "cs2/ui";
 import styles from "../Panel.module.css";

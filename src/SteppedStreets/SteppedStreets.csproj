@@ -1,9 +1,11 @@
-<!-- Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: standalone game references and UI packaging, without toolchain, versioning or deployment targets. -->
+<!-- Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: standalone game references and UI packaging, without toolchain, versioning or deployment targets. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\..\build\GameReferences.props" />
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>9.0</LangVersion>
+    <!-- Keep in step with ModVersion in Properties/PublishConfiguration.xml: the game's mod list shows this one. -->
+    <Version>2.0.1</Version>
     <Nullable>disable</Nullable>
     <OutputType>Library</OutputType>
     <AssemblyName>SteppedStreets</AssemblyName>

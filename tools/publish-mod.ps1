@@ -1,4 +1,4 @@
-# Stepped Streets. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+# Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
 # Uploads the mod to Paradox Mods with the game's own publisher, using the Paradox login the game already has.
 #   First upload:   pwsh tools/publish-mod.ps1
 #   Later updates:  raise ModVersion and the ChangeLog in src/SteppedStreets/Properties/PublishConfiguration.xml, then

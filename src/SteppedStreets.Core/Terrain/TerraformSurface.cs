@@ -6,7 +6,7 @@
 // heights (Floater 2003): exact at the vertices, linear along every edge, smooth inside. Neighbouring grid quads
 // share their corner heights, so the sculpted ground is continuous across cells. Pure, used by the build raster,
 // TerrainField, site safety cuts, the overlay and the gallery.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: namespace changed.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: namespace changed.
 
 using System;
 using System.Collections.Generic;

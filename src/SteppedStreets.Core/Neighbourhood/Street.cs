@@ -1,4 +1,4 @@
-// Stepped Streets, the hillside neighbourhood generator. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+// Stepped Streets, the hillside neighbourhood generator. Original work by TevBenji, 2026-11. GPL-3.0.
 using System.Collections.Generic;
 using Unity.Mathematics;
 

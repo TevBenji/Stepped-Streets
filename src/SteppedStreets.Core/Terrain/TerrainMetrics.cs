@@ -7,7 +7,7 @@
 //  * seat     — how badly a net sits on the ground: the height difference across its width (a net flattens the ground
 //               under it, so a cross slope becomes a little cliff along its edge) and between the net and the ground.
 // Used by the tests, the gallery and the in-game debug dump (same code over live heights). Pure.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: namespace changed.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: namespace changed.
 
 using System;
 using System.Collections.Generic;

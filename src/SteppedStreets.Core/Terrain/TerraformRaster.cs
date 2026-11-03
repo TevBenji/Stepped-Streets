@@ -9,7 +9,7 @@
 //  * the soft-edged paint coverage of a polygon,
 //  * square tiling of a raster for the brush (the game maps one brush texture onto a square).
 // Pure so it can be unit tested; the game layer only samples the terrain and uploads textures.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: namespace changed.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: namespace changed.
 
 using System;
 using System.Collections.Generic;

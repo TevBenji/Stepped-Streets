@@ -1,4 +1,4 @@
-# Stepped Streets. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+# Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
 # This loads managed types only; it creates no systems and never starts the game.
 param(
     [string]$ManagedPath = 'D:/Steam/steamapps/common/Cities Skylines II/Cities2_Data/Managed',

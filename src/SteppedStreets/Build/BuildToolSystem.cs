@@ -8,7 +8,7 @@
 // tool produces definitions, so every temporary entity belongs to our build.
 //
 // Phase: ToolUpdate (all tools update there; ToolOutputSystem reads applyMode right after).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: cut apply gates and audit fields; own activation, one startup Clear, quiet frames and previous-tool restoration for the zoning spike.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: cut apply gates and audit fields; own activation, one startup Clear, quiet frames and previous-tool restoration for the zoning spike.
 
 using Game.Prefabs;
 using Game.Tools;

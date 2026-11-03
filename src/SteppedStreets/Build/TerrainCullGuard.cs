@@ -11,7 +11,7 @@
 // Before our nets are emitted (build and ghost), the list gets room for what is already there twice over plus 18 sections for
 // every net we add: the vanilla code still grows it by its own rule, we only make sure it never overflows. Every job that reads or
 // writes the list is completed first (the cull, the clip-map and the cascade lane jobs), as the game does before it resizes.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: namespace changed; logging through the mod's logger.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: namespace changed; logging through the mod's logger.
 
 using System;
 using System.Collections;

@@ -5,7 +5,7 @@
 // grid (idea from Grid Road Generator's HeightSnapshot), a coarser water-depth grid, nearby nets
 // as Bézier curves with widths, building lots as obstacles, and the asset info map. The result
 // (SiteContext) is immutable after capture and therefore safe to read from any thread.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: a drawn area instead of one street; fixed 4 m terrain and 8 m water grids, building lots and water rasterised into one blocked grid, existing road edges sampled for the neighbourhood generator with their entity handles, and a fingerprint to notice changes before a build.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: a drawn area instead of one street; fixed 4 m terrain and 8 m water grids, building lots and water rasterised into one blocked grid, existing road edges sampled for the neighbourhood generator with their entity handles, and a fingerprint to notice changes before a build.
 using System;
 using System.Collections.Generic;
 using Colossal.Mathematics;

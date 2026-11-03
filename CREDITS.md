@@ -1,147 +1,91 @@
 # Credits
 
-Stepped Streets is by TevBenji and is licensed under GPL-3.0.
+Stepped Streets is made by **[TevBenji](https://github.com/TevBenji)** and released under the
+[GNU General Public License v3.0](LICENSE).
 
-The build setup is adapted from [Placemaker by jackwrichards](https://github.com/jackwrichards/placemaker), GPL-3.0, commit `e654b32`:
+It stands on the shoulders of the Cities: Skylines II modding community. The projects below shaped how this mod talks to the
+game, and some of their code lives on here, adapted. Thank you to every one of them.
 
-- `src/SteppedStreets/SteppedStreets.csproj`: standalone compiler settings and explicit framework/game DLL references, trimmed to remove the toolchain, UI build, git versioning, and deployment.
-- `tests/SteppedStreets.Tests/SteppedStreets.Tests.csproj`: .NET 9/xUnit setup and the copy-local Unity.Mathematics reference, changed to reference the separate Core project.
+## Projects this mod builds on
 
-The default game DLL path is shared through `build/GameReferences.props`.
+| Project | Author | Licence | What it contributed |
+|---|---|---|---|
+| [Placemaker](https://github.com/jackwrichards/placemaker) (commit `e654b32`) | jackwrichards | GPL-3.0 | Terrain shaping and verification, the invisible build tool, zoning, object and road-course definitions, the road-cull crash guard, the site snapshot, and the panel's UI plumbing and look |
+| ParkManager | tomkpunkt | GPL-3.0 | The road-course definition pattern and a boundary-distance helper, credited through Placemaker |
+| Grid Road Generator | Ti4goc | GPL-3.0 | Course positions on existing roads, the zoning flags, the height-grid idea and UI registration patterns, credited through Placemaker |
+| ParkingLotTool | KruemelGames | GPL-3.0 | The object-definition pattern, credited through Placemaker |
+| [CS2-NetworkTools](https://github.com/lucarager/CS2-NetworkTools) | Luca Rager | MIT | The lookup of the game's own UI components, credited through Placemaker |
 
-The game-side zoning build is adapted from the same Placemaker commit (`e654b32`, GPL-3.0):
+Every adapted file keeps its original header and adds a line naming its source and what changed:
+`Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, <date>: <changes>.`
 
-- `src/SteppedStreets/Build/BuildToolSystem.cs`: from `Game/Build/BuildToolSystem.cs` and the tool activation handoff in `Game/Build/BuildService.cs`. Kept the invisible tool and one-shot Apply handoff; removed apply gates and audit fields and added activation, one startup Clear, quiet frames and previous-tool restoration.
-- `src/SteppedStreets/Build/ZoneBuildSystem.cs`: from the zoning emit/apply and live-cell verification in `Game/Build/BuildService.Terrain.cs:637-837`, plus `Height()` and definition ownership in `BuildService.Emit.cs`. Extracted a standalone quad API, named prefab lookup, requested-zone verification and completion report. Kept only neighbouring column depths as possible blocked-cell causes. The zoning definitions also follow **Grid Road Generator by Ti4goc (GPL-3.0)**, as credited by Placemaker: `ZoningFlags.Zone | ZoningFlags.Marquee`, without `Overwrite`. No terrain, fallback brushes or water code from that file is included.
-The game terrain apply path is adapted from the same Placemaker commit (`e654b32`, GPL-3.0):
+## Original work
 
-- `src/SteppedStreets/Build/TerrainBuildSystem.cs`: from `Game/Build/BuildService.Terrain.cs:30-451` and `Height()` in `Game/Build/BuildService.Emit.cs:97-106`. Kept direct Shift passes, masks, calibration and height copying; replaced plan/group types with the patch/report contract, retained the original snapshot for final curtain measurement, and removed pits, debug hooks, paint, dabs, water and zoning. No ParkManager or GridRoadGenerator code is included in this apply system.
-- `src/SteppedStreets.Core/Terrain/TerraformApplyMath.cs`: extracted patch inputs (`Game/Build/BuildService.Terrain.cs:94-114`) and delta-time compensation (`:404-416`). Added patch validation and snapshot copies, and the inverse low-strength curve verified in the installed game's `TerrainSystem.ApplyToTerrain`, so reversing with a longer frame still cancels the original Shift displacement. Removed game and plan types.
+Original work by TevBenji (2026), GPL-3.0:
 
-The pure terrain code below is adapted from the same Placemaker commit (`e654b32`, GPL-3.0):
+- **The neighbourhood generator** (`src/SteppedStreets.Core/Neighbourhood/`): the site survey, contour streets, connectors
+  and hairpins, the connection to existing roads, the mountain lane, rule validation and pruning, lot layout, the zone and
+  service mix, the grading field with its banks, trees and garden walls. Placemaker's hillside terraces were studied for two
+  ideas (streets at a constant height interval and the terrace spacing rule); no code was copied or adapted from them, nor
+  from its `LotLevel.cs` or `PolishLookLayer.cs`.
+- **The stepped-lot planner** (`src/SteppedStreets.Core/Planning/`): lot rules, steps, aprons, bank capacity, garden-wall
+  geometry and preview wording. The idea of a sloped strip between two levels comes from Placemaker's lot fillers, and the
+  1 m zoning-quad inset from its `ZoneGuard`; no code was copied.
+- **The tool and build flow** (`src/SteppedStreets/Tool/`, `Build/RoadCatalog.cs`, `Build/ServiceCatalog.cs`, the settings
+  and the registration in `Mod.cs`). They follow the tool lifecycle, input and overlay patterns of Placemaker's tool system,
+  written for this mod. The build order (ground, then roads, then zoning once the zone blocks exist) follows Placemaker's
+  build service; the code is this mod's own.
+- **The panel** (`src/SteppedStreets.UI/src/Panel.tsx`, `Panel.module.css`, `lib/state.ts`, its tests and the icons). The
+  look follows Placemaker's panel styles (dark docked panel, small-caps sections, label-left rows, segmented choices, accent
+  footer button) and its slider API; no component was copied.
+- `src/SteppedStreets.UI/tools/check-panel-json.ps1` and `tools/publish-mod.ps1`.
 
-- `src/SteppedStreets.Core/Terrain/Sculpt.cs`: from `Core/Layers/Common/Sculpt.cs`. Changed the namespace and usings; `Emit` takes a patch list and cancellation token and returns the emitted cell count. Removed `Over`, `Resnap`, `GradeAt`, `Warn`, `CrossesRing`, the `Ground.Override` call, plan facts, and the clip path and state. Kept the shaping, interpolation, and earthwork code.
-- `src/SteppedStreets.Core/Terrain/TerraformRaster.cs`: from `Core/Build/TerraformRaster.cs`, whole file with its namespace changed, including coverage and diagnostics.
-- `src/SteppedStreets.Core/Terrain/TerraformSurface.cs`: from `Core/Build/TerraformSurface.cs`, whole file with its namespace changed.
-- `src/SteppedStreets.Core/Terrain/TerrainMetrics.cs`: from `Core/Build/TerrainMetrics.cs`, whole file with its namespace changed.
-- `src/SteppedStreets.Core/Terrain/PlannedTerraform.cs`: from `Core/Contracts.cs:849-872`. Kept `TerraformKind` and the `Ring`, `Kind`, `TargetHeight`, `Permanent`, and `Sloped` members; changed the namespace and removed the water fields and `Apron`.
-- `src/SteppedStreets.Core/Terrain/PolygonHelpers.cs`: from `Core/Geometry/Poly.cs:174-204` (`Contains`/`ContainsD`) and `:243-263` (`Bounds`/`DistanceToBoundary`), `Core/Contracts.cs:363-381` (`ReservedSpace.DistSqToSegment`/`PointInPolygon`), and `Core/Build/TerraformDabs.cs:131-137` (`TerraformDabs.DistanceToBoundary`). Extracted static helpers, changed the namespace, and expanded helper parameter and local names. The original `TerraformDabs.cs` header also credits ParkManager's `ParkLakePlanner.ExcavationDabs/WaterAnchor` by tomkpunkt (GPL-3.0); that attribution is retained, although only the boundary-distance helper is included here.
+## Adapted files
 
-The M1 spike trigger is original work. It follows Placemaker's patterns, but none of its code is copied: settings, key
-bindings and Options labels (`Game/Tool/ToolRegistration.cs`), reading a hotkey action (`Game/Tool/PlacemakerToolSystem.Input.cs`),
-walking a street's edges by their nodes and aggregate (`Game/Tool/PlacemakerToolSystem.Points.cs`, `Game/Suite/SuiteLab.FenceMap.cs`),
-and reading the selection from `SelectedInfoUISystem` (`Game/Suite/SuiteSteps.Build.cs`). Files: `src/SteppedStreets/Settings/SteppedStreetsSettings.cs`,
-`src/SteppedStreets/Spike/*.cs`, `src/SteppedStreets.Core/Planning/StepPlanPatches.cs` and `StreetChain.cs`. The idea of a
-sloped strip that ramps between two levels comes from Placemaker's lot fillers (`Core/Layers/Types/Zoning/LotLevel.cs`),
-and the 1 m zoning-quad inset from its `Core/Build/ZoneGuard.cs` (`QuadShrink`).
+All from [Placemaker](https://github.com/jackwrichards/placemaker) by jackwrichards, GPL-3.0, commit `e654b32`.
 
-## Wave 4: low walls and documentation
+### Building in the game
 
-The low-wall build uses the same Placemaker commit (`e654b32`, jackwrichards, GPL-3.0):
+| File | Adapted from | What changed |
+|---|---|---|
+| `src/SteppedStreets/Build/BuildToolSystem.cs` | `Game/Build/BuildToolSystem.cs` and the tool hand-off in `BuildService.cs` | Kept the invisible tool and one-shot Apply; added activation, a start-up Clear, quiet frames and restoring the player's tool. |
+| `src/SteppedStreets/Build/TerrainBuildSystem.cs` | `Game/Build/BuildService.Terrain.cs` and `Height()` in `BuildService.Emit.cs` | Kept the Shift passes, masks, calibration and height copies; takes the planner's raster ready-made and reports instead of failing; no pits, paint, water or zoning. |
+| `src/SteppedStreets/Build/NetBuildSystem.cs` | The road-course path of `Game/Build/BuildService.Emit.cs` | Kept course construction and attaching ends to existing roads; builds the plan as short pieces at their planned heights, counts refused and built pieces. Credits ParkManager and Grid Road Generator through the original header. |
+| `src/SteppedStreets/Build/ZoneBuildSystem.cs` | Zoning emit, apply and cell checks in `BuildService.Terrain.cs` and `BuildService.Emit.cs` | A standalone quad API with prefab lookup by name and a per-zone report. Zoning flags follow Grid Road Generator. |
+| `src/SteppedStreets/Build/ObjectBuildSystem.cs` | The object-definition path of `BuildService.Emit.cs` | Trees and service buildings, 1500 a frame, on the live ground. Credits ParkingLotTool through the original header. |
+| `src/SteppedStreets/Build/WallBuildSystem.cs` | The object-definition path of `BuildService.Emit.cs` and the prefab lookup in `SurfaceCloneSystem.cs` | Garden walls end to end at measured piece lengths; wall facts from Placemaker's kerb planner. |
+| `src/SteppedStreets/Build/TerrainCullGuard.cs` | `Game/Build/TerrainCullGuard.cs` | Copied; namespace and log lines changed. Guards the game's road-cull list once the mod builds many roads at once. |
+| `src/SteppedStreets/Tool/SiteSnapshot.cs` | `Game/Preview/SiteCapture.cs` | Captures a drawn area: heights, water and buildings in one blocked grid, nearby roads and a change fingerprint. The height grid credits Grid Road Generator. |
+| `src/SteppedStreets/Panel/PanelSystem.cs` | The JSON binding and trigger pattern of `Game/UI/PlacemakerUISystem.cs` | Rewritten for one state value, validated settings and the zone, road and service catalogues. |
+| `src/SteppedStreets/SteppedStreets.csproj` | `Placemaker.csproj` | Standalone game references and the UI bundle step, without the toolchain or deployment. |
 
-- `src/SteppedStreets/Build/WallBuildSystem.cs`: object-definition fields adapted from `Game/Build/BuildService.Emit.cs:534-569`; named prefab/entity lookup adapted from `Game/Build/SurfaceCloneSystem.cs:162-171`, using `StaticObjectPrefab` for the existing EU_Wall02 garden wall. Retained the emitter's original header and credits. Removed nets, surface clones, grouping, snapping, scale variation and audit code; added measured `ObjectGeometryData.m_Size.z` piece length, a logged 3 m fallback, fixed pad heights, end-to-end pieces and a completion report. Apply at +2 frames and definition cleanup at +4 follow this mod's `ZoneBuildSystem`, itself adapted from Placemaker's `BuildService.Terrain.cs` and invisible build tool. No new net emitter, fallback brush or water code is included.
-- Placemaker's object-definition pattern credits **ParkingLotTool by KruemelGames (GPL-3.0)**. Its retained emitter header also credits **ParkManager by tomkpunkt** and **Grid Road Generator by Ti4goc (GPL-3.0)** for net definitions; this wall system uses only the object path. `SurfaceCloneSystem` also credits ParkingLotTool; this mod creates no cloned prefabs.
-- `Core/Layers/Parking/Kerbs.cs:34-45` was studied for the EU_Wall02 choice, 0.2 m thickness, 0.9 m height and local-Z direction. Those asset facts inform the wall placement; its kerb planner was not copied.
+### Terrain maths
 
-`src/SteppedStreets.Core/Planning/StepPlanWalls.cs` and `tests/SteppedStreets.Tests/Planning/StepPlanWallsTests.cs` are original work by Tevin Benjamin, as are the registration block and player guide. Wall geometry uses the existing planner's corners and whole-column banks. No code is copied from `LotLevel.cs`, `PolishLookLayer.cs`, `TerraceField.LimitBanks` or `Resolve`. The full GPL-3.0 licence was already present in the root `LICENSE` and is retained unchanged.
-## Wave 4: planner completion
+| File | Adapted from | What changed |
+|---|---|---|
+| `src/SteppedStreets.Core/Terrain/TerraformRaster.cs` | `Core/Build/TerraformRaster.cs` | Whole file; namespace changed. |
+| `src/SteppedStreets.Core/Terrain/TerraformSurface.cs` | `Core/Build/TerraformSurface.cs` | Whole file; namespace changed. |
+| `src/SteppedStreets.Core/Terrain/TerrainMetrics.cs` | `Core/Build/TerrainMetrics.cs` | Whole file; namespace changed. |
+| `src/SteppedStreets.Core/Terrain/Sculpt.cs` | `Core/Layers/Common/Sculpt.cs` | Kept the shaping, interpolation and earthwork; takes a patch list and a cancellation token. |
+| `src/SteppedStreets.Core/Terrain/TerraformApplyMath.cs` | Patch inputs and frame-time compensation in `BuildService.Terrain.cs` | Added patch validation, snapshot copies and the inverse strength curve for undoing a pass. |
+| `src/SteppedStreets.Core/Terrain/PlannedTerraform.cs` | `Core/Contracts.cs` | The terraform kind and ring members only. |
+| `src/SteppedStreets.Core/Terrain/PolygonHelpers.cs` | `Core/Geometry/Poly.cs`, `Core/Contracts.cs`, `Core/Build/TerraformDabs.cs` | Static point-in-polygon, bounds and distance helpers. The boundary-distance helper credits ParkManager by tomkpunkt. |
 
-Original work by Tevin Benjamin, 2026-11, GPL-3.0:
+### Panel
 
-- `src/SteppedStreets.Core/Planning/StepPlanRequest.cs`, `StepPlan.cs`, `StepPlanner.cs` and `StepPlanPatches.cs`: bank capacity per lot width, road-height aprons, sampled earthwork and obstacle checks, hillside-aware smoothstep blend sizing, and preview summaries and messages. No additional Placemaker code was copied or adapted; the existing terrain raster and surface interpolation retain their credits above.
-- `tests/SteppedStreets.Tests/Planning/StepPlannerTests.cs`, `StepPlannerSiteTests.cs` and `StepPlanPatchesTests.cs`: synthetic planner rules, apron continuity, preview wording, deterministic results, and off-game raster checks at 8%, 12% and 15%.
-## Wave 4: street picker, preview and build flow (W2)
+| File | Adapted from | What changed |
+|---|---|---|
+| `src/SteppedStreets.UI/src/components/ToolbarButton.tsx` | `UI/src/components/ToolbarButton.tsx` | New icon and toggle; watches toolbar redraws so it sits beside Placemaker without interfering. |
+| `src/SteppedStreets.UI/src/lib/vanilla.ts` | `UI/src/lib/vanilla.ts` | Trimmed to the slider and focus key. Credits Grid Road Generator and CS2-NetworkTools. |
+| `src/SteppedStreets.UI/src/lib/bindings.ts` | `UI/src/lib/bindings.ts` | One late-safe JSON binding and guarded triggers. |
+| `src/SteppedStreets.UI/src/lib/errorBoundary.tsx`, `tips.tsx` | The matching Placemaker UI helpers | Trimmed to quiet crash fallbacks and the toolbar tooltip. Credits Grid Road Generator. |
+| `src/SteppedStreets.UI/src/index.tsx` | `UI/src/index.tsx` | Registers the panel and the toolbar button only. Credits Grid Road Generator and CS2-NetworkTools. |
+| `src/SteppedStreets.UI/types/*.d.ts` | Placemaker's declarations of the game's UI modding API | Copied with attribution. |
+| `src/SteppedStreets.UI/webpack.config.js` | Placemaker's UI webpack setup | Same window externals, metadata banner and hashed images; simplified to TypeScript and CSS modules. |
+| `src/SteppedStreets.UI/tools/css-lint.js` | `UI/tools/css-lint.js` | Unchanged apart from the header; checks CSS against what the game's UI engine supports. |
+| `src/SteppedStreets.UI/tools/css-presence.js` | `UI/tools/css-presence.js` | Exports `hasCSS`, without which the game never loads the panel's stylesheet (as the official UI mod template does). |
 
-- `src/SteppedStreets/Tool/SiteSnapshot.cs` adapts the height and water grids from Placemaker
-  `Game/Preview/SiteCapture.cs:153-204` and the road composition/ground-level checks at `:217-250`
-  (same GPL-3.0 commit `e654b32`). It keeps fixed 4 m terrain and 8 m water grids, captures building
-  lots and sampled road corridors, and fails capture rather than treating missing water data as dry.
-  Building lot corners follow the API usage studied in `Game/Selection/BuildingFootprints.cs:27-38`.
-  Placemaker credits Grid Road Generator's HeightSnapshot as the height-grid idea; that credit is retained.
-- `Tool/StepStreetToolSystem.cs`, `Tool/StepStreetHotkeySystem.cs`, `Tool/RightClickGesture.cs` and
-  `Tool/StepPreviewSystem.cs` are original work, informed by Placemaker's tool lifecycle/raycast
-  (`Game/Tool/PlacemakerToolSystem.cs:165-304`), modifier/cancel input
-  (`Game/Tool/PlacemakerToolSystem.Input.cs:37-155`) and overlay buffer usage
-  (`Game/Overlay/PlacemakerOverlaySystem.cs:82-134`, `:625`). No code was copied from those files.
-- `Tool/StreetCapture.cs` moves and extends this project's original `Spike/SelectedStreet.cs`.
-  The original three failure logs and street summary remain. Shift-add validates a single unbranched
-  chain, node identifiers include their version, and mixed-width chains use their widest road.
-  The street-name call was studied in Placemaker's `Game/Suite/SuiteLab.FenceMap.cs:95-107`.
-- `Tool/StepStreetToolSystem.Build.cs` moves this project's original spike flow into the picker,
-  with settings fixed to its preview, guarded callbacks and the W4 low-wall completion step.
-  The existing terrain and zoning systems retain their earlier Placemaker credits above.
-- `Tool/ToolState.cs`, `Tool/SiteGeometry.cs`, `tests/SteppedStreets.Tests/Tool/*.cs`, and the
-  Wave 4 contract stubs are original work. The test project links the pure geometry and gesture
-  source files so those exact helpers are tested without game assemblies.
-- The settings, registration and game-reference changes are original work. Options group and
-  binding identifiers are preserved. The historical `Spike/*.cs` paths above now live under `Tool/`.
-## Wave 4: toolbar, panel and bindings
+## Game data
 
-`src/SteppedStreets.UI/tools/check-panel-json.ps1` is an original managed-assembly self-check by Tevin Benjamin, 2026-11, GPL-3.0, for the compiled JSON writers; it does not create game systems.
-
-The UI integration is adapted from Placemaker by jackwrichards, GPL-3.0, commit `e654b32`. Original headers are retained in adapted files, followed by the adaptation note naming Tevin Benjamin and the changes.
-
-- `src/SteppedStreets.UI/src/components/ToolbarButton.tsx`: from `UI/src/components/ToolbarButton.tsx`. Kept the vanilla ToolbarButtonStrip extension and portal into the first group; replaced the icon and toggle binding, added observation of group redraws and used a React class host to avoid a sibling marker interfering with Placemaker.
-- `src/SteppedStreets.UI/src/lib/vanilla.ts`: trimmed `UI/src/lib/vanilla.ts` to the slider and focus key. Placemaker credits **Grid Road Generator by Ti4goc (GPL-3.0)** and the vanilla lookup pattern from **CS2-NetworkTools by Luca Rager (MIT, https://github.com/lucarager/CS2-NetworkTools)**; those credits are retained.
-- `src/SteppedStreets.UI/src/lib/errorBoundary.tsx` and `tips.tsx`: trimmed Placemaker's matching UI helpers to null crash fallbacks and the one native toolbar tooltip. Placemaker credits Grid Road Generator by Ti4goc for both patterns.
-- `src/SteppedStreets.UI/src/lib/bindings.ts`: from `UI/src/lib/bindings.ts`, trimmed to one late-safe JSON binding and guarded Stepped Streets triggers; state normalization is separate original code.
-- `src/SteppedStreets.UI/src/index.tsx`: trimmed `UI/src/index.tsx` registration to the Game panel and bottom toolbar extension. Its original registration credits are **Grid Road Generator by Ti4goc (GPL-3.0)** and **CS2-NetworkTools by Luca Rager (MIT)**.
-- `src/SteppedStreets.UI/types/{api,assets,bindings,cohtml,input,l10n,modding,react,ui,utils}.d.ts`: Placemaker's declarations of the game's modding API, copied with attribution and normalized whitespace; `validateTypes.ts` is excluded.
-- `src/SteppedStreets.UI/tools/css-lint.js`: Placemaker's Gameface CSS lint, unchanged apart from the adaptation header; used during webpack and available as a CLI check.
-- `src/SteppedStreets.UI/webpack.config.js`: from Placemaker's UI webpack setup: same window externals, module metadata banner and namespaced hashed image output; simplified to TypeScript and CSS modules, with no deployment or output cleanup. `package.json`, `mod.json` and `tsconfig.json` follow its project shape, with pinned minimal dependencies and our metadata.
-- `src/SteppedStreets/Panel/PanelSystem.cs`: from the safe JSON binding/trigger pattern in `Game/UI/PlacemakerUISystem.cs`; rewritten for one state value, validated settings and a one-time localized zone catalog. Prefab query and label lookup follow `Game/Overlay/ZoneGridOpacitySystem.cs` and `Game/Assets/AssetCatalogSystem.cs` as patterns. No code was copied from either zoning planner file.
-
-The panel (`src/SteppedStreets.UI/src/Panel.tsx`, `Panel.module.css`), defensive state reader (`src/lib/state.ts`), its tests (`tests/state.test.cjs`), the 48-unit stepped-lots SVG (`src/assets/stepped-streets.svg`) and UI README are original work by Tevin Benjamin, 2026-11, GPL-3.0. The slider API follows Placemaker's `UI/src/controls/Slider.tsx:64–88`; its drag state is implemented here for this panel. The Mod.cs registration block, optional csproj bundle target, .gitignore entries and shared Look/EarthworkLimit settings block are also original integration work. The temporary Wave4Stubs.cs contract files were removed during integration.
-
-## Wave 4: integration review
-
-Original integration corrections, Tevin Benjamin, 2026-11: `TerraformApplyMath.RequireClearGround` and its tests reject protected ground under the outer blend and brush margin before any brush runs; `TerrainBuildSystem.HeightAt` reads live terrain for zoning instead of substituting the target. The tool's patch log counts aprons separately, and planner advice no longer assumes narrower lots always permit a taller step. The project packages LICENSE, CREDITS.md and README.md beside its DLLs and UI assets. No additional reference code was copied for these corrections.
-
-## Panel styling fix
-
-- `src/SteppedStreets.UI/tools/css-presence.js` is adapted from Placemaker's `UI/tools/css-presence.js` (jackwrichards, GPL-3.0), which follows the official Cities: Skylines II UI mod template: the bundle exports `hasCSS`, without which the game never loads the panel's stylesheet.
-- The panel's look (dark docked panel, small-caps sections, label-left rows, segmented choices, accent footer button and the UI sound calls) follows Placemaker's `UI/src/styles/_tokens.scss`, `components/common.module.scss`, `components/panel.module.scss` and `components/dialog.module.scss`. The panel code and stylesheet are written for Stepped Streets; no Placemaker component is copied.
-
-## Version 2: the hillside neighbourhood generator (November 2026)
-
-Original work by Tevin Benjamin, 2026-11, GPL-3.0:
-
-- `src/SteppedStreets.Core/Neighbourhood/*.cs`: the layout generator (survey, contour streets, S-curve and traced-ramp links,
-  connection, mountain lane, validation and pruning, lot layout with settling and gaps, the zone mix, the grading field with
-  its bank cones, trees and garden-wall placement). Placemaker's Hillside terraces (`Core/Layers/Roads/Terraces/*.cs`,
-  `docs/proposals/s52.md`) were studied for ideas — contour streets at a constant height interval and the terrace spacing
-  rule — but no code was copied or adapted; `TerraceField.LimitBanks` and `Resolve` were not used, and `LotLevel.cs` and
-  `PolishLookLayer.cs` were not read for code.
-- `tests/SteppedStreets.Tests/Neighbourhood/*.cs`: the synthetic hillsides, rule tests and the PNG gallery (its small PNG
-  writer included). Placemaker's `Tests/Placemaker.Gallery` was the idea for a gallery; nothing was copied.
-- `src/SteppedStreets/Tool/NeighbourhoodToolSystem*.cs`, `NeighbourhoodPreviewSystem.cs`, `ToolState.cs`,
-  `src/SteppedStreets/Build/RoadCatalog.cs`, the settings and the registration changes: original, following the earlier
-  tool, preview and build patterns credited above.
-- The panel rebuild (`src/SteppedStreets.UI/src/Panel.tsx`, `Panel.module.css`, `lib/state.ts`, `lib/bindings.ts`,
-  `tests/state.test.cjs`, `assets/dice.svg`, `assets/plus.svg`): original, keeping the look credited under "Panel styling
-  fix" and the adapted bindings helper credited under Wave 4.
-
-Adapted from Placemaker by jackwrichards, GPL-3.0, commit `e654b32` (headers retained, each with its "Adapted from
-Placemaker ... Modified by Tevin Benjamin, 2026-11" line):
-
-- `src/SteppedStreets/Build/NetBuildSystem.cs`: the net-course path of `Game/Build/BuildService.Emit.cs` (`EmitNets`,
-  `MakeCoursePos`, `NewDefinition`). Kept `NetCourse` and `CoursePos` construction, attaching an end to an existing edge or
-  node by `m_Entity` and `m_SplitPosition`, and rebuilding the curve to the snapped point; the roads come from the plan cut
-  into short cubic pieces at their planned heights. Removed course fitting, elevation, fences, objects, surfaces, groups and
-  audit code; added the build-tool cadence, a count of temporaries refused before Apply and a count of built edges. The
-  emitter's header credits **ParkManager by tomkpunkt** (`CreateNetCourseDefinition`) and **Grid Road Generator by Ti4goc**
-  (`CreateGridDefinitions`/`MakeCoursePos`), both GPL-3.0; those credits carry over.
-- `src/SteppedStreets/Build/TerrainCullGuard.cs`: copied from `Game/Build/TerrainCullGuard.cs`; namespace and log lines
-  changed. Needed now that the mod emits nets (the road-cull list overflow behind `TerrainSystem.CullForCascades`).
-- `src/SteppedStreets/Build/TreeBuildSystem.cs`: the object-definition path of `Game/Build/BuildService.Emit.cs:534-569`, as
-  `WallBuildSystem` already used it; tree prefabs chosen by name, live ground heights and batches of 1500 per frame
-  (`BuildService.DefinitionsPerFrame`). Credits **ParkingLotTool by KruemelGames (GPL-3.0)** through Placemaker's header.
-- `src/SteppedStreets/Tool/SiteSnapshot.cs` (already adapted from `Game/Preview/SiteCapture.cs`): now captures a drawn area,
-  rasterises buildings and water into one blocked grid, samples existing road edges with their entity handles, and keeps a
-  fingerprint to notice changes before a build.
-- `src/SteppedStreets/Build/TerrainBuildSystem.cs` (already adapted): takes the raster ready-made from the planner's field.
-- The build order (ground, then nets, then zoning after the zone blocks appear) follows `Game/Build/BuildService.cs`'s step
-  sequence; the code is this mod's own.
-
-Removed in version 2: the street picker (`Tool/StepStreetToolSystem*.cs`, `StreetCapture.cs`, `StepPreviewSystem.cs`); the
-generator covers it. Their credits above are kept for the history.
+Cities: Skylines II, its assets and its modding API belong to Colossal Order and Paradox Interactive. Stepped Streets is an
+independent mod and is not made or endorsed by them.

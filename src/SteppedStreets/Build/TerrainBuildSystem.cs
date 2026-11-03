@@ -6,7 +6,7 @@
 // source fills the basin. Zoning follows GridRoadGenerator's Zoning
 // definitions (Ti4goc, GPL-3.0): ZoningFlags.Zone|Marquee without Overwrite never repaints cells
 // that are already zoned.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: standalone terrain apply system and report; removed dabs, water, zoning, pits, debug hooks and plan/group types; retained the original height copy for curtains and corrected low-strength rollback; the raster now comes ready-made from the neighbourhood planner's ground field.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: standalone terrain apply system and report; removed dabs, water, zoning, pits, debug hooks and plan/group types; retained the original height copy for curtains and corrected low-strength rollback; the raster now comes ready-made from the neighbourhood planner's ground field.
 // The original header above describes the source file; none of its ParkManager or GridRoadGenerator code is included here.
 
 using System;

@@ -1,4 +1,4 @@
-// Stepped Streets. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+// Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
 // The look follows Placemaker's panel (jackwrichards, GPL-3.0): a dark panel docked on the right, small-caps sections,
 // label-left rows, segmented choices and one accent button in the footer. Plain elements rather than cs2/ui components,
 // so nothing depends on the vanilla themes, which left the first version unstyled.

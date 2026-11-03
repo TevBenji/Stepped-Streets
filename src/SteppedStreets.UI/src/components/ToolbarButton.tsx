@@ -3,7 +3,7 @@
 // our button is rendered into its first group (a portal into the game's own element, re-attached if the game redraws it) with
 // the strip's own button classes and the transparent-button theme its buttons use, so it looks and behaves like its neighbours.
 // The icon is the area-tool tile with a path and a tree (the user's pick, F3): assets/toolbar/placemaker3d.svg.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: single Stepped Streets toggle, original stepped-lots icon and redraw observation.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: single Stepped Streets toggle, original stepped-lots icon and redraw observation.
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { createPortal, findDOMNode } from "react-dom";
 import { getModule, ModuleRegistryExtend } from "cs2/modding";

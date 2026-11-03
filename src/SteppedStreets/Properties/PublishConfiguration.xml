@@ -51,9 +51,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/06.png" />
 	<Screenshot Value="Properties/Screenshots/07.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.0.0" />
+	<ModVersion Value="2.0.1" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- First release of the hillside neighbourhood generator: contour streets, connectors, stepped lots, zoning, service buildings, trees, steep hills mode." />
+	<ChangeLog Value="- The game's mod list now shows the right version (2.0.1).&#10;- Credits and readme tidied." />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
 	<!--Public, Unlisted or Private, exactly as written-->
 	<AccessLevel Value="Public" />

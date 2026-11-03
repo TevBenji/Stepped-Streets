@@ -4,7 +4,7 @@
 // Upgraded composition flags on the definition). Object definitions follow ParkingLotTool's
 // "field by field like ObjectToolBaseSystem" ObjectDefinition. Credits: tomkpunkt, Ti4goc,
 // KruemelGames (GPL-3.0).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: garden-wall objects only, named prefab lookup, measured piece length, fixed pad heights and the standalone build-tool cadence; no nets, ground snapping, scaling, grouping or audit machinery.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: garden-wall objects only, named prefab lookup, measured piece length, fixed pad heights and the standalone build-tool cadence; no nets, ground snapping, scaling, grouping or audit machinery.
 
 using System;
 using System.Collections.Generic;

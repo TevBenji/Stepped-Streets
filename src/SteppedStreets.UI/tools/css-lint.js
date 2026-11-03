@@ -1,4 +1,4 @@
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: unchanged Gameface checks for the Stepped Streets bundle.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: unchanged Gameface checks for the Stepped Streets bundle.
 // Gameface CSS lint (Coherent Gameface 2.2.1 as shipped with Cities: Skylines II 1.6.x).
 // Fails the build when the emitted CSS uses constructs the game silently rejects (they show up only
 // in Logs/UI.log, after a game restart). See docs/RESEARCH-NOTES.md rule 23.

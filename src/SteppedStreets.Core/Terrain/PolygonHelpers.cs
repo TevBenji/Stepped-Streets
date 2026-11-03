@@ -8,7 +8,7 @@
 //
 // Poly is split over several files: Poly.cs (basics, Clean, IsSimple), Poly.Ops.cs (booleans, offset,
 // split, clip, holes), Poly.Shape.cs (simplify, smooth, resample, fill runs, pole of inaccessibility).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: extracted Contains/ContainsD from Core/Geometry/Poly.cs:174-204 and Bounds/DistanceToBoundary from :243-263; namespace changed; partial class removed; helper parameter and local names expanded.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: extracted Contains/ContainsD from Core/Geometry/Poly.cs:174-204 and Bounds/DistanceToBoundary from :243-263; namespace changed; partial class removed; helper parameter and local names expanded.
 
 using System.Collections.Generic;
 using Unity.Mathematics;
@@ -78,7 +78,7 @@ namespace SteppedStreets.Core.Terrain
     // That keeps generators runnable off the main thread and testable without the game.
     // The game layer (Game/) turns an AreaPlan into CreationDefinitions; generators never
     // touch ECS.
-    // Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: extracted ReservedSpace.DistSqToSegment and PointInPolygon from Core/Contracts.cs:363-381 into a static helper; namespace changed; helper parameter and local names expanded.
+    // Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: extracted ReservedSpace.DistSqToSegment and PointInPolygon from Core/Contracts.cs:363-381 into a static helper; namespace changed; helper parameter and local names expanded.
     internal static class ReservedSpace
     {
         internal static float DistSqToSegment(float2 point, float2 start, float2 end)
@@ -104,7 +104,7 @@ namespace SteppedStreets.Core.Terrain
 
     // Placemaker — brush dab placement for terraforming (GPL-3.0).
     // Adapted from ParkManager's ParkLakePlanner.ExcavationDabs/WaterAnchor (tomkpunkt, GPL-3.0).
-    // Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: extracted TerraformDabs.DistanceToBoundary from Core/Build/TerraformDabs.cs:131-137 only; namespace changed; helper parameter and local names expanded.
+    // Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: extracted TerraformDabs.DistanceToBoundary from Core/Build/TerraformDabs.cs:131-137 only; namespace changed; helper parameter and local names expanded.
     public static class TerraformDabs
     {
         public static float DistanceToBoundary(float2[] ring, float2 point)

@@ -1,5 +1,5 @@
 // Adapted from Placemaker (jackwrichards, GPL-3.0), which follows the official Cities: Skylines II UI mod template.
-// Modified by Tevin Benjamin, 2026-11: patch the last export of the module and fail the build when it cannot be patched.
+// Modified by TevBenji, 2026-11: patch the last export of the module and fail the build when it cannot be patched.
 // The game loads <mod id>.css next to the module only when the module exports hasCSS = true; without it the panel
 // renders with no styles at all.
 const { Compilation, sources } = require("webpack");

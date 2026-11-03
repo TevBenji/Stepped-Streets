@@ -4,7 +4,7 @@
 // Upgraded composition flags on the definition). Object definitions follow ParkingLotTool's
 // "field by field like ObjectToolBaseSystem" ObjectDefinition. Credits: tomkpunkt, Ti4goc,
 // KruemelGames (GPL-3.0).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: road courses only, from the neighbourhood plan's roads cut into short cubic pieces at their planned heights; MakeCoursePos reduced to attaching a road end to an existing edge or node; the standalone build-tool cadence, a temporaries count before Apply and a count of the built edges afterwards; no fitting, elevation, fences, objects, surfaces or audit machinery.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: road courses only, from the neighbourhood plan's roads cut into short cubic pieces at their planned heights; MakeCoursePos reduced to attaching a road end to an existing edge or node; the standalone build-tool cadence, a temporaries count before Apply and a count of the built edges afterwards; no fitting, elevation, fences, objects, surfaces or audit machinery.
 
 using System;
 using System.Collections.Generic;

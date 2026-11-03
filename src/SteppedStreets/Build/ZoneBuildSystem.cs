@@ -6,7 +6,7 @@
 // source fills the basin. Zoning follows GridRoadGenerator's Zoning
 // definitions (Ti4goc, GPL-3.0): ZoningFlags.Zone|Marquee without Overwrite never repaints cells
 // that are already zoned.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: extracted zoning only; named prefab lookup, live corner heights, owned definitions, centre-cell verification of the requested zone and a completion report.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: extracted zoning only; named prefab lookup, live corner heights, owned definitions, centre-cell verification of the requested zone and a completion report.
 
 using System;
 using System.Collections.Generic;

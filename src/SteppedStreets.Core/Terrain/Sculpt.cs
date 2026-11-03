@@ -10,7 +10,7 @@
 // Emit (terraform + ctx.Ground) → Resnap (objects/nets/surfaces onto the final ground).
 // Nodes outside the sculptable zone are locked at the original ground, so the surface always meets the
 // surroundings smoothly. Pure, deterministic, engine-free.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: namespace and usings changed; Emit takes a patch list and cancellation token and returns the cell count; Over, Resnap, GradeAt, Warn, CrossesRing, the Ground.Override call, plan facts and the clip path/state removed.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: namespace and usings changed; Emit takes a patch list and cancellation token and returns the cell count; Over, Resnap, GradeAt, Warn, CrossesRing, the Ground.Override call, plan facts and the clip path/state removed.
 
 using System;
 using System.Collections.Generic;

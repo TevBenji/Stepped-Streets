@@ -4,7 +4,7 @@
 // PLT; RESEARCH-NOTES rule 22). The UI parses them (JSON.parse). Values are rebuilt only when
 // their inputs changed (version stamps) and pushed only when the JSON actually differs
 // (ValueBinding compares) — not ~100 bindings per frame like GRG.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: one Stepped Streets state value for the neighbourhood tool, validated settings triggers, and one-time zone and road catalogues.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: one Stepped Streets state value for the neighbourhood tool, validated settings triggers, and one-time zone and road catalogues.
 using System;
 using System.Collections.Generic;
 using System.Globalization;

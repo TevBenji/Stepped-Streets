@@ -6,9 +6,9 @@
 // source fills the basin. Zoning follows GridRoadGenerator's Zoning
 // definitions (Ti4goc, GPL-3.0): ZoningFlags.Zone|Marquee without Overwrite never repaints cells
 // that are already zoned.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: extracted patch inputs and Shift rollback timing from Game/Build/BuildService.Terrain.cs:94-114,404-416; added input validation, snapshot copies and the inverse low-strength curve; removed game and plan types.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: extracted patch inputs and Shift rollback timing from Game/Build/BuildService.Terrain.cs:94-114,404-416; added input validation, snapshot copies and the inverse low-strength curve; removed game and plan types.
 // The original header above describes the source file; none of its ParkManager or GridRoadGenerator code is included here.
-// The protected-ground check below is original Stepped Streets integration work, Tevin Benjamin, 2026-11.
+// The protected-ground check below is original Stepped Streets integration work, TevBenji, 2026-11.
 
 using System;
 using System.Collections.Generic;

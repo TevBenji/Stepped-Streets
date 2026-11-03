@@ -1,5 +1,5 @@
 // Bindings to Game/UI/PlacemakerUISystem (shapes: ../contract.ts, which is authoritative).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: one defensive JSON state binding and the Stepped Streets triggers.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: one defensive JSON state binding and the Stepped Streets triggers.
 import { useMemo } from "react";
 import { bindValue, trigger, useValue, ValueBinding } from "cs2/api";
 import { readState } from "./state";

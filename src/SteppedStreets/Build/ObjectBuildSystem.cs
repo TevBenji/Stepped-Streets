@@ -4,7 +4,7 @@
 // Upgraded composition flags on the definition). Object definitions follow ParkingLotTool's
 // "field by field like ObjectToolBaseSystem" ObjectDefinition. Credits: tomkpunkt, Ti4goc,
 // KruemelGames (GPL-3.0).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: trees (prefabs chosen by name from the game's trees) and service buildings only, live ground heights, batches of 1500 definitions per frame and the standalone build-tool cadence; no nets, scaling, grouping or audit machinery.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: trees (prefabs chosen by name from the game's trees) and service buildings only, live ground heights, batches of 1500 definitions per frame and the standalone build-tool cadence; no nets, scaling, grouping or audit machinery.
 
 using System;
 using System.Collections.Generic;

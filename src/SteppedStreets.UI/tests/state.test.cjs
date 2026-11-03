@@ -1,4 +1,4 @@
-// Stepped Streets. Original work by Tevin Benjamin, 2026-11. GPL-3.0.
+// Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const fs = require("node:fs");

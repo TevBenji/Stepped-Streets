@@ -1,4 +1,4 @@
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by Tevin Benjamin, 2026-11: declarations for the Stepped Streets UI; normalized whitespace.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: declarations for the Stepped Streets UI; normalized whitespace.
 declare module "cs2/modding" {
   import { ComponentType } from 'react';
 
