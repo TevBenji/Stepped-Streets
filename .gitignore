@@ -17,3 +17,6 @@ TestResults/
 node_modules/
 src/SteppedStreets.UI/build/
 gallery/
+
+# Claude Code instructions: kept locally, not published
+CLAUDE.md
