@@ -54,6 +54,8 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<ModVersion Value="2.0.2" />
 	<GameVersion Value="1.6.*" />
 	<ChangeLog Value="- Fixed: groups of streets built apart from the rest. Every group is now joined to your roads, or left out with a message when no gentle road can join it.&#10;- Fixed: squeezed junctions where a road bent back alongside the street it joined, or joined right next to a dead end." />
+	<!--The forum thread whose replies show as the Discussion on the mod page-->
+	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
 	<!--Public, Unlisted or Private, exactly as written-->
 	<AccessLevel Value="Public" />
