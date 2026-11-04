@@ -123,8 +123,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             }
             var collectorLinks = new List<int>();
             // Diagonal avenues: chains of cross streets leaning across the rows between two of them, each on a line through a
-            // centre. Two cross the whole diagonal grid; the radial grid's four run out from the corners of its middle block, so
-            // no junction has more than four roads.
+            // centre. Two cross the whole diagonal grid; the radial grid's four run out from beside the corners of its middle
+            // block, at least 40 m apart on each row, so no junction has more than four roads.
             var avenues = new List<(float U, float V, float Lean, int FromRow, int ToRow)>();
             if (offsets.Count > 1)
             {
@@ -138,18 +138,23 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 if (style == NeighbourhoodStyle.RadialGrid)
                 {
                     int middle = (offsets.Count - 1) / 2;
-                    float centreV = (offsets[middle] + offsets[middle + 1]) * 0.5f;
-                    avenues.Add((middleU, centreV, DiagonalLean, middle + 1, rows.Count - 1));
-                    avenues.Add((middleU, centreV, -DiagonalLean, middle + 1, rows.Count - 1));
-                    avenues.Add((middleU, centreV, DiagonalLean, 0, middle));
-                    avenues.Add((middleU, centreV, -DiagonalLean, 0, middle));
+                    float lower = offsets[middle], upper = offsets[middle + 1];
+                    float half = math.max((upper - lower) * 0.5f * DiagonalLean, RoadLinks.JunctionSpacing * 0.5f + Step);
+                    avenues.Add((middleU + half, upper, DiagonalLean, middle + 1, rows.Count - 1));
+                    avenues.Add((middleU - half, upper, -DiagonalLean, middle + 1, rows.Count - 1));
+                    avenues.Add((middleU + half, lower, -DiagonalLean, 0, middle));
+                    avenues.Add((middleU - half, lower, DiagonalLean, 0, middle));
                 }
             }
             foreach (var (u, v, diagonal, fromRow, toRow) in avenues)
                 for (int row = fromRow; row < toRow; row++)
                 {
-                    float at = u + (offsets[row] - v) * diagonal;
-                    Cross(survey, request, streets, rows[row], rows[row + 1], along, at, at + (offsets[row + 1] - offsets[row]) * diagonal);
+                    float at = u + (offsets[row] - v) * diagonal, next = at + (offsets[row + 1] - offsets[row]) * diagonal;
+                    // Traffic-optimised: the through road comes first, so an avenue stops either side of it rather than cutting it.
+                    float road = collector + (offsets[row] - offsets[0]) * lean, roadNext = road + (offsets[row + 1] - offsets[row]) * lean;
+                    if (traffic && (math.abs(at - road) < crossSpacing * 0.35f || math.abs(next - roadNext) < crossSpacing * 0.35f
+                        || (at - road) * (next - roadNext) < 0f)) continue;
+                    Cross(survey, request, streets, rows[row], rows[row + 1], along, at, next);
                 }
             for (int row = 0; row + 1 < rows.Count; row++)
             {

@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS = {
     style: "ContourSuburb", road: "Small Road", blockDepth: 90, maxRoadGradePercent: 8, steepestBuildablePercent: 15,
     steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 4,
     shapeGround: true, junctions: "Staggered",
-    levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: true,
+    levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: false,
     treeDensityPercent: 50, seed: 1,
 };
 const EMPTY_STATS = {

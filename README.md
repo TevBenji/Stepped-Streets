@@ -52,9 +52,10 @@ builder would, previews it on the ground, and builds it when you say so.
   you choose. Lots are 4 cells deep by default, so every low-density house fits on level ground.
 - **Service buildings in the mix**: police, fire, health, schools, parks, utilities, any unlocked roadside service building,
   each on a level site of its own, facing the road.
-- **Forest** on ground too steep to build, trees on the banks, and optional garden walls.
-- **Hillside and grid layouts**: three that follow the contours, and five grids for flat or gentle ground, with
-  crossroads, staggered T-junctions or a traffic-optimised road hierarchy.
+- **Trees if you want them**: forest on ground too steep to build and trees on the banks (off by default), and optional
+  garden walls.
+- **Hillside, grid and radial layouts**: three that follow the contours, nine grids and four radial layouts for flat or
+  gentle ground, with crossroads, staggered T-junctions or a traffic-optimised road hierarchy on the grids.
 - **Shape the ground, or don't**: grade roads and lots into the hill, or leave the terrain exactly as it is.
 - A live preview, and **Reroll** for another layout from the same area.
 - **Steep hills mode** for slopes up to 60 %, and areas up to 6.4 km across.
@@ -165,7 +166,7 @@ The panel shows the essentials; everything else is under **More settings**. One 
 | Services | buildings and counts (1–20) | none | Service buildings on level sites beside the new roads. **Add a service** adds one. |
 | Mix mode | Random, Clumps, Even | Clumps | How a zone mix is spread: per lot, in runs of neighbouring lots, or evenly. |
 | Steep hills | on / off | off | Build on slopes up to 60 % with up to 12 m of earthwork; connectors may switch back. |
-| Trees | on / off | on | Forest on steep ground, trees on banks and in the gaps between lots. |
+| Trees | on / off | off | Forest on steep ground, trees on banks and in the gaps between lots. |
 
 <details>
 <summary><strong>More settings</strong></summary>

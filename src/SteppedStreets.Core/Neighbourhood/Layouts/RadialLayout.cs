@@ -34,6 +34,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             var style = request.Style;
             float depth = request.BlockDepth;
             bool fan = style == NeighbourhoodStyle.Fan, star = style == NeighbourhoodStyle.Star;
+            bool share = style != NeighbourhoodStyle.Rings;
 
             // The centre, and the direction its first radial street takes: towards the city's road, turned a little by Reroll;
             // a fan opens from the edge nearest that road.
@@ -77,8 +78,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     for (int attempt = 0; attempt < tries; attempt++)
                     {
                         float nudge = (attempt + 1) / 2 * (attempt % 2 == 0 ? 1f : -1f) * 2f * Step / (2f * math.PI * rings[ring].Radius);
-                        if (!Find(streets, rings[ring].Arcs, turn + nudge, out int a, out int pointA)
-                            || !Find(streets, rings[ring + 1].Arcs, turn + nudge, out int b, out int pointB)) continue;
+                        if (!Find(streets, rings[ring].Arcs, turn + nudge, share, out int a, out int pointA)
+                            || !Find(streets, rings[ring + 1].Arcs, turn + nudge, share, out int b, out int pointB)) continue;
                         if (GridLayout.Join(survey, request, streets, a, pointA, b, pointB) >= 0) break;
                     }
                 }
@@ -89,7 +90,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             {
                 int outer = rings.Count - 1, count = StarStreets * (rings.Count > 1 ? 2 : 1);
                 for (int spoke = 0; spoke < count; spoke++)
-                    if (Find(streets, rings[outer].Arcs, spoke / (float)count, out int host, out int point))
+                    if (Find(streets, rings[outer].Arcs, spoke / (float)count, share, out int host, out int point))
                         GridLayout.Spoke(survey, request, streets, host, point, math.normalizesafe(streets[host].Points[point] - centre), farthest);
             }
 
@@ -115,11 +116,11 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     float2 outward = Direction(start + 2f * math.PI * turn);
                     // Only where no further ring lies outside this one.
                     if (survey.StreetRoomAt(centre + outward * (rings[ring].Radius + depth)) >= 0f) continue;
-                    if (Find(streets, rings[ring].Arcs, turn, out int host, out int point))
+                    if (Find(streets, rings[ring].Arcs, turn, share, out int host, out int point))
                         joined |= GridLayout.Reach(survey, request, streets, host, point, outward);
                 }
             }
-            if (fan && Find(streets, rings[0].Arcs, 0f, out int apex, out int apexPoint))
+            if (fan && Find(streets, rings[0].Arcs, 0f, share, out int apex, out int apexPoint))
                 joined |= GridLayout.Reach(survey, request, streets, apex, apexPoint, -facing);
             return streets;
         }
@@ -180,8 +181,11 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             return arcs;
         }
 
-        /// <summary>The ring's point at a turn round it (0 to 1 from the first radial), clear of arc ends and other junctions.</summary>
-        private static bool Find(List<Street> streets, List<Arc> arcs, float turn, out int street, out int point)
+        /// <summary>
+        /// The ring's point at a turn round it (0 to 1 from the first radial), clear of arc ends and other junctions; with
+        /// <paramref name="share"/>, it may be a junction already there.
+        /// </summary>
+        private static bool Find(List<Street> streets, List<Arc> arcs, float turn, bool share, out int street, out int point)
         {
             street = point = -1;
             foreach (var arc in arcs)
@@ -195,8 +199,9 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     float along = candidate.Stations[at], length = candidate.Stations[candidate.Stations.Length - 1];
                     if (along < EndClearance || length - along < EndClearance) return false;
                 }
+                // A point already a junction is shared only where radials line up (crossroads); rings stay all T-junctions.
                 foreach (int junction in candidate.Junctions)
-                    if (junction != at && candidate.Between(junction, at) < RoadLinks.JunctionSpacing) return false;
+                    if ((junction != at || !share) && candidate.Between(junction, at) < RoadLinks.JunctionSpacing) return false;
                 street = arc.Street;
                 point = at;
                 return true;

@@ -168,7 +168,8 @@ namespace SteppedStreets.Settings
             HighestStep = 3.2f;
             LotSpacing = -1;
             RetainingWalls = false;
-            Trees = true;
+            // Off unless asked for: players found a forest they didn't expect (forum, 3 November 2026).
+            Trees = false;
             TreeDensityPercent = 50;
             Seed = 1;
         }

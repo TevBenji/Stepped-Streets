@@ -169,7 +169,7 @@ export function readState(raw: unknown): ToolState {
             bankGradePercent: number(settings.bankGradePercent, 40, 20, 50),
             lotSpacing: whole(settings.lotSpacing, -1, -1, 2),
             retainingWalls: flag(settings.retainingWalls, false),
-            trees: flag(settings.trees, true),
+            trees: flag(settings.trees, false),
             treeDensityPercent: number(settings.treeDensityPercent, 50, 10, 100),
             seed: whole(settings.seed, 1, 1, 99999),
         },
