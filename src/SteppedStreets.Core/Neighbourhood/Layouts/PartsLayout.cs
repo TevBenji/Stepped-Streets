@@ -27,7 +27,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 var part = request.Copy();
                 part.Boundary = boundary;
                 part.Style = style;
-                var partSurvey = new SiteSurvey(part);
+                var partSurvey = new SiteSurvey(part, cancellation);
                 bool partJoined;
                 var planned = RadialLayout.Handles(style) ? RadialLayout.Plan(partSurvey, part, out partJoined, cancellation)
                     : BranchLayout.Handles(style) ? BranchLayout.Plan(partSurvey, part, out partJoined, cancellation)
