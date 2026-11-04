@@ -27,6 +27,9 @@ namespace SteppedStreets.Core.Neighbourhood
             public bool Level;
             public float Phase;
             public float EntryHeight;
+
+            /// <summary>Roads laid before the contour streets (a ridge or valley road), which the streets keep their distance from.</summary>
+            public List<List<float2>> Reserved;
         }
 
         /// <summary>The streets of one phase of the level grid, and what the in-between levels need to carry on.</summary>
@@ -77,6 +80,8 @@ namespace SteppedStreets.Core.Neighbourhood
 
             layout.Nearest = new float[survey.Count];
             for (int index = 0; index < layout.Nearest.Length; index++) layout.Nearest[index] = float.MaxValue;
+            foreach (var road in options.Reserved ?? new List<List<float2>>())
+                Stamp(survey, road, options.BlockDepth * InfillShare + Spacing * 2f, layout.Nearest);
 
             var levels = new List<float>();
             for (float level = lowest + options.Phase * layout.Interval; level <= highest; level += layout.Interval) levels.Add(level);
@@ -339,14 +344,14 @@ namespace SteppedStreets.Core.Neighbourhood
         }
 
         /// <summary>Marching squares over the area's part of the grid: the contour lines at one level, as polylines.</summary>
-        internal static List<(List<float2> Line, bool Closed)> Trace(SiteSurvey survey, float level)
+        internal static List<(List<float2> Line, bool Closed)> Trace(SiteSurvey survey, float level, float[] field = null)
         {
             int columns = survey.Columns;
             int firstColumn = math.max(0, (int)((survey.BoundaryMinimum.x - survey.Origin.x) / survey.Cell) - 2);
             int lastColumn = math.min(columns - 2, (int)((survey.BoundaryMaximum.x - survey.Origin.x) / survey.Cell) + 2);
             int firstRow = math.max(0, (int)((survey.BoundaryMinimum.y - survey.Origin.y) / survey.Cell) - 2);
             int lastRow = math.min(survey.Rows - 2, (int)((survey.BoundaryMaximum.y - survey.Origin.y) / survey.Cell) + 2);
-            var values = survey.Smooth;
+            var values = field ?? survey.Smooth;
             var points = new Dictionary<int, float2>();
             var touching = new Dictionary<int, List<int>>();
             var segments = new List<int2>();

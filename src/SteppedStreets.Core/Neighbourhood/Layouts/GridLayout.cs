@@ -25,7 +25,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             || style == NeighbourhoodStyle.RectangularGrid || style == NeighbourhoodStyle.IrregularGrid
             || style == NeighbourhoodStyle.SkewedGrid || style == NeighbourhoodStyle.FragmentedGrid
             || style == NeighbourhoodStyle.DiagonalGrid || style == NeighbourhoodStyle.CurvedGrid
-            || style == NeighbourhoodStyle.WarpedGrid || style == NeighbourhoodStyle.RadialGrid;
+            || style == NeighbourhoodStyle.WarpedGrid || style == NeighbourhoodStyle.RadialGrid || Tiled(style);
 
         // A diagonal avenue meets the streets at 64°: clear of the sharpest junction allowed (60°) once its ends are rounded to
         // the streets' 4 m points.
@@ -58,6 +58,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 float u = math.dot(corner, along), v = math.dot(corner, across);
                 uMin = math.min(uMin, u); uMax = math.max(uMax, u); vMin = math.min(vMin, v); vMax = math.max(vMax, v);
             }
+            if (Tiled(style)) return Tiles(survey, request, along, across, uMin, uMax, vMin, vMax, out joined, cancellation);
 
             float rowSpacing = request.BlockDepth;
             bool curved = style == NeighbourhoodStyle.CurvedGrid || style == NeighbourhoodStyle.WarpedGrid;
@@ -234,6 +235,150 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 float offset = staggered && (row == 0 ? 1 : row + 1) % 2 == 1 ? crossSpacing * 0.5f : 0f;
                 for (float u = uMin + phase + offset - crossSpacing; u < uMax + crossSpacing; u += crossSpacing)
                     if (Find(streets, rows[row], u, out int host, out int point)) joined |= Reach(survey, request, streets, host, point, outward);
+            }
+            return streets;
+        }
+
+        /// <summary>The tiled grids: triangles, hexagons, and hexagons split into diamonds.</summary>
+        public static bool Tiled(NeighbourhoodStyle style) => style == NeighbourhoodStyle.TriangularMesh
+            || style == NeighbourhoodStyle.Hexagonal || style == NeighbourhoodStyle.HexagonalSpokes;
+
+        /// <summary>
+        /// A tiled grid. Triangles: straight rows with streets 60° either way between lattice points, six roads at a junction.
+        /// Hexagons: rows that zigzag at 30°, each one's peaks above the next one's troughs, joined there by short straight
+        /// streets, so every junction has three roads at 120°; with spokes, each hexagon is split into three diamonds by
+        /// streets from its centre. Every corner and junction falls on one of the rows' 4 m points, so the angles are exact.
+        /// </summary>
+        private static List<Street> Tiles(SiteSurvey survey, NeighbourhoodRequest request, float2 along, float2 across,
+            float uMin, float uMax, float vMin, float vMax, out bool joined, CancellationToken cancellation)
+        {
+            var streets = new List<Street>();
+            joined = false;
+            var style = request.Style;
+            uint seed = request.Seed;
+            bool triangles = style == NeighbourhoodStyle.TriangularMesh, spokes = style == NeighbourhoodStyle.HexagonalSpokes;
+            float sqrt3 = math.sqrt(3f);
+            // Triangles: the side an even number of 4 m steps, so half a side falls on a point too. Hexagons: the run of one
+            // zigzag side (a hexagon side is that over cos 30°), small enough for lots to meet back to back inside, larger
+            // with spokes so each diamond holds lots all round.
+            int steps = triangles ? 2 * math.max(6, (int)math.round(request.BlockDepth / Step))
+                : math.max(10, (int)math.round((spokes ? 1f : 0.62f) * request.BlockDepth / Step));
+            float run = steps * Step;
+            float side = triangles ? run : 2f * run / sqrt3;
+            float rowSpacing = triangles ? run * sqrt3 * 0.5f : run * sqrt3;
+            float amplitude = triangles ? 0f : run / (2f * sqrt3);
+            float start = uMin - Step;
+            // Reroll slides the pattern along by whole steps.
+            float origin = start + Step * math.floor(Geometry.Hash01(seed, 2, 0) * (triangles ? steps : 2 * steps));
+
+            float Zig(float u, int row)
+            {
+                float x = (u - origin) / run + row;
+                float t = x - 2f * math.floor(x * 0.5f);
+                return amplitude * (2f * math.abs(t - 1f) - 1f);
+            }
+
+            var offsets = new List<float>();
+            for (float v = vMin + Geometry.Hash01(seed, 1, 0) * rowSpacing * 0.5f + rowSpacing * 0.25f; v < vMax; v += rowSpacing) offsets.Add(v);
+            var rows = new List<List<(int Street, float From)>>();
+            for (int row = 0; row < offsets.Count; row++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var stretches = new List<(int, float)>();
+                int current = row;
+                foreach (var (from, points) in Clip(survey, along, across, offsets[row], start, uMax + Step, u => triangles ? 0f : Zig(u, current)))
+                {
+                    var street = Street(survey, request, points, RoadKind.Street);
+                    if (street == null) continue;
+                    // A zigzag turns 60° at every corner: each side is a straight road of its own.
+                    if (!triangles)
+                    {
+                        int first = (int)math.round((from - origin) / Step);
+                        for (int point = 1; point < points.Count - 1; point++)
+                            if (((first + point) % steps + steps) % steps == 0) street.Corners.Add(point);
+                    }
+                    stretches.Add((streets.Count, from));
+                    streets.Add(street);
+                }
+                rows.Add(stretches);
+            }
+
+            // Where the lattice falls on a row: triangles every side, shifted half a side on odd rows; hexagon corners every run.
+            float Column(int row, int column) => triangles ? origin + column * side + (row % 2 == 1 ? side * 0.5f : 0f) : origin + column * run;
+            int firstColumn = (int)math.floor((start - origin) / (triangles ? side : run)) - 2;
+            int lastColumn = (int)math.ceil((uMax + Step - origin) / (triangles ? side : run)) + 2;
+            // A hexagon row's peaks: where (column + row) is even.
+            bool Peak(int row, int column) => ((column + row) % 2 + 2) % 2 == 0;
+
+            for (int row = 0; row + 1 < rows.Count; row++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                for (int column = firstColumn; column <= lastColumn; column++)
+                {
+                    float u = Column(row, column);
+                    if (triangles)
+                    {
+                        Cross(survey, request, streets, rows[row], rows[row + 1], along, u, u + side * 0.5f);
+                        Cross(survey, request, streets, rows[row], rows[row + 1], along, u, u - side * 0.5f);
+                    }
+                    else if (Peak(row, column)) Cross(survey, request, streets, rows[row], rows[row + 1], along, u, u);
+                }
+            }
+
+            if (spokes)
+                for (int row = 0; row + 1 < rows.Count; row++)
+                    for (int column = firstColumn; column <= lastColumn; column++)
+                    {
+                        if (!Peak(row, column)) continue;
+                        // The hexagon between this peak and the next: its bottom corner on this row, its top corners on the next.
+                        float left = Column(row, column);
+                        if (!Find(streets, rows[row], left + run, out int bottom, out int bottomPoint)
+                            || !Find(streets, rows[row + 1], left, out int upperLeft, out int leftPoint)
+                            || !Find(streets, rows[row + 1], left + 2f * run, out int upperRight, out int rightPoint)) continue;
+                        float2 low = streets[bottom].Points[bottomPoint], centre = low + across * side;
+                        var line = Line(low, centre);
+                        bool clear = true;
+                        foreach (var point in line) clear &= survey.StreetRoomAt(point) >= 0f;
+                        if (!clear) continue;
+                        var stem = Street(survey, request, line, RoadKind.Street, streets[bottom].Heights[bottomPoint]);
+                        if (stem == null) continue;
+                        stem.Start = new Attachment { Street = bottom, Point = bottomPoint };
+                        streets[bottom].Junctions.Add(bottomPoint);
+                        int hub = streets.Count;
+                        streets.Add(stem);
+                        foreach (var (host, point) in new[] { (upperLeft, leftPoint), (upperRight, rightPoint) })
+                        {
+                            var arm = Line(streets[host].Points[point], centre);
+                            var spoke = Street(survey, request, arm, RoadKind.Link, streets[host].Heights[point], stem.Heights[stem.Heights.Length - 1]);
+                            if (spoke == null) continue;
+                            spoke.Start = new Attachment { Street = host, Point = point };
+                            spoke.End = new Attachment { Street = hub, Point = stem.Points.Count - 1 };
+                            streets[host].Junctions.Add(point);
+                            streets.Add(spoke);
+                        }
+                    }
+
+            // Every row that runs out towards the city's road meets it in a T, and so do the outermost rows' corners.
+            int made = streets.Count;
+            for (int index = 0; index < made; index++)
+            {
+                var street = streets[index];
+                if (street.Kind != RoadKind.Street || street.Start.Joined) continue;
+                int last = street.Points.Count - 1;
+                joined |= Reach(survey, request, streets, index, 0, math.normalizesafe(street.Points[0] - street.Points[1]));
+                joined |= Reach(survey, request, streets, index, last, math.normalizesafe(street.Points[last] - street.Points[last - 1]));
+            }
+            foreach (int row in new[] { 0, rows.Count - 1 })
+            {
+                if (row < 0 || row >= rows.Count) continue;
+                bool outer = row == 0;
+                for (int column = firstColumn; column <= lastColumn; column++)
+                {
+                    // Hexagons: the bottom row's troughs and the top row's peaks point outwards.
+                    if (!triangles && Peak(row, column) == outer) continue;
+                    if (Find(streets, rows[row], Column(row, column), out int host, out int point))
+                        joined |= Reach(survey, request, streets, host, point, outer ? -across : across);
+                }
             }
             return streets;
         }

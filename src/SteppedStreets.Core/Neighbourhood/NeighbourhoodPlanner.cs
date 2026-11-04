@@ -82,6 +82,7 @@ namespace SteppedStreets.Core.Neighbourhood
             float radius = MinimumRadius(request.Style);
             var streets = request.Style == NeighbourhoodStyle.MountainLane ? Lane(survey, request, radius, cancellation)
                 : Layouts.GridLayout.Handles(request.Style) || Layouts.RadialLayout.Handles(request.Style) || Layouts.BranchLayout.Handles(request.Style)
+                    || Layouts.TerrainLayout.Handles(request.Style)
                 ? Grid(survey, request, cancellation, Stage)
                 : Contours(survey, request, radius, cancellation, Stage);
 
@@ -167,6 +168,11 @@ namespace SteppedStreets.Core.Neighbourhood
         {
             float entry = EntryHeight(survey, request);
             float seedPhase = Geometry.Hash01(request.Seed, 0, 0);
+            // Ridge and valley: the main road first, along the crest or the floor; the contour streets keep their distance from it.
+            var mains = request.Style == NeighbourhoodStyle.Ridge || request.Style == NeighbourhoodStyle.Valley
+                ? Layouts.TerrainLayout.Spines(survey, request, request.Style == NeighbourhoodStyle.Ridge) : new List<Street>();
+            var reserved = new List<List<float2>>();
+            foreach (var main in mains) reserved.Add(main.Points);
             // A few phases of the level grid, compared on their regular levels (in parallel: they share only the read-only
             // survey): the one with the longest, least broken streets wins and gets its in-between levels. The seed shifts the
             // grid, so Reroll gives another layout.
@@ -183,6 +189,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         Level = request.Style == NeighbourhoodStyle.TerracedBlocks,
                         Phase = (seedPhase + phase * 0.25f) % 1f,
                         EntryHeight = entry,
+                        Reserved = reserved,
                     }, cancellation);
                 });
             }
@@ -195,11 +202,12 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (best == null || phase.Score > best.Score + 1e-3f) best = phase;
             ContourStreets.Infill(survey, best, cancellation);
             var result = best.Streets;
+            result.InsertRange(0, mains);
             stage("contours");
             var links = new RoadLinks(survey, request, result, LinkRadius(request));
             links.LinkNeighbours(cancellation);
             stage("links");
-            if (request.Style == NeighbourhoodStyle.ContourSuburb) links.JoinEnds(request.BlockDepth * 0.8f, cancellation);
+            if (request.Style != NeighbourhoodStyle.TerracedBlocks) links.JoinEnds(request.BlockDepth * 0.8f, cancellation);
             stage("joins");
             Connect(result, links, null, cancellation);
             return result;
@@ -233,6 +241,7 @@ namespace SteppedStreets.Core.Neighbourhood
             bool joined;
             var result = Layouts.RadialLayout.Handles(request.Style) ? Layouts.RadialLayout.Plan(survey, request, out joined, cancellation)
                 : Layouts.BranchLayout.Handles(request.Style) ? Layouts.BranchLayout.Plan(survey, request, out joined, cancellation)
+                : Layouts.TerrainLayout.Handles(request.Style) ? Layouts.TerrainLayout.Plan(survey, request, out joined, cancellation)
                 : Layouts.GridLayout.Plan(survey, request, out through, out joined, cancellation);
             stage("grid");
             var links = new RoadLinks(survey, request, result, LinkRadius(request));

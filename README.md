@@ -8,7 +8,7 @@
 
 <p>
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods" src="https://img.shields.io/badge/Paradox%20Mods-Subscribe-1f6feb?style=for-the-badge"></a>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.4.0-2ea44f?style=for-the-badge"></a>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.5.0-2ea44f?style=for-the-badge"></a>
 <img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490?style=for-the-badge">
 <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c?style=for-the-badge"></a>
 </p>
@@ -54,8 +54,9 @@ builder would, previews it on the ground, and builds it when you say so.
   each on a level site of its own, facing the road.
 - **Trees if you want them**: forest on ground too steep to build and trees on the banks (off by default), and optional
   garden walls.
-- **Layouts for hills and flat ground**: three that follow the contours, and for flat or gentle ground nine grids, four
-  radial layouts and nine linear and branching ones (spines, combs, trees, cul-de-sacs, loops and lollipops).
+- **Layouts for hills and flat ground**: five that follow the land (contours, ridges, valleys), and for flat or gentle
+  ground nine grids, three tiled ones (triangles and hexagons), four radial layouts, nine linear and branching ones, a
+  coastal one that follows the shore and one long winding road.
 - **Shape the ground, or don't**: grade roads and lots into the hill, or leave the terrain exactly as it is.
 - A live preview, and **Reroll** for another layout from the same area.
 - **Steep hills mode** for slopes up to 60 %, and areas up to 6.4 km across.
@@ -84,6 +85,11 @@ builder would, previews it on the ground, and builds it when you say so.
 <tr>
 <td><img src="src/SteppedStreets/Properties/Screenshots/14.png" alt="Loops and lollipops"></td>
 <td><img src="src/SteppedStreets/Properties/Screenshots/15.png" alt="Spines, combs and fishbones"></td>
+<td><img src="src/SteppedStreets/Properties/Screenshots/16.png" alt="Triangles and hexagons"></td>
+</tr>
+<tr>
+<td><img src="src/SteppedStreets/Properties/Screenshots/17.png" alt="Along the shore"></td>
+<td></td>
 <td></td>
 </tr>
 </table>
@@ -158,11 +164,20 @@ tells you so you can join them up with a road of your own.
 | **Loops** | Trunks with loop streets off both sides, each leaving its trunk and coming back to it. |
 | **Loops and lollipops** | Trunks with loops and lollipops in turn. |
 | **Lollipops on a stick** | Trunks with short sticks off both sides, each ending in a small ring street. |
+| **Triangular mesh** | Streets in three directions 60° apart, so every block is a triangle. |
+| **Hexagonal** | A honeycomb of streets: hexagonal blocks, every junction a three-way one at 120°. |
+| **Hexagons with spokes** | Larger hexagons, each split into three diamonds by streets from its centre. |
+| **Ridge** | A main road along the crest of a ridge, with streets following the contours down both sides. |
+| **Valley** | A main road along the valley floor, one on each bank where a river runs there, with contour streets up both sides. |
+| **Coastal** | Streets parallel to the shore, joined by streets square to it. With no water near, they line up with your road. |
+| **Winding** | One road winding back and forth across the area in gentle waves, with a cross street every few blocks. |
 
 The hillside layouts need a slope; all the others work on flat land too. A grid lines up with your nearest road and
 meets it the way a real grid does: every street that runs towards it joins it in a T. The radial layouts centre on the
 roomiest part of the area (the fan on the edge nearest your road) and meet your road the same way. The linear and
 branching layouts run their trunks in from your road, each meeting it in a T, with the side streets off the trunks.
+Ridge and Valley need a hill, like the contour layouts; Coastal follows water in or beside the area (with none, it lines
+up with your road).
 
 **Junctions** (grids): **Crossroads** lines the cross streets up into four-way junctions; **Staggered** offsets them like
 brickwork, so every junction is a T; **Traffic** runs one through road across the grid as the only road that meets

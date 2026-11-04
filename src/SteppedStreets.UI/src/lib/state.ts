@@ -3,11 +3,13 @@ export type ToolStage = "Closed" | "Drawing" | "Planning" | "Planned" | "Buildin
 export type NeighbourhoodStyle = "ContourSuburb" | "TerracedBlocks" | "MountainLane"
     | "SquareGrid" | "RectangularGrid" | "IrregularGrid" | "SkewedGrid" | "FragmentedGrid"
     | "DiagonalGrid" | "CurvedGrid" | "WarpedGrid" | "RadialGrid" | "Star" | "Rings" | "Spiderweb" | "Fan"
-    | "Spine" | "Ladder" | "Comb" | "Fishbone" | "Tree" | "CulDeSacs" | "Loops" | "LoopsAndLollipops" | "Lollipops";
+    | "Spine" | "Ladder" | "Comb" | "Fishbone" | "Tree" | "CulDeSacs" | "Loops" | "LoopsAndLollipops" | "Lollipops"
+    | "TriangularMesh" | "Hexagonal" | "HexagonalSpokes" | "Ridge" | "Valley" | "Coastal" | "Winding";
 export const STYLES: NeighbourhoodStyle[] = ["ContourSuburb", "TerracedBlocks", "MountainLane",
     "SquareGrid", "RectangularGrid", "IrregularGrid", "SkewedGrid", "FragmentedGrid",
     "DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid", "Star", "Rings", "Spiderweb", "Fan",
-    "Spine", "Ladder", "Comb", "Fishbone", "Tree", "CulDeSacs", "Loops", "LoopsAndLollipops", "Lollipops"];
+    "Spine", "Ladder", "Comb", "Fishbone", "Tree", "CulDeSacs", "Loops", "LoopsAndLollipops", "Lollipops",
+    "TriangularMesh", "Hexagonal", "HexagonalSpokes", "Ridge", "Valley", "Coastal", "Winding"];
 const JUNCTION_STYLES: NeighbourhoodStyle[] = ["SquareGrid", "RectangularGrid", "IrregularGrid", "SkewedGrid", "FragmentedGrid", "DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid"];
 /** The grid layouts, whose cross streets can meet as crossroads, staggered or traffic-optimised. */
 export const usesJunctions = (style: NeighbourhoodStyle) => JUNCTION_STYLES.includes(style);
