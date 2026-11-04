@@ -188,7 +188,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         }
 
         /// <summary>A straight side street from the trunk point at <paramref name="v"/>, up to <paramref name="longest"/>; −1 where none fits.</summary>
-        private static int Branch(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, List<(int Street, float From)> trunk,
+        internal static int Branch(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, List<(int Street, float From)> trunk,
             float v, float2 direction, float longest)
         {
             if (!Point(streets, trunk, v, out int host, out int point)) return -1;
@@ -199,7 +199,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         /// A loop off the trunk: out from one point, round a half circle and back to a point a block further on, the two legs a
         /// block apart so the lots inside meet back to back. As long as fits, up to <paramref name="reach"/>.
         /// </summary>
-        private static void Loop(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, List<(int Street, float From)> trunk,
+        internal static void Loop(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, List<(int Street, float From)> trunk,
             float vA, float vB, float2 outward, float2 forward, float reach)
         {
             if (!Point(streets, trunk, vA, out int host, out int a) || !Point(streets, trunk, vB, out int other, out int b) || other != host) return;

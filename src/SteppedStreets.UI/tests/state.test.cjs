@@ -173,12 +173,14 @@ test("the radial, linear and branching layouts are read, and only grids offer ju
     const { readState, usesJunctions } = await stateModule();
     for (const style of ["DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid", "Star", "Rings", "Spiderweb", "Fan",
         "Spine", "Ladder", "Comb", "Fishbone", "Tree", "CulDeSacs", "Loops", "LoopsAndLollipops", "Lollipops",
-        "TriangularMesh", "Hexagonal", "HexagonalSpokes", "Ridge", "Valley", "Coastal", "Winding"])
+        "TriangularMesh", "Hexagonal", "HexagonalSpokes", "Ridge", "Valley", "Coastal", "Winding",
+        "OrganicMesh", "Hybrid", "Polycentric", "Superblock", "Radburn", "FusedGrid", "FilteredGrid", "BarcelonaSuperblock"])
         assert.equal(readState({ settings: { style } }).settings.style, style);
     assert.equal(usesJunctions("RadialGrid"), true);
     assert.equal(usesJunctions("Fan"), false);
     assert.equal(usesJunctions("Lollipops"), false);
     assert.equal(usesJunctions("Hexagonal"), false);
+    assert.equal(usesJunctions("FilteredGrid"), false);
     assert.equal(usesJunctions("ContourSuburb"), false);
 });
 
