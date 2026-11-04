@@ -309,6 +309,15 @@ const LAYOUTS: Option[] = [
     { name: "Rings", label: "Rings", group: "Radial" },
     { name: "Spiderweb", label: "Spiderweb", group: "Radial" },
     { name: "Fan", label: "Fan", group: "Radial" },
+    { name: "Spine", label: "Spine", group: "Linear" },
+    { name: "Ladder", label: "Ladder", group: "Linear" },
+    { name: "Comb", label: "Comb", group: "Linear" },
+    { name: "Fishbone", label: "Fishbone", group: "Linear" },
+    { name: "Tree", label: "Tree", group: "Branching" },
+    { name: "CulDeSacs", label: "Cul-de-sacs", group: "Branching" },
+    { name: "Loops", label: "Loops", group: "Branching" },
+    { name: "LoopsAndLollipops", label: "Loops and lollipops", group: "Branching" },
+    { name: "Lollipops", label: "Lollipops on a stick", group: "Branching" },
 ];
 const JUNCTIONS: [JunctionPattern, string][] = [["Crossroads", "Crossroads"], ["Staggered", "Staggered"], ["TrafficOptimised", "Traffic"]];
 const MIX_PATTERNS: [MixPattern, string][] = [["Random", "Random"], ["Clumps", "Clumps"], ["Even", "Even"]];

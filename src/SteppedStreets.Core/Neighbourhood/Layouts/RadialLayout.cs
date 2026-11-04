@@ -151,11 +151,9 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             var arcs = new List<Arc>();
             if (fits == around)
             {
-                var ring = new List<float2>(points);
-                var heights = RoadProfile.FitRing(ring, survey.GroundAt, request.MaxRoadGrade);
-                for (int index = 0; index < around; index++)
-                    if (math.abs(heights[index] - survey.GroundAt(ring[index])) > request.EarthworkLimit) return arcs;
-                streets.Add(new Street(RoadKind.Street, ring, heights) { Closed = true });
+                var whole = Closed(survey, request, new List<float2>(points));
+                if (whole == null) return arcs;
+                streets.Add(whole);
                 arcs.Add(new Arc { Street = streets.Count - 1, Start = 0, Count = around, Around = around });
                 return arcs;
             }
@@ -179,6 +177,15 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 arcs.Add(new Arc { Street = streets.Count - 1, Start = first, Count = count, Around = around });
             }
             return arcs;
+        }
+
+        /// <summary>A ring street on the ground's line, or null where it would need more earth than the limit.</summary>
+        internal static Street Closed(SiteSurvey survey, NeighbourhoodRequest request, List<float2> ring)
+        {
+            var heights = RoadProfile.FitRing(ring, survey.GroundAt, request.MaxRoadGrade);
+            for (int index = 0; index < ring.Count; index++)
+                if (math.abs(heights[index] - survey.GroundAt(ring[index])) > request.EarthworkLimit) return null;
+            return new Street(RoadKind.Street, ring, heights) { Closed = true };
         }
 
         /// <summary>

@@ -330,7 +330,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         }
 
         /// <summary>The stretches of a straight line where a street fits, each with where along the line it starts.</summary>
-        private static List<(float From, List<float2> Points)> Clip(SiteSurvey survey, float2 along, float2 across, float v, float from, float to,
+        internal static List<(float From, List<float2> Points)> Clip(SiteSurvey survey, float2 along, float2 across, float v, float from, float to,
             Func<float, float> bend)
         {
             var stretches = new List<(float, List<float2>)>();
