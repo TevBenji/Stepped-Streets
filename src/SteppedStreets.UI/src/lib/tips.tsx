@@ -47,6 +47,15 @@ export const LAYOUT_TIPS: Record<string, string> = {
     Rings: "Concentric ring streets joined by staggered radial streets.",
     Spiderweb: "Concentric rings crossed by radial streets running straight out from the centre.",
     Fan: "Arcs and radial streets opening like a fan from the edge nearest your road.",
+    Spine: "A trunk street from your road with straight side streets off both sides.",
+    Ladder: "Rails running in from your road, joined by rungs one block apart.",
+    Comb: "A trunk along one side with side streets off one side only, like a comb.",
+    Fishbone: "A trunk with side streets slanting off it in pairs, like the bones of a fish.",
+    Tree: "A trunk with limbs, and twigs off the limbs: streets branching like a tree.",
+    CulDeSacs: "Trunks from your road with short dead-end streets off both sides.",
+    Loops: "Trunks with loop streets off both sides, each leaving and rejoining its trunk.",
+    LoopsAndLollipops: "Trunks with loops and lollipops in turn.",
+    Lollipops: "Trunks with short sticks off both sides, each ending in a small ring street.",
 };
 
 /** A setting's description on hover, in the game's tooltip bubble; rows without one are left as they are. */

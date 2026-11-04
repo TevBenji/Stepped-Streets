@@ -59,6 +59,33 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Rings and radial streets spreading from a point on the area's edge, like an open fan.</summary>
         Fan,
+
+        /// <summary>A trunk street from the city's road with straight side streets off both sides.</summary>
+        Spine,
+
+        /// <summary>Rails running in from the city's road, joined by rungs one block apart.</summary>
+        Ladder,
+
+        /// <summary>A trunk along one side of the area with side streets off one side only, like the teeth of a comb.</summary>
+        Comb,
+
+        /// <summary>A trunk with side streets slanting off it in pairs, like the bones of a fish.</summary>
+        Fishbone,
+
+        /// <summary>A trunk with limbs off it and twigs off the limbs: a branching hierarchy of streets.</summary>
+        Tree,
+
+        /// <summary>Trunks with short dead-end streets off both sides.</summary>
+        CulDeSacs,
+
+        /// <summary>Trunks with loop streets off both sides, each leaving and rejoining its trunk.</summary>
+        Loops,
+
+        /// <summary>Trunks with loops and lollipops in turn.</summary>
+        LoopsAndLollipops,
+
+        /// <summary>Trunks with lollipops off both sides: short sticks ending in small ring streets.</summary>
+        Lollipops,
     }
 
     public static class NeighbourhoodStyles

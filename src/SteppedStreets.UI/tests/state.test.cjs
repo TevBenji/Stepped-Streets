@@ -169,12 +169,14 @@ test("layouts, junctions and the terrain option read leniently", async () => {
     assert.equal(bad.settings.shapeGround, true);
 });
 
-test("the radial layouts are read, and only grids offer junctions", async () => {
+test("the radial, linear and branching layouts are read, and only grids offer junctions", async () => {
     const { readState, usesJunctions } = await stateModule();
-    for (const style of ["DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid", "Star", "Rings", "Spiderweb", "Fan"])
+    for (const style of ["DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid", "Star", "Rings", "Spiderweb", "Fan",
+        "Spine", "Ladder", "Comb", "Fishbone", "Tree", "CulDeSacs", "Loops", "LoopsAndLollipops", "Lollipops"])
         assert.equal(readState({ settings: { style } }).settings.style, style);
     assert.equal(usesJunctions("RadialGrid"), true);
     assert.equal(usesJunctions("Fan"), false);
+    assert.equal(usesJunctions("Lollipops"), false);
     assert.equal(usesJunctions("ContourSuburb"), false);
 });
 
