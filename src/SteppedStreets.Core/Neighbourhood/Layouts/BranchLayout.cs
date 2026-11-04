@@ -56,12 +56,21 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             if (style == NeighbourhoodStyle.Comb) positions.Add(uMin + depth * 0.5f);
             else if (style == NeighbourhoodStyle.Ladder)
             {
-                int rails = math.max(2, (int)math.ceil((width - depth) / 420f) + 1);
-                for (int rail = 0; rail < rails; rail++) positions.Add(math.lerp(uMin + depth * 0.5f, uMax - depth * 0.5f, rail / (float)(rails - 1)));
+                // Rails a block in from each side and at least a block apart; an area too narrow for two gets one.
+                if (width - depth < depth) positions.Add((uMin + uMax) * 0.5f);
+                else
+                {
+                    int rails = (int)math.ceil((width - depth) / 420f) + 1;
+                    for (int rail = 0; rail < rails; rail++) positions.Add(math.lerp(uMin + depth * 0.5f, uMax - depth * 0.5f, rail / (float)(rails - 1)));
+                }
             }
             else if (shortBranches)
             {
                 int count = math.max(1, (int)math.ceil(width / (3.8f * depth)));
+                // Fewer trunks where the smallest lollipop wouldn't fit between two, so the rings of neighbouring trunks never meet.
+                float least = style == NeighbourhoodStyle.CulDeSacs || style == NeighbourhoodStyle.Loops ? 0f
+                    : RoadLinks.JunctionSpacing + Step + 2f * LollipopRadius(request, unit);
+                while (count > 1 && width / count * 0.5f - 0.4f * depth < least) count--;
                 float spacing = width / count;
                 for (int trunk = 0; trunk < count; trunk++) positions.Add(uMin + (trunk + 0.5f) * spacing);
                 reach = math.min(1.5f * depth, spacing * 0.5f - 0.4f * depth);
@@ -232,8 +241,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             if (!Point(streets, trunk, v, out int host, out int at)) return;
             var street = streets[host];
             float2 start = street.Points[at];
-            // Small, but no tighter than the street's smallest curve, and narrow enough for its slot with lots round it.
-            float radius = math.clamp(unit * 0.4f, NeighbourhoodPlanner.MinimumRadius(request.Style) + 6f, 48f);
+            float radius = LollipopRadius(request, unit);
             // The stick's two junctions, on the trunk and on the ring, at least 40 m apart, even if the lollipop then reaches a
             // little further than a loop would.
             float shortest = RoadLinks.JunctionSpacing + Step;
@@ -263,6 +271,10 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 return;
             }
         }
+
+        /// <summary>A lollipop's ring: small, but no tighter than the street's smallest curve, and narrow enough for its slot with lots round it.</summary>
+        private static float LollipopRadius(NeighbourhoodRequest request, float unit) =>
+            math.clamp(unit * 0.4f, NeighbourhoodPlanner.MinimumRadius(request.Style) + 6f, 48f);
 
         private static bool Fits(SiteSurvey survey, List<float2> points, int from, int to)
         {
