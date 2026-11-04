@@ -43,6 +43,7 @@ namespace SteppedStreets.Tool
         // Planning on the worker: the latest request wins.
         private Task<NeighbourhoodPlan> planTask;
         private CancellationTokenSource planCancel;
+        private bool replanOnOpen;
         private int requestedVersion, taskVersion;
         private SiteSnapshot taskSnapshot;
         private NeighbourhoodRequest taskRequest;
@@ -105,6 +106,7 @@ namespace SteppedStreets.Tool
                 if (State.Stage == ToolStage.Building) return;
                 m_ToolSystem.activeTool = this;
                 RefreshStage();
+                if (replanOnOpen) { replanOnOpen = false; Replan(); }
             }
             catch (Exception exception) { Fail(exception, "The neighbourhood tool could not open."); }
         }
@@ -198,6 +200,15 @@ namespace SteppedStreets.Tool
                 dragging = -1;
                 Cursor = null;
                 HoveredCorner = -1;
+                // Planning takes every core for a few seconds, so a plan still being worked out stops with the tool and
+                // starts again when it opens.
+                if (State.Stage != ToolStage.Building && planTask != null && !planTask.IsCompleted)
+                {
+                    planCancel?.Cancel();
+                    planCancel = null;
+                    planTask = null;
+                    replanOnOpen = true;
+                }
                 // The invisible build tool briefly owns the tool slot while a build stage applies.
                 if (State.Stage != ToolStage.Building) State.Stage = ToolStage.Closed;
                 Touch();
@@ -464,6 +475,8 @@ namespace SteppedStreets.Tool
                 Touch();
                 return;
             }
+            // A change from the Options page while the tool is closed plans when the tool opens, not in the background now.
+            if (!IsActive) { replanOnOpen = true; Touch(); return; }
             var settings = Mod.Settings ?? throw new InvalidOperationException("Stepped Streets settings are unavailable.");
             var boundary = corners.ToArray();
             var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -673,6 +686,7 @@ namespace SteppedStreets.Tool
                 // The sampled ground and entity handles belong to the old city.
                 planCancel?.Cancel();
                 planTask = null;
+                replanOnOpen = false;
                 corners.Clear();
                 history.Clear();
                 areaClosed = false;

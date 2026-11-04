@@ -1,8 +1,8 @@
 // Vanilla game UI components resolved from the cohtml module registry.
 // Adapted from Grid Road Generator (Ti4goc); vanilla.ts pattern from CS2-NetworkTools
 // (Luca Rager, MIT, https://github.com/lucarager/CS2-NetworkTools).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: resolve only the slider, text input and focus key used by Stepped Streets.
-import { ComponentType } from "react";
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: resolve only the slider, text input, scroll area and focus key used by Stepped Streets.
+import { ComponentType, ReactNode, Ref } from "react";
 import { FocusKey } from "cs2/ui";
 import { ModuleRegistry } from "cs2/modding";
 
@@ -25,13 +25,25 @@ interface TextInputProps {
     className?: string;
     onChange: (event: { target: { value: string } }) => void;
 }
-export const vanilla: { Slider?: ComponentType<SliderProps>; TextInput?: ComponentType<TextInputProps>; focusDisabled?: FocusKey } = {};
+// The game's scroll area: the bar it draws can be dragged, which a plain scrolling box in Gameface doesn't show.
+interface ScrollableProps {
+    className?: string;
+    vertical?: boolean;
+    trackVisibility?: "always" | "scrollable" | "reserve";
+    children?: ReactNode;
+    ref?: Ref<HTMLDivElement>;
+}
+export const vanilla: {
+    Slider?: ComponentType<SliderProps>; TextInput?: ComponentType<TextInputProps>; Scrollable?: ComponentType<ScrollableProps>; focusDisabled?: FocusKey;
+} = {};
 export function initializeVanilla(registry: ModuleRegistry) {
     try { vanilla.Slider = registry.get("game-ui/common/input/slider/slider.tsx", "Slider"); }
     catch (error) { console.warn("[SteppedStreets] Slider unavailable; using step buttons", error); }
     // No fallback to a plain input: without the game's, typed keys would also reach the game's shortcuts.
     try { vanilla.TextInput = registry.get("game-ui/common/input/text/text-input.tsx", "TextInput"); }
     catch (error) { console.warn("[SteppedStreets] Text input unavailable; lists show without a search box", error); }
+    try { vanilla.Scrollable = registry.get("game-ui/common/scrolling/scrollable.tsx", "Scrollable"); }
+    catch (error) { console.warn("[SteppedStreets] Scroll area unavailable; lists scroll without a bar", error); }
     try { vanilla.focusDisabled = registry.get("game-ui/common/focus/focus-key.ts", "FOCUS_DISABLED"); }
     catch (error) { console.warn("[SteppedStreets] Focus key unavailable", error); }
 }

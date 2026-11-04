@@ -170,9 +170,12 @@ namespace SteppedStreets.Panel
                 var settings = Mod.Settings;
                 if (settings == null || _state == null || _tool == null) return;
                 bool catalogueChanged = BuildZones() | BuildRoads() | BuildServices();
-                string settingsJson = SettingsJson(settings);
                 var state = _tool.State;
-                if (_published && !catalogueChanged && _version == state.Version && settingsJson == _settingsJson) return;
+                bool current = _published && !catalogueChanged && _version == state.Version;
+                // The panel is hidden while the tool is closed and opening it moves the version, so until then there is nothing to rebuild.
+                if (current && state.Stage == ToolStage.Closed) return;
+                string settingsJson = SettingsJson(settings);
+                if (current && settingsJson == _settingsJson) return;
                 _state.Update(StateJson(state, settingsJson));
                 _version = state.Version;
                 _settingsJson = settingsJson;
