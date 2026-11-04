@@ -1,6 +1,6 @@
-<img align="right" src="src/SteppedStreets/Properties/Thumbnail.png" alt="Stepped Streets" width="260">
-
 # Stepped Streets
+
+<img align="right" src="src/SteppedStreets/Properties/Thumbnail.png" alt="Stepped Streets" width="260">
 
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods: Stepped Streets" src="https://img.shields.io/badge/Paradox%20Mods-Stepped%20Streets-2ea44f"></a>
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.6.1-1f6feb"></a>
