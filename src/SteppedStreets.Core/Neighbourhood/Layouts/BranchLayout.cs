@@ -32,8 +32,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             var style = request.Style;
             uint seed = request.Seed;
             float depth = request.BlockDepth;
-            // Junctions along a trunk at least 40 m apart, even where the two sides' branches alternate.
-            float unit = math.max(depth, 2f * RoadLinks.JunctionSpacing);
+            // Junctions along a trunk 44 m apart at least, clear of the 40 m rule, even where the two sides' branches alternate.
+            float unit = math.max(depth, 2f * (RoadLinks.JunctionSpacing + 4f));
 
             // Trunks run away from the city's road, so each meets it at its near end; Reroll mirrors the layout.
             float2 inward = Inward(survey, request);
@@ -294,7 +294,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 float along = candidate.Stations[at], length = candidate.Stations[candidate.Stations.Length - 1];
                 if (along < EndClearance || length - along < EndClearance) return false;
                 foreach (int junction in candidate.Junctions)
-                    if (junction != at && candidate.Between(junction, at) < RoadLinks.JunctionSpacing) return false;
+                    if (junction != at && candidate.Between(junction, at) < GridLayout.JunctionGap) return false;
                 street = index;
                 point = at;
                 return true;

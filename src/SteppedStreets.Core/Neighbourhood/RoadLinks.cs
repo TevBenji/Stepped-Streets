@@ -75,7 +75,11 @@ namespace SteppedStreets.Core.Neighbourhood
             public bool Traced;
         }
 
-        /// <summary>Links each contour street to the next one up, about every link spacing along what they share.</summary>
+        /// <summary>
+        /// Links each contour street to the next one up, about every link spacing along what they share. A ridge or valley's
+        /// main road too steep along its length to be a contour street looks both ways: on a valley floor every contour lies
+        /// above it, and none looks down to it.
+        /// </summary>
         public void LinkNeighbours(CancellationToken cancellation)
         {
             this.cancellation = cancellation;
@@ -85,15 +89,19 @@ namespace SteppedStreets.Core.Neighbourhood
             {
                 cancellation.ThrowIfCancellationRequested();
                 var street = streets[lower];
-                if (street.Kind != RoadKind.Contour) continue;
-                // Which street lies uphill of each station, by a ray up the slope.
+                if (street.Kind != RoadKind.Contour && street.Kind != RoadKind.Street) continue;
+                // Which street lies uphill of each station, by a ray up the slope (and down it, from a main road).
                 var runs = new List<(int Upper, int First, int Last)>();
-                for (int point = 0; point < street.Points.Count; point += 4)
+                foreach (bool down in street.Kind == RoadKind.Street ? new[] { false, true } : new[] { false })
                 {
-                    int upper = UphillNeighbour(street, lower, point, buckets);
-                    if (runs.Count > 0 && runs[runs.Count - 1].Upper == upper && point - runs[runs.Count - 1].Last <= 4)
-                        runs[runs.Count - 1] = (upper, runs[runs.Count - 1].First, point);
-                    else runs.Add((upper, point, point));
+                    int firstRun = runs.Count;
+                    for (int point = 0; point < street.Points.Count; point += 4)
+                    {
+                        int upper = UphillNeighbour(street, lower, point, buckets, down);
+                        if (runs.Count > firstRun && runs[runs.Count - 1].Upper == upper && point - runs[runs.Count - 1].Last <= 4)
+                            runs[runs.Count - 1] = (upper, runs[runs.Count - 1].First, point);
+                        else runs.Add((upper, point, point));
+                    }
                 }
                 foreach (var run in runs)
                 {
@@ -712,11 +720,12 @@ namespace SteppedStreets.Core.Neighbourhood
             return buckets;
         }
 
-        private int UphillNeighbour(Street street, int self, int point, SpatialBuckets<int2> buckets)
+        private int UphillNeighbour(Street street, int self, int point, SpatialBuckets<int2> buckets, bool down = false)
         {
             float2 origin = street.Points[point];
             float2 normal = Geometry.Left(street.Tangent(point));
             if (math.dot(normal, survey.UphillAt(origin)) < 0f) normal = -normal;
+            if (down) normal = -normal;
             float reach = request.BlockDepth * 2.5f;
             for (float distance = 8f; distance <= reach; distance += 2f)
             {

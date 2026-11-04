@@ -30,10 +30,8 @@ namespace SteppedStreets.Core.Planning
         // So a step of exactly the highest step is allowed.
         internal const float StepTolerance = 0.001f;
 
-        // ponytail: a lot on the inside of a bend moves on 1 m at a time until it clears the previous lot, which can waste
-        // up to 1 m of frontage per bend; solve for the exact clearance if that frontage matters.
-        private const float OverlapNudge = 1f;
-
+        // ponytail: a lot on the inside of a bend moves on a whole cell until it clears the previous lot, which can leave a
+        // cell of frontage empty per bend; narrowing the previous lot instead would keep it, if that frontage matters.
         // Lots that only touch along an edge do not overlap.
         private const float TouchTolerance = 0.01f;
 
@@ -215,7 +213,9 @@ namespace SteppedStreets.Core.Planning
 
                 if (previousLot != null && Overlaps(outline, previousLot))
                 {
-                    start += OverlapNudge;
+                    // On to the next whole cell, not a metre: the game's zone cells run on the street's 8 m grid from its start,
+                    // and a lot nudged off it would leave every cell after it straddling two lots.
+                    start = CellSize * (math.floor(start / CellSize + 1e-3f) + 1f);
                     continue;
                 }
 

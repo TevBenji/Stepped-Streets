@@ -108,6 +108,9 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>At least one new road reaches an existing road.</summary>
         public bool Connected;
 
+        /// <summary>How many streets the layout planned, and how many of them the road rules then dropped (for the tests).</summary>
+        internal int StreetsPlanned, StreetsDropped;
+
         /// <summary>At least one road. The area need not touch a road, so a standalone network is buildable too.</summary>
         public bool Buildable => Roads.Count > 0;
 

@@ -50,7 +50,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             var radii = new List<float>();
             if (star)
             {
-                radii.Add(math.max(depth * 0.6f, StarStreets * 42f / (2f * math.PI)));
+                radii.Add(math.max(depth * 0.6f, StarStreets * GridLayout.JunctionRoom / (2f * math.PI)));
                 if (radii[0] + depth * 3f < farthest) radii.Add(radii[0] + depth * 2f);
             }
             else
@@ -73,11 +73,12 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 for (int radial = 0; radial < count; radial++)
                 {
                     float turn = (radial + offset) / count;
-                    // Staggered streets of rings whose counts differ can land too near each other: a few metres either way will do.
-                    int tries = style == NeighbourhoodStyle.Rings ? 5 : 1;
+                    // Staggered streets of rings whose counts differ can land too near each other: try 4 m steps either way,
+                    // far enough to clear a junction right where this one would go.
+                    int tries = style == NeighbourhoodStyle.Rings ? 2 * (int)math.ceil(GridLayout.JunctionRoom / Step) + 1 : 1;
                     for (int attempt = 0; attempt < tries; attempt++)
                     {
-                        float nudge = (attempt + 1) / 2 * (attempt % 2 == 0 ? 1f : -1f) * 2f * Step / (2f * math.PI * rings[ring].Radius);
+                        float nudge = (attempt + 1) / 2 * (attempt % 2 == 0 ? 1f : -1f) * Step / (2f * math.PI * rings[ring].Radius);
                         if (!Find(streets, rings[ring].Arcs, turn + nudge, share, out int a, out int pointA)
                             || !Find(streets, rings[ring + 1].Arcs, turn + nudge, share, out int b, out int pointB)) continue;
                         if (GridLayout.Join(survey, request, streets, a, pointA, b, pointB) >= 0) break;
@@ -208,7 +209,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 }
                 // A point already a junction is shared only where radials line up (crossroads); rings stay all T-junctions.
                 foreach (int junction in candidate.Junctions)
-                    if ((junction != at || !share) && candidate.Between(junction, at) < RoadLinks.JunctionSpacing) return false;
+                    if ((junction != at || !share) && candidate.Between(junction, at) < GridLayout.JunctionGap) return false;
                 street = arc.Street;
                 point = at;
                 return true;
