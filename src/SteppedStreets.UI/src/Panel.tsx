@@ -11,6 +11,7 @@ import {
     formatArea, isExperimental, JunctionPattern, MixPattern, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
 } from "./lib/state";
 import { vanilla } from "./lib/vanilla";
+import { LAYOUT_ICONS } from "./lib/layoutIcons";
 import icon from "./assets/stepped-streets.svg";
 import closeIcon from "./assets/close.svg";
 import chevronIcon from "./assets/chevron.svg";
@@ -129,9 +130,32 @@ function ToggleRow({ label, value, disabled, trigger }: { label: string; value: 
     </Row>;
 }
 
+/**
+ * A scrolling box: the game's own scroll area, whose bar can be dragged, or a plain box where the registry lacks it.
+ * A nested one keeps the wheel to itself: the game's scroll area doesn't stop it, so the panel behind would scroll too.
+ */
+function Scroll({ className, innerClassName, nested = false, children }: React.PropsWithChildren<{
+    className: string; innerClassName: string; nested?: boolean;
+}>) {
+    const scroller = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const element = scroller.current;
+        if (!nested || !element) return;
+        const keep = (event: WheelEvent) => event.stopPropagation();
+        element.addEventListener("wheel", keep);
+        return () => element.removeEventListener("wheel", keep);
+    }, [nested]);
+    const Scrollable = vanilla.Scrollable;
+    const inner = <div className={innerClassName}>{children}</div>;
+    return Scrollable
+        ? <Scrollable ref={scroller} className={classes(styles.scroll, styles.gameScroll, className)} vertical trackVisibility="scrollable">{inner}</Scrollable>
+        : <div ref={scroller} className={classes(styles.scroll, styles.plainScroll, className)}>{inner}</div>;
+}
+
 /** A button that opens an inline list. Without a label it spans the row, and children sit beside it. */
-function Picker({ label, options, value, disabled, onPick, initiallyOpen = false, children }: React.PropsWithChildren<{
+function Picker({ label, options, value, disabled, onPick, initiallyOpen = false, bigIcons = false, children }: React.PropsWithChildren<{
     label?: string; options: Option[]; value: string; disabled: boolean; onPick: (name: string) => void; initiallyOpen?: boolean;
+    bigIcons?: boolean;
 }>) {
     // A row just added opens its list at once, so adding is one click to choose rather than two.
     const [open, setOpen] = useState(initiallyOpen);
@@ -152,24 +176,24 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
         <SettingTip label={label}><div className={styles.row}>
             {label ? <div className={styles.label}>{label}</div> : null}
             <Button className={styles.picker} disabled={disabled} selected={open} onSelect={() => setOpen(!open)}>
-                {chosen?.icon ? <img className={styles.optionIcon} src={chosen.icon} /> : null}
+                {chosen?.icon ? <img className={bigIcons ? styles.layoutIconSmall : styles.optionIcon} src={chosen.icon} /> : null}
                 <div className={styles.pickerLabel}>{current}</div>
                 <img className={classes(styles.chevron, open && styles.chevronOpen)} src={chevronIcon} />
             </Button>
             {children}
         </div></SettingTip>
-        {open && !disabled ? <div className={classes(styles.list, !label && styles.listFull)}>
+        {open && !disabled ? <Scroll className={classes(styles.list, !label && styles.listFull)} innerClassName={styles.listInner} nested>
             {searchable && vanilla.TextInput ? <vanilla.TextInput className={styles.search} value={query} placeholder="Search"
                 onChange={event => setQuery(event.target.value)} /> : null}
             {listed.map((option, index) => <React.Fragment key={option.name}>
                 {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}
-                <Button className={styles.listItem} selected={option.name === value}
+                <Button className={classes(styles.listItem, bigIcons && styles.listItemTall)} selected={option.name === value}
                     onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>
-                    {option.icon ? <img className={styles.optionIcon} src={option.icon} /> : null}<div>{option.label}</div>
+                    {option.icon ? <img className={bigIcons ? styles.layoutIcon : styles.optionIcon} src={option.icon} /> : null}<div>{option.label}</div>
                 </Button>
             </React.Fragment>)}
             {listed.length === 0 ? <div className={styles.noMatch}>Nothing matches "{query.trim()}"</div> : null}
-        </div> : null}
+        </Scroll> : null}
     </>;
 }
 
@@ -333,7 +357,7 @@ const LAYOUTS: Option[] = [
     { name: "FusedGrid", label: "Fused grid", group: "Planning (experimental)" },
     { name: "FilteredGrid", label: "Filtered grid", group: "Planning (experimental)" },
     { name: "BarcelonaSuperblock", label: "Barcelona superblock", group: "Planning (experimental)" },
-];
+].map(layout => ({ ...layout, icon: LAYOUT_ICONS[layout.name] }));
 const JUNCTIONS: [JunctionPattern, string][] = [["Crossroads", "Crossroads"], ["Staggered", "Staggered"], ["TrafficOptimised", "Traffic"]];
 const MIX_PATTERNS: [MixPattern, string][] = [["Random", "Random"], ["Clumps", "Clumps"], ["Even", "Even"]];
 const SPACINGS: [string, string][] = [["-1", "Auto"], ["0", "0"], ["1", "1"], ["2", "2"]];
@@ -384,7 +408,7 @@ function NeighbourhoodPanel() {
                     </Button>
                 </div>
 
-                <div className={styles.content}>
+                <Scroll className={styles.content} innerClassName={styles.contentInner}>
                     <Steps state={state} />
                     <div className={classes(styles.status, statusTone(state))} aria-live="polite">
                         <div className={styles.statusHead}>
@@ -410,7 +434,7 @@ function NeighbourhoodPanel() {
                     </div>
 
                     <Section title="Layout">
-                        <Picker options={LAYOUTS} value={settings.style} disabled={disabled} onPick={style => act("setStyle", style)} />
+                        <Picker options={LAYOUTS} value={settings.style} disabled={disabled} bigIcons onPick={style => act("setStyle", style)} />
                         <div className={styles.layoutTip}>{LAYOUT_TIPS[settings.style]}</div>
                         {isExperimental(settings.style)
                             ? <div className={styles.layoutNote}>New and not yet tried in many cities: tell us how it builds.</div> : null}
@@ -503,7 +527,7 @@ function NeighbourhoodPanel() {
                             <div className={styles.messageText}>{message}</div>
                         </div>)}
                     </Section> : null}
-                </div>
+                </Scroll>
 
                 <div className={styles.footer}>
                     <Button className={styles.secondary} disabled={disabled || state.corners === 0}

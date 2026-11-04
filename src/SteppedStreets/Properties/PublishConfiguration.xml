@@ -56,9 +56,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/18.png" />
 	<Screenshot Value="Properties/Screenshots/19.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.6.1" />
+	<ModVersion Value="2.7.0" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- The new layouts are marked experimental in the picker until they have been tried in more cities. Tell me how they build.&#10;- Fixed: on streets running downhill, lots now line up with the game's zone cells, so the houses fill each lot.&#10;- Fixed: lots after a bend no longer drift off the zone cells.&#10;- Fixed: a grid only one row deep, such as a strip along a road, now joins the road beside it.&#10;- Fixed: Star now builds all eight streets from its ring, and Rings, Spine, Cul-de-sacs and Lollipops no longer lose streets at small block depths.&#10;- Fixed: the traffic-optimised square grid could lose its through road.&#10;- Fixed: Winding no longer loses the whole road when one row can't be built.&#10;- Fixed: coastal streets round a lake no longer break in two, and the Valley main road now links to the streets on both slopes.&#10;- A layout whose joins to your road all fail now gets a winding connection instead of standing apart." />
+	<ChangeLog Value="- Every layout in the picker now has a small picture of its streets, drawn from a real plan of that layout.&#10;- Long lists in the panel have the game's scroll bar, which you can drag to get to the bottom quickly.&#10;- Lighter on the game while the tool is closed: the panel stays idle, and a plan still being worked out stops when you close the tool (it plans again when you open it).&#10;- The new layouts are still marked experimental in the picker until they have been tried in more cities. Tell me how they build." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
