@@ -107,6 +107,30 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>One road winding back and forth across the area, with a cross street every few blocks.</summary>
         Winding,
+
+        /// <summary>An irregular mesh: streets that wave their own ways, cross streets at varied angles, blocks all different.</summary>
+        OrganicMesh,
+
+        /// <summary>A grid in one part of the area and loops and cul-de-sacs in the other.</summary>
+        Hybrid,
+
+        /// <summary>Several small centres, each its own neighbourhood of rings and radial streets.</summary>
+        Polycentric,
+
+        /// <summary>Big blocks ringed by through streets, with only dead-end streets inside them.</summary>
+        Superblock,
+
+        /// <summary>Superblocks whose short cul-de-sacs leave a green space in the middle of each block.</summary>
+        Radburn,
+
+        /// <summary>A grid of through streets with loops and crescents inside each block.</summary>
+        FusedGrid,
+
+        /// <summary>A grid whose streets are closed in the middle of every other block, so they carry no through traffic.</summary>
+        FilteredGrid,
+
+        /// <summary>Superblocks of three by three blocks whose inner streets turn back to the edge, round a central square.</summary>
+        BarcelonaSuperblock,
     }
 
     public static class NeighbourhoodStyles
@@ -117,7 +141,7 @@ namespace SteppedStreets.Core.Neighbourhood
             || style == NeighbourhoodStyle.Ridge || style == NeighbourhoodStyle.Valley;
 
         /// <summary>The layouts whose cross streets can meet as crossroads, staggered or traffic-optimised.</summary>
-        public static bool UsesJunctions(this NeighbourhoodStyle style) => Layouts.GridLayout.Handles(style) && !Layouts.GridLayout.Tiled(style);
+        public static bool UsesJunctions(this NeighbourhoodStyle style) => Layouts.GridLayout.Handles(style) && !Layouts.GridLayout.FixedJunctions(style);
     }
 
     /// <summary>How the cross streets of a grid meet its main streets.</summary>
@@ -265,6 +289,9 @@ namespace SteppedStreets.Core.Neighbourhood
     /// <summary>The drawn area, the site and the player's settings.</summary>
     public sealed class NeighbourhoodRequest
     {
+        /// <summary>The same request, its arrays shared: for planning one part of the area with a layout of its own.</summary>
+        public NeighbourhoodRequest Copy() => (NeighbourhoodRequest)MemberwiseClone();
+
         /// <summary>The drawn area in world (x, z), either winding.</summary>
         public float2[] Boundary = new float2[0];
 

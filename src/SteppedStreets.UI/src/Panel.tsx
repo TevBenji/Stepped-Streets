@@ -325,6 +325,14 @@ const LAYOUTS: Option[] = [
     { name: "Valley", label: "Valley", group: "Terrain" },
     { name: "Coastal", label: "Coastal", group: "Terrain" },
     { name: "Winding", label: "Winding", group: "Terrain" },
+    { name: "OrganicMesh", label: "Organic mesh", group: "Planning" },
+    { name: "Hybrid", label: "Hybrid", group: "Planning" },
+    { name: "Polycentric", label: "Polycentric", group: "Planning" },
+    { name: "Superblock", label: "Superblock", group: "Planning" },
+    { name: "Radburn", label: "Radburn", group: "Planning" },
+    { name: "FusedGrid", label: "Fused grid", group: "Planning" },
+    { name: "FilteredGrid", label: "Filtered grid", group: "Planning" },
+    { name: "BarcelonaSuperblock", label: "Barcelona superblock", group: "Planning" },
 ];
 const JUNCTIONS: [JunctionPattern, string][] = [["Crossroads", "Crossroads"], ["Staggered", "Staggered"], ["TrafficOptimised", "Traffic"]];
 const MIX_PATTERNS: [MixPattern, string][] = [["Random", "Random"], ["Clumps", "Clumps"], ["Even", "Even"]];

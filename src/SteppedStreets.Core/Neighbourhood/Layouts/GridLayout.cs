@@ -25,7 +25,12 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             || style == NeighbourhoodStyle.RectangularGrid || style == NeighbourhoodStyle.IrregularGrid
             || style == NeighbourhoodStyle.SkewedGrid || style == NeighbourhoodStyle.FragmentedGrid
             || style == NeighbourhoodStyle.DiagonalGrid || style == NeighbourhoodStyle.CurvedGrid
-            || style == NeighbourhoodStyle.WarpedGrid || style == NeighbourhoodStyle.RadialGrid || Tiled(style);
+            || style == NeighbourhoodStyle.WarpedGrid || style == NeighbourhoodStyle.RadialGrid || Tiled(style)
+            || style == NeighbourhoodStyle.OrganicMesh || style == NeighbourhoodStyle.FilteredGrid;
+
+        /// <summary>The grids whose junctions are part of the pattern, so the junctions choice doesn't apply.</summary>
+        public static bool FixedJunctions(NeighbourhoodStyle style) => Tiled(style)
+            || style == NeighbourhoodStyle.OrganicMesh || style == NeighbourhoodStyle.FilteredGrid;
 
         // A diagonal avenue meets the streets at 64°: clear of the sharpest junction allowed (60°) once its ends are rounded to
         // the streets' 4 m points.
@@ -44,8 +49,10 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             joined = false;
             var style = request.Style;
             uint seed = request.Seed;
-            bool traffic = request.Junctions == JunctionPattern.TrafficOptimised;
-            bool staggered = request.Junctions != JunctionPattern.Crossroads;
+            bool organic = style == NeighbourhoodStyle.OrganicMesh, filtered = style == NeighbourhoodStyle.FilteredGrid;
+            // An organic mesh is always offset, a filtered grid always crossroads.
+            bool traffic = request.Junctions == JunctionPattern.TrafficOptimised && !organic && !filtered;
+            bool staggered = organic || (!filtered && request.Junctions != JunctionPattern.Crossroads);
 
             // Rows run along the city's nearest road, else the area's longest side; Reroll may turn the grid a quarter, except
             // traffic-optimised, whose through road crosses the rows and so must point at the city's road.
@@ -65,8 +72,12 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             bool broken = style == NeighbourhoodStyle.FragmentedGrid || style == NeighbourhoodStyle.WarpedGrid;
             float waveLength = rowSpacing * 4.5f, amplitude = curved ? rowSpacing * 0.22f : 0f;
             float wavePhase = Geometry.Hash01(seed, 5, 0) * waveLength;
-            float Bend(float u) => amplitude * math.sin(2f * math.PI * (u + wavePhase) / waveLength);
+            // An organic mesh: every row waves a little on its own, so blocks vary from one to the next.
+            float Bend(float u, int row) => organic
+                ? rowSpacing * 0.1f * math.sin(2f * math.PI * (u + Geometry.Hash01(seed, 70 + row, 0) * waveLength) / (waveLength * (0.8f + 0.4f * Geometry.Hash01(seed, 71 + row, 0))))
+                : amplitude * math.sin(2f * math.PI * (u + wavePhase) / waveLength);
             float crossSpacing = style == NeighbourhoodStyle.SquareGrid ? rowSpacing : rowSpacing * (traffic ? 3f : 2.5f);
+            float phase = Geometry.Hash01(seed, 2, 0) * crossSpacing;
             // Skewed: cross streets lean, so each one meets the next row further along.
             float lean = style == NeighbourhoodStyle.SkewedGrid ? 1f / math.tan(math.radians(SkewDegrees)) : 0f;
 
@@ -77,6 +88,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 offsets.Add(v);
                 float spacing = rowSpacing;
                 if (style == NeighbourhoodStyle.IrregularGrid) spacing *= 0.8f + 0.5f * Geometry.Hash01(seed, 10, offsets.Count);
+                // Wider than a plain grid's rows, as each waves its own way.
+                if (organic) spacing *= 1.05f + 0.3f * Geometry.Hash01(seed, 10, offsets.Count);
                 v += spacing;
             }
 
@@ -86,10 +99,12 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             {
                 cancellation.ThrowIfCancellationRequested();
                 var stretches = new List<(int, float)>();
-                foreach (var (from, points) in Clip(survey, along, across, offsets[row], uMin - Step, uMax + Step, Bend))
+                int current = row;
+                foreach (var (from, points) in Clip(survey, along, across, offsets[row], uMin - Step, uMax + Step, u => Bend(u, current)))
                 {
                     var pieces = new List<(float, List<float2>)> { (from, points) };
                     if (broken) pieces = Break(points, from, crossSpacing, seed, row);
+                    if (filtered) pieces = Filter(points, from, uMin + phase, crossSpacing, row);
                     foreach (var (start, line) in pieces)
                     {
                         var street = Street(survey, request, line, RoadKind.Street);
@@ -102,7 +117,6 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             }
 
             // Cross streets between each pair of neighbouring rows.
-            float phase = Geometry.Hash01(seed, 2, 0) * crossSpacing;
             float collector = (uMin + uMax) * 0.5f;
             // The through road's place: the middle, or the nearest place within 64 m where its straight join to the city's road
             // lands clear of the junctions already on it.
@@ -167,14 +181,16 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 // Columns are counted from the first row and lean with a skewed grid, so crossroads line up from row to row; the
                 // irregular grid's jitter is per column for crossroads (per column and row when staggered).
                 float leanHere = (offsets[row] - offsets[0]) * lean;
-                var positions = new List<(float U, bool Collector)>();
+                var positions = new List<(float U, bool Collector, float Shift)>();
                 // The columns that fall on this row once leaned: a tall skewed grid's columns drift a long way along the rows.
                 int firstColumn = (int)math.floor((-phase - offset - leanHere) / crossSpacing) - 1;
                 for (int column = firstColumn; uMin + phase + column * crossSpacing + offset + leanHere < uMax + crossSpacing; column++)
                 {
                     float at = uMin + phase + column * crossSpacing + offset + leanHere;
-                    if (style == NeighbourhoodStyle.IrregularGrid)
-                        at += (Geometry.Hash01(seed, staggered ? 20 + row : 20, column + 1000) - 0.5f) * crossSpacing * 0.5f;
+                    if (style == NeighbourhoodStyle.IrregularGrid || organic)
+                        at += (Geometry.Hash01(seed, staggered ? 20 + row : 20, column + 1000) - 0.5f) * crossSpacing * (organic ? 0.4f : 0.5f);
+                    // An organic mesh's cross streets lean up to 18° either way, each its own.
+                    float shiftHere = organic ? (offsets[row + 1] - offsets[row]) * math.tan(math.radians(36f * Geometry.Hash01(seed, 80 + row, column + 1000) - 18f)) : shift;
                     if (broken && Geometry.Hash01(seed, 40 + row, column + 1000) < 0.3f) continue;
                     // Traffic-optimised: locals keep clear of the through road, which lines up across every row.
                     if (traffic && math.abs(at - collectorHere) < crossSpacing * 0.35f) continue;
@@ -187,12 +203,12 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                             || (at - low) * (at + shift - high) < 0f;
                     }
                     if (nearAvenue) continue;
-                    positions.Add((at, false));
+                    positions.Add((at, false, shiftHere));
                 }
-                if (traffic) positions.Add((collectorHere, true));
-                foreach (var (u, isCollector) in positions)
+                if (traffic) positions.Add((collectorHere, true, shift));
+                foreach (var (u, isCollector, shiftHere) in positions)
                 {
-                    int link = Cross(survey, request, streets, rows[row], rows[row + 1], along, u, u + shift);
+                    int link = Cross(survey, request, streets, rows[row], rows[row + 1], along, u, u + shiftHere);
                     if (link >= 0 && isCollector) collectorLinks.Add(link);
                 }
             }
@@ -499,6 +515,29 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             return stretches;
         }
 
+        /// <summary>
+        /// The filtered grid: every second block along a row, alternating from row to row, the row is closed in the middle of
+        /// the block, so it serves its houses but carries no traffic through. The 24 m gap is where a footpath carries on.
+        /// </summary>
+        private static List<(float From, List<float2> Points)> Filter(List<float2> points, float from, float columnZero, float crossSpacing, int row)
+        {
+            var pieces = new List<(float, List<float2>)>();
+            int gap = 6, start = 0;
+            for (int at = 0; at < points.Count; at++)
+            {
+                float u = from + at * Step;
+                float block = (u - columnZero) / crossSpacing - 0.5f;
+                int column = (int)math.round(block);
+                bool middle = math.abs(block - column) * crossSpacing < Step * 0.5f && ((column + row) % 2 + 2) % 2 == 0;
+                if (!middle || at - start < gap) continue;
+                pieces.Add((from + start * Step, points.GetRange(start, at - gap / 2 - start)));
+                start = at + gap / 2;
+            }
+            if (start < points.Count) pieces.Add((from + start * Step, points.GetRange(start, points.Count - start)));
+            pieces.RemoveAll(piece => (piece.Item2.Count - 1) * Step < ContourStreets.ShortestStreet);
+            return pieces;
+        }
+
         /// <summary>The broken grid: a long stretch loses a gap about two-thirds of a block long, at a seeded place.</summary>
         private static List<(float From, List<float2> Points)> Break(List<float2> points, float from, float crossSpacing, uint seed, int row)
         {
@@ -526,7 +565,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         }
 
         /// <summary>A cross street from one row to the next, at a place along each; −1 where it can't go.</summary>
-        private static int Cross(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, List<(int Street, float From)> lower,
+        internal static int Cross(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, List<(int Street, float From)> lower,
             List<(int Street, float From)> upper, float2 along, float uLower, float uUpper)
         {
             if (!Find(streets, lower, uLower, out int a, out int pointA) || !Find(streets, upper, uUpper, out int b, out int pointB)) return -1;
@@ -577,7 +616,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         }
 
         /// <summary>The row stretch and point nearest a place along it, clear of its ends and of other junctions on it.</summary>
-        private static bool Find(List<Street> streets, List<(int Street, float From)> row, float u, out int street, out int point)
+        internal static bool Find(List<Street> streets, List<(int Street, float From)> row, float u, out int street, out int point)
         {
             street = point = -1;
             foreach (var (index, from) in row)

@@ -82,7 +82,7 @@ namespace SteppedStreets.Core.Neighbourhood
             float radius = MinimumRadius(request.Style);
             var streets = request.Style == NeighbourhoodStyle.MountainLane ? Lane(survey, request, radius, cancellation)
                 : Layouts.GridLayout.Handles(request.Style) || Layouts.RadialLayout.Handles(request.Style) || Layouts.BranchLayout.Handles(request.Style)
-                    || Layouts.TerrainLayout.Handles(request.Style)
+                    || Layouts.TerrainLayout.Handles(request.Style) || Layouts.BlockLayout.Handles(request.Style) || Layouts.PartsLayout.Handles(request.Style)
                 ? Grid(survey, request, cancellation, Stage)
                 : Contours(survey, request, radius, cancellation, Stage);
 
@@ -234,7 +234,7 @@ namespace SteppedStreets.Core.Neighbourhood
             JoinPieces(result, links, cancellation);
         }
 
-        /// <summary>A grid, radial or branching layout's streets, joined to the city's roads (traffic-optimised: only by its through road).</summary>
+        /// <summary>A layout's streets, other than the hillside ones, joined to the city's roads (traffic-optimised: only by its through road).</summary>
         private static List<Street> Grid(SiteSurvey survey, NeighbourhoodRequest request, CancellationToken cancellation, Action<string> stage)
         {
             var through = new HashSet<int>();
@@ -242,6 +242,8 @@ namespace SteppedStreets.Core.Neighbourhood
             var result = Layouts.RadialLayout.Handles(request.Style) ? Layouts.RadialLayout.Plan(survey, request, out joined, cancellation)
                 : Layouts.BranchLayout.Handles(request.Style) ? Layouts.BranchLayout.Plan(survey, request, out joined, cancellation)
                 : Layouts.TerrainLayout.Handles(request.Style) ? Layouts.TerrainLayout.Plan(survey, request, out joined, cancellation)
+                : Layouts.BlockLayout.Handles(request.Style) ? Layouts.BlockLayout.Plan(survey, request, out joined, cancellation)
+                : Layouts.PartsLayout.Handles(request.Style) ? Layouts.PartsLayout.Plan(survey, request, out joined, cancellation)
                 : Layouts.GridLayout.Plan(survey, request, out through, out joined, cancellation);
             stage("grid");
             var links = new RoadLinks(survey, request, result, LinkRadius(request));

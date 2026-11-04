@@ -63,6 +63,14 @@ export const LAYOUT_TIPS: Record<string, string> = {
     Valley: "A main road along the valley floor (one on each bank of a river), contour streets up both sides.",
     Coastal: "Streets parallel to the shore, joined by streets down to the water.",
     Winding: "One road winding back and forth across the area, with a cross street every few blocks.",
+    OrganicMesh: "Streets that wave their own ways and cross at varied angles: every block different.",
+    Hybrid: "A grid on one side of the area, loops and lollipops on the other.",
+    Polycentric: "Two to four small centres, each its own neighbourhood of rings and radial streets.",
+    Superblock: "Big blocks ringed by through streets, with only dead-end streets inside.",
+    Radburn: "Superblocks of short cul-de-sacs round a green space in the middle of each.",
+    FusedGrid: "A grid of through streets with loops inside each big block.",
+    FilteredGrid: "A grid whose streets close in the middle of every other block: no through traffic.",
+    BarcelonaSuperblock: "Three-by-three superblocks whose inner streets turn back to the edge round a central square.",
 };
 
 /** A setting's description on hover, in the game's tooltip bubble; rows without one are left as they are. */
