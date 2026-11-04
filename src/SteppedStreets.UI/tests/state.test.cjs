@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS = {
     style: "ContourSuburb", road: "Small Road", blockDepth: 90, maxRoadGradePercent: 8, steepestBuildablePercent: 15,
     steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 4,
     shapeGround: true, junctions: "Staggered",
-    levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: true,
+    levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: false,
     treeDensityPercent: 50, seed: 1,
 };
 const EMPTY_STATS = {
@@ -167,6 +167,15 @@ test("layouts, junctions and the terrain option read leniently", async () => {
     assert.equal(bad.settings.style, "ContourSuburb");
     assert.equal(bad.settings.junctions, "Staggered");
     assert.equal(bad.settings.shapeGround, true);
+});
+
+test("the radial layouts are read, and only grids offer junctions", async () => {
+    const { readState, usesJunctions } = await stateModule();
+    for (const style of ["DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid", "Star", "Rings", "Spiderweb", "Fan"])
+        assert.equal(readState({ settings: { style } }).settings.style, style);
+    assert.equal(usesJunctions("RadialGrid"), true);
+    assert.equal(usesJunctions("Fan"), false);
+    assert.equal(usesJunctions("ContourSuburb"), false);
 });
 
 test("catalogue icons pass through when they are text and are left out otherwise", async () => {

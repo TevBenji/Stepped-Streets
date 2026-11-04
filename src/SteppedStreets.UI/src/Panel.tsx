@@ -8,7 +8,7 @@ import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./li
 import { ErrorBoundary } from "./lib/errorBoundary";
 import { LAYOUT_TIPS, SettingTip } from "./lib/tips";
 import {
-    formatArea, isHillStyle, JunctionPattern, MixPattern, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, zoneColour, ZoneShare,
+    formatArea, JunctionPattern, MixPattern, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
 } from "./lib/state";
 import { vanilla } from "./lib/vanilla";
 import icon from "./assets/stepped-streets.svg";
@@ -301,6 +301,14 @@ const LAYOUTS: Option[] = [
     { name: "IrregularGrid", label: "Irregular grid", group: "Grid" },
     { name: "SkewedGrid", label: "Skewed grid", group: "Grid" },
     { name: "FragmentedGrid", label: "Fragmented grid", group: "Grid" },
+    { name: "DiagonalGrid", label: "Diagonal avenues", group: "Grid" },
+    { name: "CurvedGrid", label: "Curved grid", group: "Grid" },
+    { name: "WarpedGrid", label: "Warped grid", group: "Grid" },
+    { name: "RadialGrid", label: "Radial grid", group: "Grid" },
+    { name: "Star", label: "Star", group: "Radial" },
+    { name: "Rings", label: "Rings", group: "Radial" },
+    { name: "Spiderweb", label: "Spiderweb", group: "Radial" },
+    { name: "Fan", label: "Fan", group: "Radial" },
 ];
 const JUNCTIONS: [JunctionPattern, string][] = [["Crossroads", "Crossroads"], ["Staggered", "Staggered"], ["TrafficOptimised", "Traffic"]];
 const MIX_PATTERNS: [MixPattern, string][] = [["Random", "Random"], ["Clumps", "Clumps"], ["Even", "Even"]];
@@ -380,7 +388,7 @@ function NeighbourhoodPanel() {
                     <Section title="Layout">
                         <Picker options={LAYOUTS} value={settings.style} disabled={disabled} onPick={style => act("setStyle", style)} />
                         <div className={styles.layoutTip}>{LAYOUT_TIPS[settings.style]}</div>
-                        {!isHillStyle(settings.style) ? <Row label="Junctions">
+                        {usesJunctions(settings.style) ? <Row label="Junctions">
                             <Segmented options={JUNCTIONS} value={settings.junctions} disabled={disabled}
                                 onChange={junctions => act("setJunctions", junctions)} />
                         </Row> : null}

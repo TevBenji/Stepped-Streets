@@ -1,11 +1,14 @@
 // Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
 export type ToolStage = "Closed" | "Drawing" | "Planning" | "Planned" | "Building" | "Built" | "Failed";
 export type NeighbourhoodStyle = "ContourSuburb" | "TerracedBlocks" | "MountainLane"
-    | "SquareGrid" | "RectangularGrid" | "IrregularGrid" | "SkewedGrid" | "FragmentedGrid";
+    | "SquareGrid" | "RectangularGrid" | "IrregularGrid" | "SkewedGrid" | "FragmentedGrid"
+    | "DiagonalGrid" | "CurvedGrid" | "WarpedGrid" | "RadialGrid" | "Star" | "Rings" | "Spiderweb" | "Fan";
 export const STYLES: NeighbourhoodStyle[] = ["ContourSuburb", "TerracedBlocks", "MountainLane",
-    "SquareGrid", "RectangularGrid", "IrregularGrid", "SkewedGrid", "FragmentedGrid"];
-/** The layouts that follow the contours, for which the junction choice doesn't apply. */
-export const isHillStyle = (style: NeighbourhoodStyle) => style === "ContourSuburb" || style === "TerracedBlocks" || style === "MountainLane";
+    "SquareGrid", "RectangularGrid", "IrregularGrid", "SkewedGrid", "FragmentedGrid",
+    "DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid", "Star", "Rings", "Spiderweb", "Fan"];
+const JUNCTION_STYLES: NeighbourhoodStyle[] = ["SquareGrid", "RectangularGrid", "IrregularGrid", "SkewedGrid", "FragmentedGrid", "DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid"];
+/** The grid layouts, whose cross streets can meet as crossroads, staggered or traffic-optimised. */
+export const usesJunctions = (style: NeighbourhoodStyle) => JUNCTION_STYLES.includes(style);
 export type JunctionPattern = "Crossroads" | "Staggered" | "TrafficOptimised";
 export type MixPattern = "Random" | "Clumps" | "Even";
 
@@ -166,7 +169,7 @@ export function readState(raw: unknown): ToolState {
             bankGradePercent: number(settings.bankGradePercent, 40, 20, 50),
             lotSpacing: whole(settings.lotSpacing, -1, -1, 2),
             retainingWalls: flag(settings.retainingWalls, false),
-            trees: flag(settings.trees, true),
+            trees: flag(settings.trees, false),
             treeDensityPercent: number(settings.treeDensityPercent, 50, 10, 100),
             seed: whole(settings.seed, 1, 1, 99999),
         },

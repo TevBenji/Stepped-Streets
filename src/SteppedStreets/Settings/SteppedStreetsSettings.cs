@@ -168,7 +168,8 @@ namespace SteppedStreets.Settings
             HighestStep = 3.2f;
             LotSpacing = -1;
             RetainingWalls = false;
-            Trees = true;
+            // Off unless asked for: players found a forest they didn't expect (forum, 3 November 2026).
+            Trees = false;
             TreeDensityPercent = 50;
             Seed = 1;
         }
@@ -205,6 +206,14 @@ namespace SteppedStreets.Settings
                 [GetEnumValueLocaleID(NeighbourhoodStyle.IrregularGrid)] = "Irregular grid",
                 [GetEnumValueLocaleID(NeighbourhoodStyle.SkewedGrid)] = "Skewed grid",
                 [GetEnumValueLocaleID(NeighbourhoodStyle.FragmentedGrid)] = "Fragmented grid",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.DiagonalGrid)] = "Diagonal avenues",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.CurvedGrid)] = "Curved grid",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.WarpedGrid)] = "Warped grid",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.RadialGrid)] = "Radial grid",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.Star)] = "Star",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.Rings)] = "Rings",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.Spiderweb)] = "Spiderweb",
+                [GetEnumValueLocaleID(NeighbourhoodStyle.Fan)] = "Fan",
                 [GetEnumValueLocaleID(JunctionPattern.Crossroads)] = "Crossroads",
                 [GetEnumValueLocaleID(JunctionPattern.Staggered)] = "Staggered",
                 [GetEnumValueLocaleID(JunctionPattern.TrafficOptimised)] = "Traffic-optimised",

@@ -2,7 +2,7 @@
 	<!--Empty for the first upload. The publisher prints "Mod published with Id=NNNNNN": it goes here, or the next upload makes a second listing-->
 	<ModId Value="166090" />
 	<DisplayName Value="Stepped Streets" />
-	<ShortDescription Value="Draw an area on a hill and get a whole neighbourhood: streets that follow the contours, gentle connectors, level stepped lots, zoning, service buildings and trees. Preview it, reroll it, build it." />
+	<ShortDescription Value="Draw an area and get a whole neighbourhood: streets that follow the hill, or a grid, rings or a fan on flat ground, with level lots, zoning and service buildings. Preview it, reroll it, build it." />
 	<!--Every upload sends exactly this page: change it here, not on the website, or the next upload overwrites the website-->
 	<LongDescription>
 Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets does it for you: draw an area on a hillside and it lays out a whole neighbourhood the way a careful builder would.
@@ -15,7 +15,7 @@ Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets doe
 - **Level lots stepped down the hill** with soft banks, graded before anything is zoned
 - **Zoning that grows**: the game's own zone cells along the new roads, as deep as each levelled lot, in the mix you choose
 - **Service buildings** mixed in: police, fire, clinics and hospitals, schools, parks, utilities, any unlocked roadside service building, each on a level site of its own facing the road
-- **Forest** on ground too steep to build, trees on the banks, optional garden walls
+- **Trees if you want them**: forest on ground too steep to build and trees on the banks (off by default), optional garden walls
 
 ### How to use it
 
@@ -25,7 +25,7 @@ Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets doe
 4. The plan appears on the ground. **Reroll** for another layout.
 5. Press **Build**.
 
-**Layouts**: Contour suburb, Terraced blocks and Mountain lane follow the hill; Square, Rectangular, Irregular, Skewed and Fragmented grids suit flat or gentle ground, with **crossroads**, **staggered** T-junctions or a **traffic**-optimised through road. Untick **Shape the ground** to leave the terrain exactly as it is.
+**Layouts**: Contour suburb, Terraced blocks and Mountain lane follow the hill. Nine grids suit flat or gentle ground (Square, Rectangular, Irregular, Skewed, Fragmented, Curved, Warped, Diagonal avenues and Radial grid), with **crossroads**, **staggered** T-junctions or a **traffic**-optimised through road. Star, Rings, Spiderweb and Fan spread streets from a centre. Untick **Shape the ground** to leave the terrain exactly as it is.
 
 Turn on **Steep hills** for steep slopes and mountain sides. Everything else (road type, block depth, grades, lot size, grading, trees) is under **More settings**.
 
@@ -49,16 +49,16 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/02.png" />
 	<Screenshot Value="Properties/Screenshots/03.png" />
 	<Screenshot Value="Properties/Screenshots/04.png" />
-	<Screenshot Value="Properties/Screenshots/05.png" />
-	<Screenshot Value="Properties/Screenshots/06.png" />
 	<Screenshot Value="Properties/Screenshots/07.png" />
 	<Screenshot Value="Properties/Screenshots/08.png" />
-	<Screenshot Value="Properties/Screenshots/09.png" />
 	<Screenshot Value="Properties/Screenshots/10.png" />
+	<Screenshot Value="Properties/Screenshots/11.png" />
+	<Screenshot Value="Properties/Screenshots/12.png" />
+	<Screenshot Value="Properties/Screenshots/13.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.2.0" />
+	<ModVersion Value="2.3.0" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- New: grid layouts for flat or gentle ground: Square, Rectangular, Irregular, Skewed and Fragmented grids. Pick one from the new Layout list.&#10;- New: Junctions for the grids: crossroads, staggered T-junctions, or traffic-optimised, where one through road is the only road that meets yours.&#10;- New: Shape the ground. Untick it to leave the terrain exactly as it is.&#10;- A grid lines up with your nearest road and meets it the way a real grid does, every street that runs towards it in a T.&#10;- On flat ground, the hillside layouts now point you to the grids instead of stopping.&#10;- Fixed: a new road could join yours right beside one of your junctions, so the two overlapped. Joins now keep 20 m clear of your junctions.&#10;- Fixed: some neighbourhoods next to a road with many junctions were left unconnected." />
+	<ChangeLog Value="- New in 2.3.0: radial layouts. Star, Rings, Spiderweb and Fan spread streets from a centre; the fan opens from the edge nearest your road.&#10;- New in 2.3.0: four more grids. Diagonal avenues, Curved grid, Warped grid and Radial grid.&#10;- Trees are now off by default. Tick Trees in the panel to plant them.&#10;- New in 2.2.0: grid layouts for flat or gentle ground: Square, Rectangular, Irregular, Skewed and Fragmented grids. Pick one from the new Layout list.&#10;- New: Junctions for the grids: crossroads, staggered T-junctions, or traffic-optimised, where one through road is the only road that meets yours.&#10;- New: Shape the ground. Untick it to leave the terrain exactly as it is.&#10;- A grid lines up with your nearest road and meets it the way a real grid does, every street that runs towards it in a T.&#10;- On flat ground, the hillside layouts now point you to the grids instead of stopping.&#10;- Fixed: a new road could join yours right beside one of your junctions, so the two overlapped. Joins now keep 20 m clear of your junctions.&#10;- Fixed: some neighbourhoods next to a road with many junctions were left unconnected." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
