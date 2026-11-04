@@ -1,42 +1,26 @@
-<div align="center">
+<img align="right" src="src/SteppedStreets/Properties/Thumbnail.png" alt="Stepped Streets" width="260">
 
-<img src="src/SteppedStreets/Properties/Thumbnail.png" alt="Stepped Streets" width="260">
+# Stepped Streets
 
-<h1>Stepped Streets</h1>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods: Stepped Streets" src="https://img.shields.io/badge/Paradox%20Mods-Stepped%20Streets-2ea44f"></a>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.6.1-1f6feb"></a>
+<img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490">
+<a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c"></a>
 
-<p><strong>Whole hillside neighbourhoods for Cities: Skylines II, planned and built in one go.</strong></p>
+A Cities: Skylines II mod that plans and builds whole hillside neighbourhoods in one go.
 
-<p>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods" src="https://img.shields.io/badge/Paradox%20Mods-Subscribe-1f6feb?style=for-the-badge"></a>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.6.1-2ea44f?style=for-the-badge"></a>
-<img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490?style=for-the-badge">
-<a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c?style=for-the-badge"></a>
-</p>
+Building on hills is slow, fiddly work: roads that climb too steeply, lumpy lots, torn-looking ground.
+**Stepped Streets does it for you.** Draw an area on a hillside and it lays out the whole neighbourhood the way a careful
+builder would, previews it on the ground, and builds it when you say so. Forty layouts cover flat ground too.
 
-<p>
-<img alt=".NET Framework 4.8" src="https://img.shields.io/badge/.NET%20Framework-4.8-512bd4?style=flat-square&logo=dotnet&logoColor=white">
-<img alt="C# 9" src="https://img.shields.io/badge/C%23-9-239120?style=flat-square">
-<img alt="Unity ECS" src="https://img.shields.io/badge/Unity-ECS-222222?style=flat-square&logo=unity&logoColor=white">
-<img alt="React" src="https://img.shields.io/badge/React-18-087ea4?style=flat-square&logo=react&logoColor=white">
-<img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white">
-</p>
-
-<p>
 <a href="#features">Features</a> ·
 <a href="#how-to-use">How to use</a> ·
 <a href="#settings">Settings</a> ·
 <a href="#how-it-works">How it works</a> ·
 <a href="#building-from-source">Building from source</a> ·
 <a href="#credits">Credits</a>
-</p>
 
-</div>
-
----
-
-Building on hills in Cities: Skylines II is slow, fiddly work: roads that climb too steeply, lumpy lots, torn-looking ground.
-**Stepped Streets does it for you.** Draw an area on a hillside and it lays out the whole neighbourhood the way a careful
-builder would, previews it on the ground, and builds it when you say so.
+<br clear="right">
 
 <p align="center">
 <img src="src/SteppedStreets/Properties/Screenshots/01.png" alt="Contour streets on a hill" width="720">
@@ -270,6 +254,12 @@ Found a problem? [Open an issue](https://github.com/TevBenji/Stepped-Streets/iss
 `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\SteppedStreets.log`.
 
 ## Building from source
+
+<img alt=".NET Framework 4.8" src="https://img.shields.io/badge/.NET%20Framework-4.8-512bd4?logo=dotnet&logoColor=white">
+<img alt="C# 9" src="https://img.shields.io/badge/C%23-9-239120">
+<img alt="Unity ECS" src="https://img.shields.io/badge/Unity-ECS-222222?logo=unity&logoColor=white">
+<img alt="React" src="https://img.shields.io/badge/React-18-087ea4?logo=react&logoColor=white">
+<img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white">
 
 **Requirements:** Windows, Cities: Skylines II, the .NET SDK 9 or later, and Node.js 18 or later. The mod targets
 .NET Framework 4.8 with C# 9 and compiles against the game's own assemblies.
