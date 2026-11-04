@@ -554,6 +554,7 @@ namespace SteppedStreets.Tool
                 Boundary = boundary,
                 GroundHeight = snapshot.GroundHeight,
                 Blocked = snapshot.Blocked,
+                Water = snapshot.Water,
                 ExistingRoads = snapshot.ExistingRoads,
                 Style = settings.Style,
                 Junctions = settings.Junctions,

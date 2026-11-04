@@ -318,6 +318,13 @@ const LAYOUTS: Option[] = [
     { name: "Loops", label: "Loops", group: "Branching" },
     { name: "LoopsAndLollipops", label: "Loops and lollipops", group: "Branching" },
     { name: "Lollipops", label: "Lollipops on a stick", group: "Branching" },
+    { name: "TriangularMesh", label: "Triangular mesh", group: "Geometric" },
+    { name: "Hexagonal", label: "Hexagonal", group: "Geometric" },
+    { name: "HexagonalSpokes", label: "Hexagons with spokes", group: "Geometric" },
+    { name: "Ridge", label: "Ridge", group: "Terrain" },
+    { name: "Valley", label: "Valley", group: "Terrain" },
+    { name: "Coastal", label: "Coastal", group: "Terrain" },
+    { name: "Winding", label: "Winding", group: "Terrain" },
 ];
 const JUNCTIONS: [JunctionPattern, string][] = [["Crossroads", "Crossroads"], ["Staggered", "Staggered"], ["TrafficOptimised", "Traffic"]];
 const MIX_PATTERNS: [MixPattern, string][] = [["Random", "Random"], ["Clumps", "Clumps"], ["Even", "Even"]];

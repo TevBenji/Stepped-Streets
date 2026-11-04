@@ -56,6 +56,13 @@ export const LAYOUT_TIPS: Record<string, string> = {
     Loops: "Trunks with loop streets off both sides, each leaving and rejoining its trunk.",
     LoopsAndLollipops: "Trunks with loops and lollipops in turn.",
     Lollipops: "Trunks with short sticks off both sides, each ending in a small ring street.",
+    TriangularMesh: "Streets in three directions 60° apart, so every block is a triangle.",
+    Hexagonal: "A honeycomb of streets: hexagonal blocks, every junction a three-way one.",
+    HexagonalSpokes: "Larger hexagons, each split into three diamonds by streets from its centre.",
+    Ridge: "A main road along the crest of the hill, contour streets down both sides.",
+    Valley: "A main road along the valley floor (one on each bank of a river), contour streets up both sides.",
+    Coastal: "Streets parallel to the shore, joined by streets down to the water.",
+    Winding: "One road winding back and forth across the area, with a cross street every few blocks.",
 };
 
 /** A setting's description on hover, in the game's tooltip bubble; rows without one are left as they are. */

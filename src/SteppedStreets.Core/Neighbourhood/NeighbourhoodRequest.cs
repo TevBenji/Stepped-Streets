@@ -86,16 +86,38 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Trunks with lollipops off both sides: short sticks ending in small ring streets.</summary>
         Lollipops,
+
+        /// <summary>Streets in three directions 60° apart, so every block is a triangle.</summary>
+        TriangularMesh,
+
+        /// <summary>A honeycomb of streets: hexagonal blocks, every junction a three-way one at 120°.</summary>
+        Hexagonal,
+
+        /// <summary>Larger hexagons, each split into three diamonds by streets from its centre.</summary>
+        HexagonalSpokes,
+
+        /// <summary>A main road along the crest of a ridge, with streets following the contours down both sides.</summary>
+        Ridge,
+
+        /// <summary>A main road along the valley floor, with streets following the contours up both sides.</summary>
+        Valley,
+
+        /// <summary>Streets running parallel to the shore, joined by streets down to the water.</summary>
+        Coastal,
+
+        /// <summary>One road winding back and forth across the area, with a cross street every few blocks.</summary>
+        Winding,
     }
 
     public static class NeighbourhoodStyles
     {
         /// <summary>The hillside layouts, which follow the contours and so need a slope.</summary>
         public static bool FollowsContours(this NeighbourhoodStyle style) => style == NeighbourhoodStyle.ContourSuburb
-            || style == NeighbourhoodStyle.TerracedBlocks || style == NeighbourhoodStyle.MountainLane;
+            || style == NeighbourhoodStyle.TerracedBlocks || style == NeighbourhoodStyle.MountainLane
+            || style == NeighbourhoodStyle.Ridge || style == NeighbourhoodStyle.Valley;
 
         /// <summary>The layouts whose cross streets can meet as crossroads, staggered or traffic-optimised.</summary>
-        public static bool UsesJunctions(this NeighbourhoodStyle style) => Layouts.GridLayout.Handles(style);
+        public static bool UsesJunctions(this NeighbourhoodStyle style) => Layouts.GridLayout.Handles(style) && !Layouts.GridLayout.Tiled(style);
     }
 
     /// <summary>How the cross streets of a grid meet its main streets.</summary>
@@ -251,6 +273,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>True on buildings and water; existing roads come separately. Null means nothing is blocked.</summary>
         public Func<float2, bool> Blocked;
+
+        /// <summary>True on water alone, for the coastal layout's shore. Null means no water.</summary>
+        public Func<float2, bool> Water;
 
         /// <summary>Existing road edges within 400 m of the area (the connection's reach); may be empty.</summary>
         public ExistingRoad[] ExistingRoads = new ExistingRoad[0];

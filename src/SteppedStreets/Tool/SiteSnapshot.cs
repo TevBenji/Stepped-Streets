@@ -5,7 +5,7 @@
 // grid (idea from Grid Road Generator's HeightSnapshot), a coarser water-depth grid, nearby nets
 // as Bézier curves with widths, building lots as obstacles, and the asset info map. The result
 // (SiteContext) is immutable after capture and therefore safe to read from any thread.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: a drawn area instead of one street; fixed 4 m terrain and 8 m water grids, building lots and water rasterised into one blocked grid, existing road edges sampled for the neighbourhood generator with their entity handles, and a fingerprint to notice changes before a build.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: a drawn area instead of one street; fixed 4 m terrain and 8 m water grids, building lots and water rasterised into one blocked grid (water also on its own, for the coastal layout's shore), existing road edges sampled for the neighbourhood generator with their entity handles, and a fingerprint to notice changes before a build.
 using System;
 using System.Collections.Generic;
 using Colossal.Mathematics;
@@ -39,6 +39,7 @@ namespace SteppedStreets.Tool
         private readonly int columns, rows;
         private readonly float[] heights;
         private readonly bool[] blocked;
+        private readonly bool[] underWater;
 
         public readonly ExistingRoad[] ExistingRoads;
         public readonly long Fingerprint;
@@ -64,6 +65,7 @@ namespace SteppedStreets.Tool
             rows = math.max(2, (int)math.ceil((maximum.y - origin.y) / HeightSpacing) + 1);
             heights = new float[checked(columns * rows)];
             blocked = new bool[heights.Length];
+            underWater = new bool[heights.Length];
 
             var terrain = world.GetOrCreateSystemManaged<TerrainSystem>();
             var heightData = terrain.GetHeightData();
@@ -89,7 +91,7 @@ namespace SteppedStreets.Tool
                 {
                     float depth = WaterUtils.SampleDepth(ref waterData, new float3(x, 0f, z));
                     if (math.isfinite(depth) && depth <= 0.1f) continue;
-                    MarkBox(new float2(x, z) - WaterSpacing * 0.6f, new float2(x, z) + WaterSpacing * 0.6f, _ => true);
+                    MarkBox(new float2(x, z) - WaterSpacing * 0.6f, new float2(x, z) + WaterSpacing * 0.6f, _ => true, underWater);
                 }
 
             BuildingCount = CaptureBuildings(entities, origin, maximum, watchLow, watchHigh, out int watchedBuildings);
@@ -120,7 +122,17 @@ namespace SteppedStreets.Tool
             return blocked[index] || blocked[index + 1] || blocked[index + columns] || blocked[index + columns + 1];
         }
 
-        private void MarkBox(float2 low, float2 high, Func<float2, bool> inside)
+        /// <summary>True on water: any of the four grid nodes around the point is under water.</summary>
+        public bool Water(float2 point)
+        {
+            float2 coordinate = (point - origin) / HeightSpacing;
+            int column = (int)math.floor(coordinate.x), row = (int)math.floor(coordinate.y);
+            if (column < 0 || row < 0 || column >= columns - 1 || row >= rows - 1) return false;
+            int index = row * columns + column;
+            return underWater[index] || underWater[index + 1] || underWater[index + columns] || underWater[index + columns + 1];
+        }
+
+        private void MarkBox(float2 low, float2 high, Func<float2, bool> inside, bool[] also = null)
         {
             int firstColumn = math.max(0, (int)math.floor((low.x - origin.x) / HeightSpacing));
             int lastColumn = math.min(columns - 1, (int)math.ceil((high.x - origin.x) / HeightSpacing));
@@ -130,7 +142,9 @@ namespace SteppedStreets.Tool
                 for (int column = firstColumn; column <= lastColumn; column++)
                 {
                     float2 node = origin + new float2(column, row) * HeightSpacing;
-                    if (inside(node)) blocked[row * columns + column] = true;
+                    if (!inside(node)) continue;
+                    blocked[row * columns + column] = true;
+                    if (also != null) also[row * columns + column] = true;
                 }
         }
 

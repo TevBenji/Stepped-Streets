@@ -38,6 +38,9 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>Points where another street joins this one.</summary>
         public readonly List<int> Junctions = new List<int>();
 
+        /// <summary>Sharp corners the street turns at (a hexagon's zigzag): the road is cut there, so each piece runs straight.</summary>
+        public readonly List<int> Corners = new List<int>();
+
         /// <summary>Broke a rule: gone for good.</summary>
         public bool Broken;
 

@@ -117,6 +117,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (street.Removed) continue;
                 foreach (var attachment in new[] { street.Start, street.End })
                     if (attachment.Street >= 0 && !streets[attachment.Street].Removed) cuts[attachment.Street].Add(attachment.Point);
+                foreach (int corner in street.Corners) cuts[index].Add(corner);
             }
 
             // A join makes two points one node, whichever end records it: a connection arriving at a street's open end and that
