@@ -52,7 +52,8 @@ namespace SteppedStreets.Core.Neighbourhood
             roadDistance = new float[survey.Count];
             roadHeight = new float[survey.Count];
             for (int index = 0; index < roadDistance.Length; index++) roadDistance[index] = float.MaxValue;
-            foreach (var street in streets) Stamp(street);
+            // Streets the rules already dropped won't be built: a connection need not keep clear of them.
+            foreach (var street in streets) if (!street.Removed) Stamp(street);
         }
 
         // Two corridors (road plus shoulders) side by side, and a metre between them.

@@ -81,10 +81,10 @@ namespace SteppedStreets.Core.Neighbourhood
 
             float radius = MinimumRadius(request.Style);
             bool straight = !request.Style.FollowsContours();
+            // The streets a connection from the city may join (traffic-optimised: only the through road); empty means any.
+            var through = new HashSet<int>();
             var streets = request.Style == NeighbourhoodStyle.MountainLane ? Lane(survey, request, radius, cancellation)
-                : Layouts.GridLayout.Handles(request.Style) || Layouts.RadialLayout.Handles(request.Style) || Layouts.BranchLayout.Handles(request.Style)
-                    || Layouts.TerrainLayout.Handles(request.Style) || Layouts.BlockLayout.Handles(request.Style) || Layouts.PartsLayout.Handles(request.Style)
-                ? Grid(survey, request, cancellation, Stage)
+                : straight ? Grid(survey, request, cancellation, Stage, through)
                 : Contours(survey, request, radius, cancellation, Stage);
 
             Stage("connection");
@@ -112,7 +112,8 @@ namespace SteppedStreets.Core.Neighbourhood
             // gets the winding connection the hillside layouts use, rather than standing apart beside the road.
             if (!connected && straight && (request.ExistingRoads?.Length ?? 0) > 0 && plan.Roads.Count > 0)
             {
-                Connect(streets, new RoadLinks(survey, request, streets, LinkRadius(request)), null, cancellation);
+                Connect(streets, new RoadLinks(survey, request, streets, LinkRadius(request)),
+                    through.Count > 0 ? street => through.Contains(street) : (Func<int, bool>)null, cancellation);
                 Settle();
             }
             plan.Connected = connected;
@@ -253,16 +254,18 @@ namespace SteppedStreets.Core.Neighbourhood
         }
 
         /// <summary>A layout's streets, other than the hillside ones, joined to the city's roads (traffic-optimised: only by its through road).</summary>
-        private static List<Street> Grid(SiteSurvey survey, NeighbourhoodRequest request, CancellationToken cancellation, Action<string> stage)
+        private static List<Street> Grid(SiteSurvey survey, NeighbourhoodRequest request, CancellationToken cancellation, Action<string> stage,
+            HashSet<int> through)
         {
-            var through = new HashSet<int>();
             bool joined;
+            HashSet<int> gridThrough = null;
             var result = Layouts.RadialLayout.Handles(request.Style) ? Layouts.RadialLayout.Plan(survey, request, out joined, cancellation)
                 : Layouts.BranchLayout.Handles(request.Style) ? Layouts.BranchLayout.Plan(survey, request, out joined, cancellation)
                 : Layouts.TerrainLayout.Handles(request.Style) ? Layouts.TerrainLayout.Plan(survey, request, out joined, cancellation)
                 : Layouts.BlockLayout.Handles(request.Style) ? Layouts.BlockLayout.Plan(survey, request, out joined, cancellation)
                 : Layouts.PartsLayout.Handles(request.Style) ? Layouts.PartsLayout.Plan(survey, request, out joined, cancellation)
-                : Layouts.GridLayout.Plan(survey, request, out through, out joined, cancellation);
+                : Layouts.GridLayout.Plan(survey, request, out gridThrough, out joined, cancellation);
+            if (gridThrough != null) through.UnionWith(gridThrough);
             stage("grid");
             var links = new RoadLinks(survey, request, result, LinkRadius(request));
             // Met the city's road straight on: no winding connection is needed, only pieces left apart are joined.
