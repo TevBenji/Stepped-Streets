@@ -349,6 +349,9 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                         foreach (var (host, point) in new[] { (upperLeft, leftPoint), (upperRight, rightPoint) })
                         {
                             var arm = Line(streets[host].Points[point], centre);
+                            bool open = true;
+                            foreach (var at in arm) open &= survey.StreetRoomAt(at) >= 0f;
+                            if (!open) continue;
                             var spoke = Street(survey, request, arm, RoadKind.Link, streets[host].Heights[point], stem.Heights[stem.Heights.Length - 1]);
                             if (spoke == null) continue;
                             spoke.Start = new Attachment { Street = host, Point = point };
