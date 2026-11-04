@@ -32,6 +32,16 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         public static bool FixedJunctions(NeighbourhoodStyle style) => Tiled(style)
             || style == NeighbourhoodStyle.OrganicMesh || style == NeighbourhoodStyle.FilteredGrid;
 
+        /// <summary>
+        /// How close a layout lets two junctions on one street come: the road rules' own allowance (RoadNetwork.Violations
+        /// passes 39 m), so a junction a hair under 40 m apart from rounding is kept, not thrown away before it is planned.
+        /// Layouts still space their junctions with room to spare (<see cref="JunctionRoom"/>).
+        /// </summary>
+        internal const float JunctionGap = RoadLinks.JunctionSpacing - 1f;
+
+        /// <summary>The spacing layouts plan junctions at: clear of the rules' limit, so rounding to 4 m points never reaches it.</summary>
+        internal const float JunctionRoom = RoadLinks.JunctionSpacing + 8f;
+
         // A diagonal avenue meets the streets at 64°: clear of the sharpest junction allowed (60°) once its ends are rounded to
         // the streets' 4 m points.
         private static readonly float DiagonalLean = 1f / math.tan(math.radians(64f));
@@ -193,7 +203,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     float shiftHere = organic ? (offsets[row + 1] - offsets[row]) * math.tan(math.radians(36f * Geometry.Hash01(seed, 80 + row, column + 1000) - 18f)) : shift;
                     if (broken && Geometry.Hash01(seed, 40 + row, column + 1000) < 0.3f) continue;
                     // Traffic-optimised: locals keep clear of the through road, which lines up across every row.
-                    if (traffic && math.abs(at - collectorHere) < crossSpacing * 0.35f) continue;
+                    if (traffic && math.abs(at - collectorHere) < math.max(crossSpacing * 0.35f, JunctionRoom)) continue;
                     bool nearAvenue = false;
                     foreach (var (u, v, diagonal, fromRow, toRow) in avenues)
                     {
@@ -205,7 +215,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     if (nearAvenue) continue;
                     positions.Add((at, false, shiftHere));
                 }
-                if (traffic) positions.Add((collectorHere, true, shift));
+                if (traffic) positions.Insert(0, (collectorHere, true, shift));
                 foreach (var (u, isCollector, shiftHere) in positions)
                 {
                     int link = Cross(survey, request, streets, rows[row], rows[row + 1], along, u, u + shiftHere);
@@ -217,13 +227,19 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             {
                 // The through road runs on past the outermost rows to the edge of the area, and on to the city's road.
                 foreach (int link in collectorLinks) through.Add(link);
-                foreach (int row in new[] { 0, rows.Count - 1 })
+                foreach (var (row, outward) in Outer(rows.Count, across))
                 {
                     if (row < 0 || row >= rows.Count) continue;
-                    int stub = Stub(survey, request, streets, rows[row], along, row == 0 ? -across : across, collector + (offsets[row] - offsets[0]) * lean);
-                    if (stub < 0) continue;
+                    float u = collector + (offsets[row] - offsets[0]) * lean;
+                    int stub = Stub(survey, request, streets, rows[row], along, outward, u);
+                    // Too little room past the row for a stub: the through road meets the city's road from the row itself.
+                    if (stub < 0)
+                    {
+                        if (Find(streets, rows[row], u, out int host, out int point) && Reach(survey, request, streets, host, point, outward)) joined = true;
+                        continue;
+                    }
                     var end = streets[stub];
-                    bool reached = Reach(survey, request, streets, stub, end.Points.Count - 1, row == 0 ? -across : across);
+                    bool reached = Reach(survey, request, streets, stub, end.Points.Count - 1, outward);
                     // An end of the through road that meets no city road would be a road to nowhere, unless no city road is near
                     // at all; then both stay, for a winding connection to find.
                     if (reached) { joined = true; through.Add(stub); }
@@ -244,16 +260,27 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 joined |= Reach(survey, request, streets, index, 0, math.normalizesafe(street.Points[0] - street.Points[1]));
                 joined |= Reach(survey, request, streets, index, last, math.normalizesafe(street.Points[last] - street.Points[last - 1]));
             }
-            foreach (int row in new[] { 0, rows.Count - 1 })
+            foreach (var (row, outward) in Outer(rows.Count, across))
             {
                 if (row < 0 || row >= rows.Count) continue;
-                float2 outward = row == 0 ? -across : across;
-                float offset = staggered && (row == 0 ? 1 : row + 1) % 2 == 1 ? crossSpacing * 0.5f : 0f;
-                for (float u = uMin + phase + offset - crossSpacing; u < uMax + crossSpacing; u += crossSpacing)
-                    if (Find(streets, rows[row], u, out int host, out int point)) joined |= Reach(survey, request, streets, host, point, outward);
+                // Staggered: offset from the cross streets on the row's inner side. Those below the top row are the previous
+                // row's (offset when that row is odd), so the top row's joins take the other parity; row 0's are unoffset.
+                bool down = math.dot(outward, across) < 0f;
+                float offset = staggered && (down ? 1 : row) % 2 == 1 ? crossSpacing * 0.5f : 0f;
+                float leanHere = (offsets[row] - offsets[0]) * lean;
+                int firstColumn = (int)math.floor((-phase - offset - leanHere) / crossSpacing) - 1;
+                for (int column = firstColumn; uMin + phase + column * crossSpacing + offset + leanHere < uMax + crossSpacing; column++)
+                    if (Find(streets, rows[row], uMin + phase + column * crossSpacing + offset + leanHere, out int host, out int point))
+                        joined |= Reach(survey, request, streets, host, point, outward);
             }
             return streets;
         }
+
+        /// <summary>
+        /// The outermost rows and the way out from each: the first row outwards one way and the last the other. A grid one
+        /// row deep gets both ways from that one row, not the same way twice.
+        /// </summary>
+        internal static (int Row, float2 Outward)[] Outer(int rows, float2 across) => new[] { (0, -across), (rows - 1, across) };
 
         /// <summary>The tiled grids: triangles, hexagons, and hexagons split into diamonds.</summary>
         public static bool Tiled(NeighbourhoodStyle style) => style == NeighbourhoodStyle.TriangularMesh
@@ -387,16 +414,16 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 joined |= Reach(survey, request, streets, index, 0, math.normalizesafe(street.Points[0] - street.Points[1]));
                 joined |= Reach(survey, request, streets, index, last, math.normalizesafe(street.Points[last] - street.Points[last - 1]));
             }
-            foreach (int row in new[] { 0, rows.Count - 1 })
+            foreach (var (row, outward) in Outer(rows.Count, across))
             {
                 if (row < 0 || row >= rows.Count) continue;
-                bool outer = row == 0;
+                bool outer = math.dot(outward, across) < 0f;
                 for (int column = firstColumn; column <= lastColumn; column++)
                 {
                     // Hexagons: the bottom row's troughs and the top row's peaks point outwards.
                     if (!triangles && Peak(row, column) == outer) continue;
                     if (Find(streets, rows[row], Column(row, column), out int host, out int point))
-                        joined |= Reach(survey, request, streets, host, point, outer ? -across : across);
+                        joined |= Reach(survey, request, streets, host, point, outward);
                 }
             }
             return streets;
@@ -409,6 +436,9 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         internal static bool Reach(SiteSurvey survey, NeighbourhoodRequest request, List<Street> streets, int host, int point, float2 direction)
         {
             float2 origin = streets[host].Points[point];
+            // One join to the city's road per point: a second from the same point would overlap the first.
+            foreach (var other in streets)
+                if (other.Kind == RoadKind.Connection && other.Start.Street == host && other.Start.Point == point) return false;
             if (!Hit(request, origin, direction, out float3 hit, out ExistingRoad target, out float targetT)) return false;
             var line = Line(origin, hit.xz);
             // Clear of buildings and water all the way, and of the area's own streets until it nears the city's road.
@@ -627,7 +657,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 float along = at * Step, length = (candidate.Points.Count - 1) * Step;
                 if (along < EndClearance || length - along < EndClearance) return false;
                 foreach (int junction in candidate.Junctions)
-                    if (junction != at && candidate.Between(junction, at) < RoadLinks.JunctionSpacing) return false;
+                    if (junction != at && candidate.Between(junction, at) < JunctionGap) return false;
                 street = index;
                 point = at;
                 return true;

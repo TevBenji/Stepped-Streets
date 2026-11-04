@@ -27,6 +27,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 var part = request.Copy();
                 part.Boundary = boundary;
                 part.Style = style;
+                // The panel offers no junctions choice for these layouts, so a part's grid uses the default, whatever was last set.
+                part.Junctions = JunctionPattern.Staggered;
                 var partSurvey = new SiteSurvey(part, cancellation);
                 bool partJoined;
                 var planned = RadialLayout.Handles(style) ? RadialLayout.Plan(partSurvey, part, out partJoined, cancellation)

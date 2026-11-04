@@ -892,3 +892,11 @@
     line-height: 1.4;
     color: rgba(240, 251, 255, 0.7);
 }
+
+/* An experimental layout's note: the game's warm caution colour, quieter than an error. */
+.layoutNote {
+    margin: -4rem 2rem 8rem 2rem;
+    font-size: 12rem;
+    line-height: 1.4;
+    color: rgba(255, 196, 92, 0.9);
+}

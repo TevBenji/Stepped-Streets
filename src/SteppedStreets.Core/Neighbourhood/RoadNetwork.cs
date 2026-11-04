@@ -200,6 +200,13 @@ namespace SteppedStreets.Core.Neighbourhood
                     // Ends sit exactly on their nodes, so the game merges the junctions.
                     road.Points[0] = plan.Nodes[road.StartNode].Position;
                     road.Points[points.Length - 1] = plan.Nodes[road.EndNode].Position;
+                    // Every road starts at its downhill end. The lots are laid from there (StepPlanner), and the road is cut into
+                    // the game's pieces from its start on the 8 m grid (RoadPieces): from one end, lot edges and zone cells agree.
+                    if (road.Points[points.Length - 1].y < road.Points[0].y)
+                    {
+                        System.Array.Reverse(road.Points);
+                        (road.StartNode, road.EndNode) = (road.EndNode, road.StartNode);
+                    }
                     plan.Roads.Add(road);
                     owners.Add(index);
                 }

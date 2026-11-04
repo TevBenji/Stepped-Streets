@@ -1,5 +1,6 @@
 // Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using SteppedStreets.Core.Terrain;
 using Unity.Mathematics;
@@ -26,7 +27,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
 
         /// <summary>
         /// The main road of a ridge or valley layout: along the crest, or along the valley floor, one road on each bank where
-        /// water fills the floor. A contour street where it is near level along its length, else a street up to the max grade.
+        /// water fills the floor.
         /// </summary>
         public static List<Street> Spines(SiteSurvey survey, NeighbourhoodRequest request, bool crest)
         {
@@ -112,13 +113,16 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             return result;
         }
 
-        /// <summary>A main road near level along its length as a contour street, else as a street up to the max grade; null if neither fits.</summary>
+        /// <summary>
+        /// A main road: a main street (so the contour links look both ways from it), on the eased heights a contour street gets
+        /// where the ground allows, else on any grade up to the max; null if neither fits.
+        /// </summary>
         private static Street Level(SiteSurvey survey, NeighbourhoodRequest request, List<float2> points)
         {
             var heights = RoadProfile.Fit(points, survey.GroundAt, RoadProfile.LandingGrade, null, null, 5);
             bool fits = heights != null;
             for (int index = 0; fits && index < points.Count; index++) fits = math.abs(heights[index] - survey.GroundAt(points[index])) <= request.EarthworkLimit;
-            return fits ? new Street(RoadKind.Contour, points, heights) : GridLayout.Street(survey, request, points, RoadKind.Street);
+            return fits ? new Street(RoadKind.Street, points, heights) : GridLayout.Street(survey, request, points, RoadKind.Street);
         }
 
         /// <summary>
@@ -178,6 +182,13 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                         var ring = RadialLayout.Closed(survey, request, line);
                         if (ring != null) { row.Add(streets.Count); streets.Add(ring); }
                         continue;
+                    }
+                    if (closed)
+                    {
+                        // Start from a point that doesn't fit, so a stretch running across the trace's start stays one street
+                        // instead of two whose ends nearly touch.
+                        int cut = line.FindIndex(point => survey.StreetRoomAt(point) < 0f);
+                        if (cut > 0) line = line.GetRange(cut, line.Count - cut).Concat(line.GetRange(0, cut)).ToList();
                     }
                     foreach (var run in Runs(survey, line))
                     {
@@ -295,14 +306,18 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 return arc;
             }
 
-            // Snakes: runs of rows joined at alternate ends; a row that can't turn into the next ends its snake there.
-            var segments = new List<(int Street, int Row, int Start, float U, int Direction, int Count)>();
+            // Snakes: runs of rows joined at alternate ends; a row that can't turn into the next ends its snake there. The snake's
+            // heights are fitted along its whole length, as one road's would be, and then it is cut: each row a street of its
+            // own and each turn a link between two, so a row the rules drop takes only its turns with it.
+            var segments = new List<(int Snake, int Street, int Row, float U, int Direction, int Count)>();
+            int snakes = 0;
             for (int row = 0; row < offsets.Count; )
             {
                 cancellation.ThrowIfCancellationRequested();
                 if (float.IsNaN(spans[row].From)) { row++; continue; }
                 var points = new List<float2>();
-                var pieces = new List<(int Row, int Start, float U, int Direction, int Count)>();
+                // Each row's first and last point in the snake, where it starts along and which way it runs.
+                var pieces = new List<(int Row, int First, int Last, float U, int Direction)>();
                 bool right = true;
                 float entry = spans[row].From;
                 int current = row;
@@ -325,11 +340,11 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                         }
                     }
                     float end = float.IsNaN(turn) ? exit : turn;
-                    int start = points.Count;
+                    int first = points.Count;
                     float direction = right ? 1f : -1f;
                     for (float u = entry; direction * (end - u) > 0.5f; u += direction * Step) points.Add(Point(current, u));
                     points.Add(Point(current, end));
-                    pieces.Add((current, start, entry, right ? 1 : -1, points.Count - start));
+                    pieces.Add((current, first, points.Count - 1, entry, right ? 1 : -1));
                     if (float.IsNaN(turn)) break;
                     points.AddRange(arc);
                     entry = turn;
@@ -338,10 +353,45 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 }
                 row = current + 1;
                 if ((points.Count - 1) * Step < ContourStreets.ShortestStreet) continue;
-                var snake = GridLayout.Street(survey, request, points, RoadKind.Street);
-                if (snake == null) continue;
-                foreach (var piece in pieces) segments.Add((streets.Count, piece.Row, piece.Start, piece.U, piece.Direction, piece.Count));
-                streets.Add(snake);
+                // One fit along the whole snake; where that can't keep to the grade and the earth limit, each row on its own
+                // (and each turn between its rows' ends).
+                var whole = GridLayout.Street(survey, request, points, RoadKind.Street);
+                Street Cut(int from, int to, RoadKind kind, float? startHeight = null, float? endHeight = null)
+                {
+                    var slice = points.GetRange(from, to - from + 1);
+                    if (whole == null) return GridLayout.Street(survey, request, slice, kind, startHeight, endHeight);
+                    var heights = new float[slice.Count];
+                    System.Array.Copy(whole.Heights, from, heights, 0, slice.Count);
+                    return new Street(kind, slice, heights);
+                }
+                var rowStreets = new int[pieces.Count];
+                for (int piece = 0; piece < pieces.Count; piece++)
+                {
+                    var (pieceRow, first, last, u, direction) = pieces[piece];
+                    rowStreets[piece] = -1;
+                    if ((last - first) * Step < 32f) continue;
+                    var built = Cut(first, last, RoadKind.Street);
+                    if (built == null) continue;
+                    rowStreets[piece] = streets.Count;
+                    segments.Add((snakes, streets.Count, pieceRow, u, direction, last - first + 1));
+                    streets.Add(built);
+                }
+                for (int piece = 0; piece + 1 < pieces.Count; piece++)
+                {
+                    int from = rowStreets[piece], to = rowStreets[piece + 1];
+                    if (from < 0 || to < 0) continue;
+                    var a = streets[from];
+                    var b = streets[to];
+                    var link = Cut(pieces[piece].Last, pieces[piece + 1].First, RoadKind.Link, a.Heights[a.Heights.Length - 1], b.Heights[0]);
+                    if (link == null) continue;
+                    int index = streets.Count;
+                    link.Start = new Attachment { Street = from, Point = a.Points.Count - 1 };
+                    link.End = new Attachment { Street = to, Point = 0 };
+                    a.End = new Attachment { Street = index, Point = 0 };
+                    b.Start = new Attachment { Street = index, Point = link.Points.Count - 1 };
+                    streets.Add(link);
+                }
+                snakes++;
             }
 
             // A cross street every four blocks between neighbouring rows of a snake, offset from row to row, clear of the turns.
@@ -350,16 +400,15 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             {
                 var low = segments[index];
                 var high = segments[index + 1];
-                if (low.Street != high.Street || high.Row != low.Row + 1) continue;
-                var snake = streets[low.Street];
+                if (low.Snake != high.Snake || high.Row != low.Row + 1) continue;
                 float lowEnd = low.U + low.Direction * (low.Count - 1) * Step;
                 float first = math.min(low.U, lowEnd) + radius + EndClearance, last = math.max(low.U, lowEnd) - radius - EndClearance;
                 for (float u = first + (low.Row % 2 == 1 ? spacing * 0.5f : spacing * 0.25f); u < last; u += spacing)
                 {
-                    int a = low.Start + (int)math.round((u - low.U) * low.Direction / Step);
-                    int b = high.Start + (int)math.round((u - high.U) * high.Direction / Step);
-                    if (a <= low.Start || a >= low.Start + low.Count - 1 || b <= high.Start || b >= high.Start + high.Count - 1) continue;
-                    if (!Free(snake, a) || !Free(snake, b)) continue;
+                    int a = (int)math.round((u - low.U) * low.Direction / Step);
+                    int b = (int)math.round((u - high.U) * high.Direction / Step);
+                    if (a <= 0 || a >= low.Count - 1 || b <= 0 || b >= high.Count - 1) continue;
+                    if (!Free(streets[low.Street], a) || !Free(streets[high.Street], b)) continue;
                     GridLayout.Join(survey, request, streets, low.Street, a, high.Street, b);
                 }
             }
@@ -367,13 +416,14 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             // The snakes' ends, and streets square to the first and last rows, run on to the city's road.
             joined = ReachEnds(survey, request, streets);
             foreach (var segment in segments)
-            {
-                bool first = segment.Row == 0, last = segment.Row == offsets.Count - 1;
-                if (!first && !last) continue;
-                for (int point = segment.Start + 20; point < segment.Start + segment.Count - 20; point += (int)(spacing / Step))
-                    if (Free(streets[segment.Street], point))
-                        joined |= GridLayout.Reach(survey, request, streets, segment.Street, point, first ? -across : across);
-            }
+                // The first row joins outwards one way and the last the other; a single row, both.
+                foreach (var (edge, outward) in new[] { (segment.Row == 0, -across), (segment.Row == offsets.Count - 1, across) })
+                {
+                    if (!edge) continue;
+                    for (int point = 20; point < segment.Count - 20; point += (int)(spacing / Step))
+                        if (Free(streets[segment.Street], point))
+                            joined |= GridLayout.Reach(survey, request, streets, segment.Street, point, outward);
+                }
             return streets;
         }
 
@@ -420,7 +470,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 if (along < EndClearance || length - along < EndClearance) return false;
             }
             foreach (int junction in street.Junctions)
-                if (junction != point && street.Between(junction, point) < RoadLinks.JunctionSpacing) return false;
+                if (junction != point && street.Between(junction, point) < GridLayout.JunctionGap) return false;
             return true;
         }
 

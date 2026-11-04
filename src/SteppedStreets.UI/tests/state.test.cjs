@@ -181,6 +181,9 @@ test("the radial, linear and branching layouts are read, and only grids offer ju
     assert.equal(usesJunctions("Lollipops"), false);
     assert.equal(usesJunctions("Hexagonal"), false);
     assert.equal(usesJunctions("FilteredGrid"), false);
+    const { isExperimental } = await stateModule();
+    assert.equal(isExperimental("ContourSuburb"), false);
+    assert.equal(isExperimental("Star"), true);
     assert.equal(usesJunctions("ContourSuburb"), false);
 });
 

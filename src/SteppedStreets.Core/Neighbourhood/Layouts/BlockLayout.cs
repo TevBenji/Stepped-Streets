@@ -112,12 +112,12 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 joined |= GridLayout.Reach(survey, request, streets, index, 0, math.normalizesafe(street.Points[0] - street.Points[1]));
                 joined |= GridLayout.Reach(survey, request, streets, index, last, math.normalizesafe(street.Points[last] - street.Points[last - 1]));
             }
-            foreach (int row in new[] { 0, rows.Count - 1 })
+            foreach (var (row, outward) in GridLayout.Outer(rows.Count, across))
             {
                 if (row < 0 || row >= rows.Count) continue;
                 for (int column = firstColumn; column <= lastColumn; column++)
                     if (GridLayout.Find(streets, rows[row], Column(column), out int host, out int point))
-                        joined |= GridLayout.Reach(survey, request, streets, host, point, row == 0 ? -across : across);
+                        joined |= GridLayout.Reach(survey, request, streets, host, point, outward);
             }
             return streets;
         }
@@ -175,7 +175,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             float along = street.Stations[point], length = street.Stations[street.Stations.Length - 1];
             if (along < 26f || length - along < 26f) return false;
             foreach (int junction in street.Junctions)
-                if (junction != point && street.Between(junction, point) < RoadLinks.JunctionSpacing) return false;
+                if (junction != point && street.Between(junction, point) < GridLayout.JunctionGap) return false;
             return true;
         }
     }

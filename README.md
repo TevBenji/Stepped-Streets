@@ -8,7 +8,7 @@
 
 <p>
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods" src="https://img.shields.io/badge/Paradox%20Mods-Subscribe-1f6feb?style=for-the-badge"></a>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.6.0-2ea44f?style=for-the-badge"></a>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.6.1-2ea44f?style=for-the-badge"></a>
 <img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490?style=for-the-badge">
 <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c?style=for-the-badge"></a>
 </p>
@@ -180,7 +180,8 @@ tells you so you can join them up with a road of your own.
 | **Filtered grid** | A grid whose streets are closed in the middle of every other block, so they serve the houses but carry no through traffic. |
 | **Barcelona superblock** | Superblocks of three by three blocks whose inner streets come in and turn back out by the next side, round a central square. |
 
-The hillside layouts need a slope; all the others work on flat land too. A grid lines up with your nearest road and
+The hillside layouts need a slope; all the others work on flat land too. Everything but the three hillside layouts is
+new and marked **experimental** in the picker until it has been built in more cities: tell me how yours turn out. A grid lines up with your nearest road and
 meets it the way a real grid does: every street that runs towards it joins it in a T. The radial layouts centre on the
 roomiest part of the area (the fan on the edge nearest your road) and meet your road the same way. The linear and
 branching layouts run their trunks in from your road, each meeting it in a T, with the side streets off the trunks.
