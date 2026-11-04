@@ -169,6 +169,15 @@ test("layouts, junctions and the terrain option read leniently", async () => {
     assert.equal(bad.settings.shapeGround, true);
 });
 
+test("the radial layouts are read, and only grids offer junctions", async () => {
+    const { readState, usesJunctions } = await stateModule();
+    for (const style of ["DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid", "Star", "Rings", "Spiderweb", "Fan"])
+        assert.equal(readState({ settings: { style } }).settings.style, style);
+    assert.equal(usesJunctions("RadialGrid"), true);
+    assert.equal(usesJunctions("Fan"), false);
+    assert.equal(usesJunctions("ContourSuburb"), false);
+});
+
 test("catalogue icons pass through when they are text and are left out otherwise", async () => {
     const { readState } = await stateModule();
     const state = readState({

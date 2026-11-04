@@ -35,6 +35,30 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Parallel streets with gaps: some cross streets left out and some streets broken, so T-junctions and L-turns.</summary>
         FragmentedGrid,
+
+        /// <summary>A rectangular grid crossed by two diagonal avenues.</summary>
+        DiagonalGrid,
+
+        /// <summary>A grid whose streets curve in gentle waves, every junction still near square.</summary>
+        CurvedGrid,
+
+        /// <summary>Curving parallel streets with gaps: a curved grid broken like the fragmented one.</summary>
+        WarpedGrid,
+
+        /// <summary>A rectangular grid with four diagonal avenues radiating from a block at its centre.</summary>
+        RadialGrid,
+
+        /// <summary>Streets radiating from a small ring at the centre like the spokes of a wheel, twice as many past a boulevard ring.</summary>
+        Star,
+
+        /// <summary>Concentric ring streets joined by staggered radial streets.</summary>
+        Rings,
+
+        /// <summary>Concentric rings crossed by radial streets that run straight from the centre outwards.</summary>
+        Spiderweb,
+
+        /// <summary>Rings and radial streets spreading from a point on the area's edge, like an open fan.</summary>
+        Fan,
     }
 
     public static class NeighbourhoodStyles
@@ -42,6 +66,9 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>The hillside layouts, which follow the contours and so need a slope.</summary>
         public static bool FollowsContours(this NeighbourhoodStyle style) => style == NeighbourhoodStyle.ContourSuburb
             || style == NeighbourhoodStyle.TerracedBlocks || style == NeighbourhoodStyle.MountainLane;
+
+        /// <summary>The layouts whose cross streets can meet as crossroads, staggered or traffic-optimised.</summary>
+        public static bool UsesJunctions(this NeighbourhoodStyle style) => Layouts.GridLayout.Handles(style);
     }
 
     /// <summary>How the cross streets of a grid meet its main streets.</summary>

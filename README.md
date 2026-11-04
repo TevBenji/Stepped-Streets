@@ -8,7 +8,7 @@
 
 <p>
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods" src="https://img.shields.io/badge/Paradox%20Mods-Subscribe-1f6feb?style=for-the-badge"></a>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.2.0-2ea44f?style=for-the-badge"></a>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.3.0-2ea44f?style=for-the-badge"></a>
 <img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490?style=for-the-badge">
 <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c?style=for-the-badge"></a>
 </p>
@@ -75,6 +75,11 @@ builder would, previews it on the ground, and builds it when you say so.
 <td><img src="src/SteppedStreets/Properties/Screenshots/09.png" alt="Traffic-optimised grid"></td>
 <td><img src="src/SteppedStreets/Properties/Screenshots/10.png" alt="Crossroads, staggered or skewed"></td>
 </tr>
+<tr>
+<td><img src="src/SteppedStreets/Properties/Screenshots/11.png" alt="Rings and spiderwebs"></td>
+<td><img src="src/SteppedStreets/Properties/Screenshots/12.png" alt="A fan from your road"></td>
+<td><img src="src/SteppedStreets/Properties/Screenshots/13.png" alt="Curved and diagonal grids"></td>
+</tr>
 </table>
 
 ## Installation
@@ -130,9 +135,18 @@ tells you so you can join them up with a road of your own.
 | **Irregular grid** | A grid with varied street spacing and block lengths. |
 | **Skewed grid** | Long blocks whose cross streets lean, so the blocks are parallelograms. |
 | **Fragmented grid** | Parallel streets with gaps: some cross streets left out and some streets broken. |
+| **Diagonal avenues** | A rectangular grid crossed by two diagonal avenues. |
+| **Curved grid** | A grid whose streets curve in gentle waves, the junctions still close to square. |
+| **Warped grid** | Curving parallel streets with gaps, like a fragmented grid that bends. |
+| **Radial grid** | A grid with four diagonal avenues radiating from a square at its centre. |
+| **Star** | Streets radiating from a small ring at the centre, twice as many past a boulevard ring. |
+| **Rings** | Concentric ring streets joined by staggered radial streets. |
+| **Spiderweb** | Concentric rings crossed by radial streets that run straight out from the centre. |
+| **Fan** | Arcs and radial streets opening like a fan from the edge of the area nearest your road. |
 
-The hillside layouts need a slope; the grids work on flat land too. A grid lines up with your nearest road and meets
-it the way a real grid does: every street that runs towards it joins it in a T.
+The hillside layouts need a slope; the grid and radial layouts work on flat land too. A grid lines up with your nearest
+road and meets it the way a real grid does: every street that runs towards it joins it in a T. The radial layouts centre
+on the roomiest part of the area (the fan on the edge nearest your road) and meet your road the same way.
 
 **Junctions** (grids): **Crossroads** lines the cross streets up into four-way junctions; **Staggered** offsets them like
 brickwork, so every junction is a T; **Traffic** runs one through road across the grid as the only road that meets

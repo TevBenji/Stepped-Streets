@@ -39,6 +39,14 @@ export const LAYOUT_TIPS: Record<string, string> = {
     IrregularGrid: "A grid with varied street spacing and block lengths, less regimented.",
     SkewedGrid: "Long blocks whose cross streets lean, so the blocks are parallelograms.",
     FragmentedGrid: "Parallel streets with gaps: some cross streets left out and some streets broken.",
+    DiagonalGrid: "A rectangular grid crossed by two diagonal avenues.",
+    CurvedGrid: "A grid whose streets curve in gentle waves.",
+    WarpedGrid: "Curving parallel streets with gaps, like a fragmented grid that bends.",
+    RadialGrid: "A grid with four diagonal avenues radiating from a square at its centre.",
+    Star: "Streets radiating from a small central ring, twice as many past a boulevard ring.",
+    Rings: "Concentric ring streets joined by staggered radial streets.",
+    Spiderweb: "Concentric rings crossed by radial streets running straight out from the centre.",
+    Fan: "Arcs and radial streets opening like a fan from the edge nearest your road.",
 };
 
 /** A setting's description on hover, in the game's tooltip bubble; rows without one are left as they are. */
