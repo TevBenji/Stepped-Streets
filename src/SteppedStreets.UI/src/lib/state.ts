@@ -13,6 +13,9 @@ export const STYLES: NeighbourhoodStyle[] = ["ContourSuburb", "TerracedBlocks", 
     "TriangularMesh", "Hexagonal", "HexagonalSpokes", "Ridge", "Valley", "Coastal", "Winding",
     "OrganicMesh", "Hybrid", "Polycentric", "Superblock", "Radburn", "FusedGrid", "FilteredGrid", "BarcelonaSuperblock"];
 const JUNCTION_STYLES: NeighbourhoodStyle[] = ["SquareGrid", "RectangularGrid", "IrregularGrid", "SkewedGrid", "FragmentedGrid", "DiagonalGrid", "CurvedGrid", "WarpedGrid", "RadialGrid"];
+/** The layouts tried in real cities; the rest are marked experimental until they have been. */
+const TRIED_STYLES: NeighbourhoodStyle[] = ["ContourSuburb", "TerracedBlocks", "MountainLane"];
+export const isExperimental = (style: NeighbourhoodStyle) => !TRIED_STYLES.includes(style);
 /** The grid layouts, whose cross streets can meet as crossroads, staggered or traffic-optimised. */
 export const usesJunctions = (style: NeighbourhoodStyle) => JUNCTION_STYLES.includes(style);
 export type JunctionPattern = "Crossroads" | "Staggered" | "TrafficOptimised";

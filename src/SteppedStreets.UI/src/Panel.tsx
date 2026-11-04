@@ -8,7 +8,7 @@ import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./li
 import { ErrorBoundary } from "./lib/errorBoundary";
 import { LAYOUT_TIPS, SettingTip } from "./lib/tips";
 import {
-    formatArea, JunctionPattern, MixPattern, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
+    formatArea, isExperimental, JunctionPattern, MixPattern, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
 } from "./lib/state";
 import { vanilla } from "./lib/vanilla";
 import icon from "./assets/stepped-streets.svg";
@@ -296,43 +296,43 @@ const LAYOUTS: Option[] = [
     { name: "ContourSuburb", label: "Contour suburb", group: "Hills" },
     { name: "TerracedBlocks", label: "Terraced blocks", group: "Hills" },
     { name: "MountainLane", label: "Mountain lane", group: "Hills" },
-    { name: "SquareGrid", label: "Square grid", group: "Grid" },
-    { name: "RectangularGrid", label: "Rectangular grid", group: "Grid" },
-    { name: "IrregularGrid", label: "Irregular grid", group: "Grid" },
-    { name: "SkewedGrid", label: "Skewed grid", group: "Grid" },
-    { name: "FragmentedGrid", label: "Fragmented grid", group: "Grid" },
-    { name: "DiagonalGrid", label: "Diagonal avenues", group: "Grid" },
-    { name: "CurvedGrid", label: "Curved grid", group: "Grid" },
-    { name: "WarpedGrid", label: "Warped grid", group: "Grid" },
-    { name: "RadialGrid", label: "Radial grid", group: "Grid" },
-    { name: "Star", label: "Star", group: "Radial" },
-    { name: "Rings", label: "Rings", group: "Radial" },
-    { name: "Spiderweb", label: "Spiderweb", group: "Radial" },
-    { name: "Fan", label: "Fan", group: "Radial" },
-    { name: "Spine", label: "Spine", group: "Linear" },
-    { name: "Ladder", label: "Ladder", group: "Linear" },
-    { name: "Comb", label: "Comb", group: "Linear" },
-    { name: "Fishbone", label: "Fishbone", group: "Linear" },
-    { name: "Tree", label: "Tree", group: "Branching" },
-    { name: "CulDeSacs", label: "Cul-de-sacs", group: "Branching" },
-    { name: "Loops", label: "Loops", group: "Branching" },
-    { name: "LoopsAndLollipops", label: "Loops and lollipops", group: "Branching" },
-    { name: "Lollipops", label: "Lollipops on a stick", group: "Branching" },
-    { name: "TriangularMesh", label: "Triangular mesh", group: "Geometric" },
-    { name: "Hexagonal", label: "Hexagonal", group: "Geometric" },
-    { name: "HexagonalSpokes", label: "Hexagons with spokes", group: "Geometric" },
-    { name: "Ridge", label: "Ridge", group: "Terrain" },
-    { name: "Valley", label: "Valley", group: "Terrain" },
-    { name: "Coastal", label: "Coastal", group: "Terrain" },
-    { name: "Winding", label: "Winding", group: "Terrain" },
-    { name: "OrganicMesh", label: "Organic mesh", group: "Planning" },
-    { name: "Hybrid", label: "Hybrid", group: "Planning" },
-    { name: "Polycentric", label: "Polycentric", group: "Planning" },
-    { name: "Superblock", label: "Superblock", group: "Planning" },
-    { name: "Radburn", label: "Radburn", group: "Planning" },
-    { name: "FusedGrid", label: "Fused grid", group: "Planning" },
-    { name: "FilteredGrid", label: "Filtered grid", group: "Planning" },
-    { name: "BarcelonaSuperblock", label: "Barcelona superblock", group: "Planning" },
+    { name: "SquareGrid", label: "Square grid", group: "Grid (experimental)" },
+    { name: "RectangularGrid", label: "Rectangular grid", group: "Grid (experimental)" },
+    { name: "IrregularGrid", label: "Irregular grid", group: "Grid (experimental)" },
+    { name: "SkewedGrid", label: "Skewed grid", group: "Grid (experimental)" },
+    { name: "FragmentedGrid", label: "Fragmented grid", group: "Grid (experimental)" },
+    { name: "DiagonalGrid", label: "Diagonal avenues", group: "Grid (experimental)" },
+    { name: "CurvedGrid", label: "Curved grid", group: "Grid (experimental)" },
+    { name: "WarpedGrid", label: "Warped grid", group: "Grid (experimental)" },
+    { name: "RadialGrid", label: "Radial grid", group: "Grid (experimental)" },
+    { name: "Star", label: "Star", group: "Radial (experimental)" },
+    { name: "Rings", label: "Rings", group: "Radial (experimental)" },
+    { name: "Spiderweb", label: "Spiderweb", group: "Radial (experimental)" },
+    { name: "Fan", label: "Fan", group: "Radial (experimental)" },
+    { name: "Spine", label: "Spine", group: "Linear (experimental)" },
+    { name: "Ladder", label: "Ladder", group: "Linear (experimental)" },
+    { name: "Comb", label: "Comb", group: "Linear (experimental)" },
+    { name: "Fishbone", label: "Fishbone", group: "Linear (experimental)" },
+    { name: "Tree", label: "Tree", group: "Branching (experimental)" },
+    { name: "CulDeSacs", label: "Cul-de-sacs", group: "Branching (experimental)" },
+    { name: "Loops", label: "Loops", group: "Branching (experimental)" },
+    { name: "LoopsAndLollipops", label: "Loops and lollipops", group: "Branching (experimental)" },
+    { name: "Lollipops", label: "Lollipops on a stick", group: "Branching (experimental)" },
+    { name: "TriangularMesh", label: "Triangular mesh", group: "Geometric (experimental)" },
+    { name: "Hexagonal", label: "Hexagonal", group: "Geometric (experimental)" },
+    { name: "HexagonalSpokes", label: "Hexagons with spokes", group: "Geometric (experimental)" },
+    { name: "Ridge", label: "Ridge", group: "Terrain (experimental)" },
+    { name: "Valley", label: "Valley", group: "Terrain (experimental)" },
+    { name: "Coastal", label: "Coastal", group: "Terrain (experimental)" },
+    { name: "Winding", label: "Winding", group: "Terrain (experimental)" },
+    { name: "OrganicMesh", label: "Organic mesh", group: "Planning (experimental)" },
+    { name: "Hybrid", label: "Hybrid", group: "Planning (experimental)" },
+    { name: "Polycentric", label: "Polycentric", group: "Planning (experimental)" },
+    { name: "Superblock", label: "Superblock", group: "Planning (experimental)" },
+    { name: "Radburn", label: "Radburn", group: "Planning (experimental)" },
+    { name: "FusedGrid", label: "Fused grid", group: "Planning (experimental)" },
+    { name: "FilteredGrid", label: "Filtered grid", group: "Planning (experimental)" },
+    { name: "BarcelonaSuperblock", label: "Barcelona superblock", group: "Planning (experimental)" },
 ];
 const JUNCTIONS: [JunctionPattern, string][] = [["Crossroads", "Crossroads"], ["Staggered", "Staggered"], ["TrafficOptimised", "Traffic"]];
 const MIX_PATTERNS: [MixPattern, string][] = [["Random", "Random"], ["Clumps", "Clumps"], ["Even", "Even"]];
@@ -412,6 +412,8 @@ function NeighbourhoodPanel() {
                     <Section title="Layout">
                         <Picker options={LAYOUTS} value={settings.style} disabled={disabled} onPick={style => act("setStyle", style)} />
                         <div className={styles.layoutTip}>{LAYOUT_TIPS[settings.style]}</div>
+                        {isExperimental(settings.style)
+                            ? <div className={styles.layoutNote}>New and not yet tried in many cities: tell us how it builds.</div> : null}
                         {usesJunctions(settings.style) ? <Row label="Junctions">
                             <Segmented options={JUNCTIONS} value={settings.junctions} disabled={disabled}
                                 onChange={junctions => act("setJunctions", junctions)} />
