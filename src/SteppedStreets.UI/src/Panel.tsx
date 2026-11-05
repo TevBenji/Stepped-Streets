@@ -184,8 +184,8 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
         </div></SettingTip>
         {/* The search box sits above the scrolling rows, so it stays in view (Gameface has no sticky positioning). */}
         {open && !disabled ? <div className={classes(styles.list, !label && styles.listFull)}>
-            {searchable && vanilla.TextInput ? <vanilla.TextInput className={styles.search} value={query} placeholder="Search"
-                onChange={event => setQuery(event.target.value)} /> : null}
+            {searchable && vanilla.TextInput ? <div className={styles.searchRow}><vanilla.TextInput className={styles.search} value={query}
+                placeholder="Search" onChange={event => setQuery(event.target.value)} /></div> : null}
             <Scroll className={styles.listScroll} innerClassName={styles.listInner} nested>
                 {listed.map((option, index) => <React.Fragment key={option.name}>
                     {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}

@@ -56,9 +56,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/17.png" />
 	<Screenshot Value="Properties/Screenshots/25.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.7.2" />
+	<ModVersion Value="2.7.3" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- New pictures on this page, taken in the game.&#10;- The Terraced blocks picture in the layout list now shows terraces on a slope, so it no longer looks like Contour suburb.&#10;- From 2.7.1: the layout list's search box stays at the top while you scroll and spans the list, and each layout picture sits in its own box.&#10;- The new layouts are still marked experimental until they have been tried in more cities. Tell me how they build." />
+	<ChangeLog Value="- The Add a zone and Add a service buttons share the full width of the panel.&#10;- The search box in the zone, service and layout lists now spans the list in the game.&#10;- From 2.7.2: new in-game pictures on this page, and the Terraced blocks picture shows terraces on a slope.&#10;- The new layouts are still marked experimental until they have been tried in more cities. Tell me how they build." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
