@@ -812,9 +812,14 @@
 .stepDone .stepNumber { border-color: #5abe41; background-color: #5abe41; }
 
 /* -- search box at the top of a long list -- */
+/* The game's text box sizes itself to its text, so it is told to span the list, edges in line with the rows. */
 .search {
     flex-shrink: 0;
+    align-self: stretch;
+    width: 100%;
+    box-sizing: border-box;
     height: 28rem;
+    line-height: 26rem;
     margin-bottom: 4rem;
     padding: 0 12rem;
     border: 1rem solid rgba(255, 255, 255, 0.22);
