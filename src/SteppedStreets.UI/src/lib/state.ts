@@ -168,7 +168,10 @@ export function readState(raw: unknown): ToolState {
             steepGround: flag(settings.steepGround, false),
             shapeGround: flag(settings.shapeGround, true),
             junctions: choice(settings.junctions, ["Crossroads", "Staggered", "TrafficOptimised"], "Staggered"),
-            zoneMix: zoneMix.length > 0 ? zoneMix : DEFAULT_MIX.map(share => ({ ...share })),
+            // An empty list is the player's choice of no zoning; a missing or unreadable one takes the default (as the tool's
+            // ZoneShare.ParseList does).
+            zoneMix: zoneMix.length > 0 ? zoneMix
+                : Array.isArray(settings.zoneMix) && settings.zoneMix.length === 0 ? [] : DEFAULT_MIX.map(share => ({ ...share })),
             serviceMix: rows(settings.serviceMix, readServiceCount, service => service.name),
             mixPattern: choice(settings.mixPattern, ["Random", "Clumps", "Even"], "Clumps"),
             lotWidthCells: whole(settings.lotWidthCells, 3, 2, 6),

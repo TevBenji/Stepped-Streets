@@ -109,6 +109,13 @@ namespace SteppedStreets.Tool
                     return;
                 }
                 if (report.Built < report.Pieces) Message("Some road pieces were not built. Check the log for where.");
+                // No zones in the mix: the lots are levelled for the player to zone, so there is nothing to wait for.
+                if (buildPlan.ZonedCells == 0)
+                {
+                    buildReport.Add(buildPlan.Lots.Count > 0 ? "lots left unzoned" : "nothing to zone");
+                    PlaceServices();
+                    return;
+                }
                 State.Progress = 0.55f;
                 State.Summary = "Waiting for the zone blocks...";
                 Touch();
@@ -230,7 +237,7 @@ namespace SteppedStreets.Tool
                             foreach (int index in buckets.Near(centre))
                                 // The lot must face the same road: its back points away from the road, as the block does.
                                 if (math.dot(backs[index], forward) < -0.5f && SiteGeometry.Inside(centre, reaches[index])) { zone = lots[index].Zone; break; }
-                            if (zone == null) continue;
+                            if (string.IsNullOrEmpty(zone)) continue;
                             if (!byZone.TryGetValue(zone, out var quads)) byZone[zone] = quads = new List<float2[]>();
                             // The cell's own square, pulled in a metre so the marquee takes this cell and no neighbour.
                             quads.Add(new[]

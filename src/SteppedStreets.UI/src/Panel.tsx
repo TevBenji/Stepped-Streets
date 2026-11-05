@@ -160,9 +160,14 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
     // A row just added opens its list at once, so adding is one click to choose rather than two.
     const [open, setOpen] = useState(initiallyOpen);
     const [query, setQuery] = useState("");
+    const search = useRef<HTMLInputElement>(null);
+    // The search box lets go of the keyboard before the list closes, so the game's shortcuts work again at once.
+    const close = () => { search.current?.blur(); setOpen(false); };
     // Disabling closes the list, so it doesn't pop back open after the build or the confirmation.
-    useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
-    useEffect(() => { if (!open) setQuery(""); }, [open]);
+    useEffect(() => { if (disabled) close(); }, [disabled]);
+    // Typing goes into the search box as soon as the list opens; without focus, the keys reached the game's shortcuts and
+    // moved the camera (in-game test, 5 November 2026).
+    useEffect(() => { if (open) search.current?.focus(); else setQuery(""); }, [open]);
     // A saved choice the game no longer lists still shows, so the button never reads blank.
     const shown = options.some(option => option.name === value) ? options : [{ name: value, label: value }, ...options];
     const chosen = shown.find(option => option.name === value);
@@ -175,7 +180,7 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
     return <>
         <SettingTip label={label}><div className={styles.row}>
             {label ? <div className={styles.label}>{label}</div> : null}
-            <Button className={styles.picker} disabled={disabled} selected={open} onSelect={() => setOpen(!open)}>
+            <Button className={styles.picker} disabled={disabled} selected={open} onSelect={() => open ? close() : setOpen(true)}>
                 {chosen?.icon ? <img className={bigIcons ? styles.layoutIconSmall : styles.optionIcon} src={chosen.icon} /> : null}
                 <div className={styles.pickerLabel}>{current}</div>
                 <img className={classes(styles.chevron, open && styles.chevronOpen)} src={chevronIcon} />
@@ -184,13 +189,13 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
         </div></SettingTip>
         {/* The search box sits above the scrolling rows, so it stays in view (Gameface has no sticky positioning). */}
         {open && !disabled ? <div className={classes(styles.list, !label && styles.listFull)}>
-            {searchable && vanilla.TextInput ? <div className={styles.searchRow}><vanilla.TextInput className={styles.search} value={query}
-                placeholder="Search" onChange={event => setQuery(event.target.value)} /></div> : null}
+            {searchable && vanilla.TextInput ? <div className={styles.searchRow}><vanilla.TextInput ref={search} className={styles.search}
+                value={query} placeholder="Search" onChange={event => setQuery(event.target.value)} /></div> : null}
             <Scroll className={styles.listScroll} innerClassName={styles.listInner} nested>
                 {listed.map((option, index) => <React.Fragment key={option.name}>
                     {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}
                     <Button className={classes(styles.listItem, bigIcons && styles.listItemTall)} selected={option.name === value}
-                        onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>
+                        onSelect={() => { close(); if (option.name !== value) onPick(option.name); }}>
                         {option.icon ? bigIcons
                             ? <div className={styles.layoutTile}><img className={styles.layoutIcon} src={option.icon} /></div>
                             : <img className={styles.optionIcon} src={option.icon} /> : null}
@@ -262,6 +267,7 @@ function ZoneMix({ mix, zones, disabled, justAdded }: { mix: ZoneShare[]; zones:
     // The tool drops zones the game doesn't have (a removed asset pack), so a mix of only those would be refused.
     const known = (name: string) => zones.length === 0 || zones.some(zone => zone.name === name);
     return <>
+        {mix.length === 0 ? <div className={styles.layoutTip}>No zoning: roads and level lots only. Zone them yourself.</div> : null}
         {mix.map((entry, index) => {
             const replace = (change: Partial<ZoneShare>) => send(mix.map((other, at) => at === index ? { ...other, ...change } : other));
             const missing = !known(entry.zone);
@@ -270,7 +276,8 @@ function ZoneMix({ mix, zones, disabled, justAdded }: { mix: ZoneShare[]; zones:
             return <div key={entry.zone} className={styles.mixEntry}>
                 <Picker options={zones.filter(zone => zone.name === entry.zone || !mix.some(other => other.zone === zone.name))}
                     value={entry.zone} disabled={disabled} initiallyOpen={entry.zone === justAdded} onPick={zone => replace({ zone })}>
-                    <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled || mix.length === 1 || lastKnown}
+                    {/* Removing the last zone leaves no zoning; removing the last installed one beside missing ones is refused. */}
+                    <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled || (mix.length > 1 && lastKnown)}
                         onSelect={() => send(mix.filter((_, at) => at !== index))}>
                         <img className={styles.closeIcon} src={closeIcon} />
                     </Button>

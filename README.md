@@ -3,7 +3,7 @@
 <img align="right" src="src/SteppedStreets/Properties/Thumbnail.png" alt="Stepped Streets" width="260">
 
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods: Stepped Streets" src="https://img.shields.io/badge/Paradox%20Mods-Stepped%20Streets-2ea44f"></a>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.7.3-1f6feb"></a>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.8.0-1f6feb"></a>
 <img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490">
 <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c"></a>
 
@@ -50,7 +50,8 @@ In the game:
 - **A connection to your road network** within 400 m, or a neighbourhood of its own when there is none.
 - **Level lots stepped down the hill**, graded with soft banks before anything is zoned.
 - **Zoning that grows**: the game's own zone cells along the new roads, as deep as each levelled lot, in the mix of zones
-  you choose. Lots are 4 cells deep by default, so every low-density house fits on level ground.
+  you choose. Lots are 4 cells deep by default, so every low-density house fits on level ground. Remove every zone and the
+  lots are levelled but left for you to zone.
 - **Service buildings in the mix**: police, fire, health, schools, parks, utilities, any unlocked roadside service building,
   each on a level site of its own, facing the road.
 - **Trees if you want them**: forest on ground too steep to build and trees on the banks (off by default), and optional
@@ -204,7 +205,7 @@ The panel shows the essentials; everything else is under **More settings**. One 
 | Layout | see above | Contour suburb | The kind of layout. |
 | Junctions | Crossroads, Staggered, Traffic | Staggered | How a grid's cross streets meet its main streets. |
 | Shape the ground | on / off | on | Grade roads and lots. Off: no terrain changes at all; roads follow the ground. |
-| Zones | zones and shares | Residential Low | Each lot's zone. **Add a zone** mixes in another. |
+| Zones | zones and shares, or none | Residential Low | Each lot's zone. **Add a zone** mixes in another; with none, the lots are levelled but not zoned. |
 | Services | buildings and counts (1–20) | none | Service buildings on level sites beside the new roads. **Add a service** adds one. |
 | Mix mode | Random, Clumps, Even | Clumps | How a zone mix is spread: per lot, in runs of neighbouring lots, or evenly. |
 | Steep hills | on / off | off | Build on slopes up to 60 % with up to 12 m of earthwork; connectors may switch back. |

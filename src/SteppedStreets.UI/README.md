@@ -47,7 +47,7 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setJunctions` | string | Crossroads / Staggered / TrafficOptimised (grid layouts) |
 | `setRoad` | string | A road `name` from the catalogue |
 | `setMixPattern` | string | Random / Clumps / Even |
-| `setZoneMix` | string | `[{"zone":"...","share":N},...]`; zones not in the catalogue are dropped |
+| `setZoneMix` | string | `[{"zone":"...","share":N},...]`; zones not in the catalogue are dropped (a list of only those is refused); `[]` means no zoning: lots are levelled but left unzoned |
 | `setServiceMix` | string | `[{"name":"...","count":N},...]` (N 1–20); buildings not in the `services` catalogue are dropped; `[]` is allowed |
 | `setBlockDepth` | double | 60–200 m, step 5 |
 | `setMaxRoadGrade`, `setSteepestBuildable` | double | 4–12 %, 8–60 % (C# caps the second at 30 % unless `steepGround`) |

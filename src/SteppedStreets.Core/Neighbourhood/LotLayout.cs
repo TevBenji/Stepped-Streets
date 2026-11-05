@@ -240,13 +240,20 @@ namespace SteppedStreets.Core.Neighbourhood
             return u > inset && u < alongLength - inset && v > inset && v < acrossLength - inset;
         }
 
-        /// <summary>One zone per lot from the mix: Random (seeded per lot), Clumps (runs of 3–5 lots) or Even (round robin).</summary>
+        /// <summary>
+        /// One zone per lot from the mix: Random (seeded per lot), Clumps (runs of 3–5 lots) or Even (round robin). With no zones
+        /// in the mix the lots are still levelled but left unzoned (zone ""), for the player to zone by hand.
+        /// </summary>
         internal static void AssignZones(List<PlannedLot> lots, NeighbourhoodRequest request)
         {
             var mix = new List<ZoneShare>();
             foreach (var share in request.Mix ?? new ZoneShare[0])
                 if (share != null && !string.IsNullOrWhiteSpace(share.Zone) && share.Share > 0f && math.isfinite(share.Share)) mix.Add(share);
-            if (mix.Count == 0) mix.Add(new ZoneShare { Zone = "Residential Low", Share = 1f });
+            if (mix.Count == 0)
+            {
+                foreach (var lot in lots) lot.Zone = "";
+                return;
+            }
             float total = 0f;
             foreach (var share in mix) total += share.Share;
 

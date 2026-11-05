@@ -172,7 +172,10 @@ namespace SteppedStreets.Core.Neighbourhood
         private static readonly Regex ShareField = new Regex(@"""share""\s*:\s*(-?[0-9.]+(?:[eE][-+]?[0-9]+)?)", RegexOptions.CultureInvariant);
         private static readonly Regex Escape = new Regex(@"\\(.)", RegexOptions.CultureInvariant);
 
-        /// <summary>Reads [{"zone":"..","share":n},..], the only shape the panel writes; entries it can't read are skipped.</summary>
+        /// <summary>
+        /// Reads [{"zone":"..","share":n},..], the only shape the panel writes; entries it can't read are skipped. An empty list
+        /// ("[]") means no zoning; anything else that yields no zone (a damaged setting) falls back to Residential Low.
+        /// </summary>
         public static List<ZoneShare> ParseList(string json)
         {
             var shares = new List<ZoneShare>();
@@ -186,7 +189,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (shareMatch.Success && !float.TryParse(shareMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out share)) continue;
                 if (name.Length > 0 && share > 0f && !float.IsInfinity(share)) shares.Add(new ZoneShare { Zone = name, Share = share });
             }
-            if (shares.Count == 0) shares.Add(new ZoneShare { Zone = "Residential Low", Share = 100f });
+            if (shares.Count == 0 && (json ?? "").Trim() != "[]") shares.Add(new ZoneShare { Zone = "Residential Low", Share = 100f });
             return shares;
         }
 

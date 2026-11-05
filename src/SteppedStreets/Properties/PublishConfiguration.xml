@@ -13,7 +13,7 @@ Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets doe
 - **Gentle connectors** that climb across the slope, never steeper than the grade you set (8 % by default)
 - **A connection to your nearest road** within 400 m, or a neighbourhood of its own when there is none
 - **Level lots stepped down the hill** with soft banks, graded before anything is zoned
-- **Zoning that grows**: the game's own zone cells along the new roads, as deep as each levelled lot, in the mix you choose
+- **Zoning that grows**: the game's own zone cells along the new roads, as deep as each levelled lot, in the mix you choose (or none, to zone the lots yourself)
 - **Service buildings** mixed in: police, fire, clinics and hospitals, schools, parks, utilities, any unlocked roadside service building, each on a level site of its own facing the road
 - **Trees if you want them**: forest on ground too steep to build and trees on the banks (off by default), optional garden walls
 
@@ -56,9 +56,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/17.png" />
 	<Screenshot Value="Properties/Screenshots/25.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.7.3" />
+	<ModVersion Value="2.8.0" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- The Add a zone and Add a service buttons share the full width of the panel.&#10;- The search box in the zone, service and layout lists now spans the list in the game.&#10;- From 2.7.2: new in-game pictures on this page, and the Terraced blocks picture shows terraces on a slope.&#10;- The new layouts are still marked experimental until they have been tried in more cities. Tell me how they build." />
+	<ChangeLog Value="- No zoning if you want: remove the last zone under What to build and you get the roads and level lots, ready for you to zone yourself. Services still work.&#10;- Opening a list puts the cursor in its search box, so typing searches instead of moving the camera.&#10;- The Build step's name no longer touches the edge of the panel.&#10;- From 2.7.3: the Add a zone and Add a service buttons share the panel's width, and the list search boxes span the list.&#10;- The new layouts are still marked experimental until they have been tried in more cities. Tell me how they build." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
