@@ -28,7 +28,8 @@ After a Release build, `pwsh -File tools/check-panel-json.ps1` checks the actual
 
 Group: `SteppedStreets`. Value: `state`, a `ValueBinding<string>` carrying JSON, written by `src/SteppedStreets/Panel/PanelSystem.cs`
 and read defensively by `src/lib/state.ts` (`readState` never throws and clamps every field):
-`stage` (Closed, Drawing, Planning, Planned, Building, Built, Failed), `corners`, `areaClosed`, `areaSquareMetres`, `summary`,
+`stage` (Closed, Drawing, Planning, Planned, Building, Built, Failed), `corners`, `areaClosed`, `confirming` (the Build dialog is
+open; the tool clears it on Esc, a new plan and the build), `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
 `connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
 `settings` (the trigger values below, plus `steepGround`, `shapeGround`, `junctions` and `serviceMix` as `name`/`count` rows), and the catalogues `zones` and
@@ -41,7 +42,8 @@ it is the build report (the panel shows it under the status line). The state is 
 |---|---|---|
 | `toggleTool`, `close` | none | Open/close the tool |
 | `clearArea`, `closeArea`, `undo` | none | Area editing |
-| `build` | none | Build when Planned, after the UI confirmation |
+| `setConfirming` | bool | Open (only when Planned) or close the Build dialog; while it is open the tool ignores the map |
+| `build` | none | Build when Planned, after the UI confirmation; closes the dialog |
 | `reroll` | none | A new seed |
 | `setStyle` | string | ContourSuburb / TerracedBlocks / MountainLane / SquareGrid / RectangularGrid / IrregularGrid / SkewedGrid / FragmentedGrid / DiagonalGrid / CurvedGrid / WarpedGrid / RadialGrid / Star / Rings / Spiderweb / Fan / Spine / Ladder / Comb / Fishbone / Tree / CulDeSacs / Loops / LoopsAndLollipops / Lollipops / TriangularMesh / Hexagonal / HexagonalSpokes / Ridge / Valley / Coastal / Winding / OrganicMesh / Hybrid / Polycentric / Superblock / Radburn / FusedGrid / FilteredGrid / BarcelonaSuperblock |
 | `setJunctions` | string | Crossroads / Staggered / TrafficOptimised (grid layouts) |

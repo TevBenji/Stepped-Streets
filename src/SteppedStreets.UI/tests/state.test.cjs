@@ -29,6 +29,7 @@ test("missing, broken or non-object state keeps the tool closed with the default
         assert.equal(state.stage, "Closed");
         assert.equal(state.corners, 0);
         assert.equal(state.areaClosed, false);
+        assert.equal(state.confirming, false);
         assert.equal(state.areaSquareMetres, 0);
         assert.equal(state.summary, "");
         assert.equal(state.progress, 0);
@@ -140,6 +141,8 @@ test("enums are validated, wrong types and non-finite numbers fall back to defau
     assert.equal(readState({ settings: { style: "TerracedBlocks" } }).settings.style, "TerracedBlocks");
     assert.equal(readState({ settings: { trees: false } }).settings.trees, false);
     assert.equal(readState({ stats: { connected: true } }).stats.connected, true);
+    assert.equal(readState({ confirming: true }).confirming, true);
+    assert.equal(readState({ confirming: "true" }).confirming, false);
 });
 
 test("zone mix keeps valid rows, drops duplicates and falls back to the default", async () => {
@@ -151,8 +154,11 @@ test("zone mix keeps valid rows, drops duplicates and falls back to the default"
         { zone: "Residential Medium Row", share: 60 }, { zone: "Commercial Low", share: 250 }, { zone: "Residential Medium Row", share: 10 },
         { zone: "Residential High", share: 12.5 },
     ]), [
-        { zone: "Residential Medium Row", share: 60 }, { zone: "Commercial Low", share: 100 }, { zone: "Residential High", share: 12.5 },
+        // Shares are weights: one past the sliders' 100 scales the whole mix down, keeping its proportions.
+        { zone: "Residential Medium Row", share: 24 }, { zone: "Commercial Low", share: 100 }, { zone: "Residential High", share: 5 },
     ]);
+    assert.deepEqual(mix([{ zone: "Office", share: 60 }, { zone: "Commercial Low", share: 40 }]),
+        [{ zone: "Office", share: 60 }, { zone: "Commercial Low", share: 40 }]);
     for (const broken of [[{ zone: "Office", share: 0 }], [null], "Residential Low", null, {}, undefined])
         assert.deepEqual(mix(broken), [{ zone: "Residential Low", share: 100 }]);
     // An empty list is the player's choice of no zoning.

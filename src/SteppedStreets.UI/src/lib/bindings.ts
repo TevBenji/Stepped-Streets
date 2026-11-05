@@ -28,8 +28,8 @@ export type ToggleTrigger = "setLevelLots" | "setRetainingWalls" | "setTrees" | 
 export function act(name: Action): void;
 export function act(name: TextTrigger, value: string): void;
 export function act(name: NumberTrigger, value: number): void;
-export function act(name: ToggleTrigger, value: boolean): void;
-export function act(name: Action | TextTrigger | NumberTrigger | ToggleTrigger, value?: string | number | boolean): void {
+export function act(name: ToggleTrigger | "setConfirming", value: boolean): void;
+export function act(name: Action | TextTrigger | NumberTrigger | ToggleTrigger | "setConfirming", value?: string | number | boolean): void {
     try {
         if (value === undefined) trigger(GROUP, name);
         else trigger(GROUP, name, value);

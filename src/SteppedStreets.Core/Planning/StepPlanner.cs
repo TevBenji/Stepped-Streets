@@ -59,6 +59,10 @@ namespace SteppedStreets.Core.Planning
             var centreline = request?.Centreline;
             if (centreline == null || centreline.Count < 2)
                 throw new ArgumentException("The street needs at least two centreline points.", nameof(request));
+            // A NaN point makes every distance along the street NaN, and the loops that walk it would never end.
+            foreach (var point in centreline)
+                if (!math.all(math.isfinite(point)))
+                    throw new ArgumentException("The street has a point that is not a number.", nameof(request));
             if (request.LotWidthCells < MinimumWidthCells)
                 throw new ArgumentException($"Lots must be at least {MinimumWidthCells} cells wide.", nameof(request));
             if (request.NarrowestWidthCells < MinimumWidthCells || request.NarrowestWidthCells > request.LotWidthCells)

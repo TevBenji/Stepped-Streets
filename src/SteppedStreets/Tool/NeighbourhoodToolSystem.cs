@@ -1,7 +1,9 @@
 // Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Colossal.Serialization.Entities;
@@ -48,6 +50,8 @@ namespace SteppedStreets.Tool
         private SiteSnapshot taskSnapshot;
         private NeighbourhoodRequest taskRequest;
         private SiteSnapshot plannedSnapshot;
+        // Every setting the plan was made with: the Options page saves without telling the tool, so Open and Build compare.
+        private string taskSettings, plannedSettings;
 
         public ToolState State { get; } = new ToolState();
         public override string toolID => "Stepped Streets";
@@ -106,7 +110,7 @@ namespace SteppedStreets.Tool
                 if (State.Stage == ToolStage.Building) return;
                 m_ToolSystem.activeTool = this;
                 RefreshStage();
-                if (replanOnOpen) { replanOnOpen = false; Replan(); }
+                if (replanOnOpen || SettingsMoved()) { replanOnOpen = false; Replan(); }
             }
             catch (Exception exception) { Fail(exception, "The neighbourhood tool could not open."); }
         }
@@ -197,7 +201,9 @@ namespace SteppedStreets.Tool
                 applyMode = ApplyMode.None;
                 EnableActions(false);
                 rightClick.Reset();
-                dragging = -1;
+                // A drag cut short goes back, or the outline would no longer match its plan.
+                if (dragging >= 0) RestoreDrag();
+                State.Confirming = false;
                 Cursor = null;
                 HoveredCorner = -1;
                 // Planning takes every core for a few seconds, so a plan still being worked out stops with the tool and
@@ -288,6 +294,12 @@ namespace SteppedStreets.Tool
             bool control = keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
             bool escape = (Pressed(cancelAction) && !rawRightDown && !rightHeld) || (keyboard != null && keyboard.escapeKey.wasPressedThisFrame);
 
+            // The Build dialog is open: Esc closes it and the map takes nothing, so the plan stays the one being asked about.
+            if (State.Confirming)
+            {
+                if (escape) SetConfirming(false);
+                return;
+            }
             if (escape)
             {
                 if (dragging >= 0) { RestoreDrag(); return; }
@@ -421,7 +433,12 @@ namespace SteppedStreets.Tool
         private void RestoreDrag()
         {
             if (beforeDrag != null) { corners.Clear(); corners.AddRange(beforeDrag); }
-            else if (dragging >= 0 && dragging < corners.Count) corners[dragging] = dragStart;
+            // A corner grown from an edge goes again, with the undo step remembered when it was inserted.
+            else if (dragging >= 0 && dragging < corners.Count)
+            {
+                corners.RemoveAt(dragging);
+                if (history.Count > 0) history.RemoveAt(history.Count - 1);
+            }
             dragging = -1;
             beforeDrag = null;
             Touch();
@@ -455,6 +472,7 @@ namespace SteppedStreets.Tool
             PlannedRequest = null;
             PlanVersion++;
             ClearPlanState();
+            State.Confirming = false;
             State.Corners = corners.Count;
             State.AreaClosed = areaClosed;
             State.AreaSquareMetres = corners.Count >= 3 ? math.abs(SignedArea(corners)) : 0f;
@@ -488,7 +506,7 @@ namespace SteppedStreets.Tool
             taskVersion = ++requestedVersion;
             taskSnapshot = snapshot;
             taskRequest = request;
-            taskRoadName = settings.RoadName;
+            taskSettings = SettingsSignature(settings);
             int version = taskVersion;
             planTask = Task.Run(() => NeighbourhoodPlanner.Plan(request, cancel.Token, roads =>
             {
@@ -535,7 +553,7 @@ namespace SteppedStreets.Tool
             Plan = plan;
             EarlyRoads = null;
             PlannedRequest = taskRequest;
-            plannedRoadName = taskRoadName;
+            plannedSettings = taskSettings;
             plannedSnapshot = taskSnapshot;
             PlanVersion++;
             State.Summary = plan.SummaryLine;
@@ -594,6 +612,24 @@ namespace SteppedStreets.Tool
                 TreeDensity = settings.TreeDensityPercent / 100f,
                 Seed = (uint)math.max(1, settings.Seed),
             };
+        }
+
+        /// <summary>True when a setting changed since the current plan was made (the Options page doesn't re-plan).</summary>
+        private bool SettingsMoved() => Plan != null && plannedSettings != SettingsSignature(Mod.Settings);
+
+        private static string SettingsSignature(Settings.SteppedStreetsSettings settings) => settings == null ? "" : string.Join("|",
+            typeof(Settings.SteppedStreetsSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .Where(property => property.CanRead && property.GetIndexParameters().Length == 0
+                    && (property.PropertyType.IsPrimitive || property.PropertyType.IsEnum || property.PropertyType == typeof(string)))
+                .Select(property => Convert.ToString(property.GetValue(settings), CultureInfo.InvariantCulture)));
+
+        /// <summary>The panel's Build dialog opens or closes; the panel shows it from the state, so Esc on the map can close it.</summary>
+        public void SetConfirming(bool open)
+        {
+            open = open && State.Stage == ToolStage.Planned;
+            if (State.Confirming == open) return;
+            State.Confirming = open;
+            Touch();
         }
 
         /// <summary>The mixed-in service buildings with their lot sizes from the game; ones the game no longer has are left out.</summary>

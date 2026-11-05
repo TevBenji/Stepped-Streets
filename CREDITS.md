@@ -66,7 +66,6 @@ All from [Placemaker](https://github.com/jackwrichards/placemaker) by jackwricha
 | `src/SteppedStreets.Core/Terrain/TerraformRaster.cs` | `Core/Build/TerraformRaster.cs` | Whole file; namespace changed. |
 | `src/SteppedStreets.Core/Terrain/TerraformSurface.cs` | `Core/Build/TerraformSurface.cs` | Whole file; namespace changed. |
 | `src/SteppedStreets.Core/Terrain/TerrainMetrics.cs` | `Core/Build/TerrainMetrics.cs` | Whole file; namespace changed. |
-| `src/SteppedStreets.Core/Terrain/Sculpt.cs` | `Core/Layers/Common/Sculpt.cs` | Kept the shaping, interpolation and earthwork; takes a patch list and a cancellation token. |
 | `src/SteppedStreets.Core/Terrain/TerraformApplyMath.cs` | Patch inputs and frame-time compensation in `BuildService.Terrain.cs` | Added patch validation, snapshot copies and the inverse strength curve for undoing a pass. |
 | `src/SteppedStreets.Core/Terrain/PlannedTerraform.cs` | `Core/Contracts.cs` | The terraform kind and ring members only. |
 | `src/SteppedStreets.Core/Terrain/PolygonHelpers.cs` | `Core/Geometry/Poly.cs`, `Core/Contracts.cs`, `Core/Build/TerraformDabs.cs` | Static point-in-polygon, bounds and distance helpers. The boundary-distance helper credits ParkManager by tomkpunkt. |

@@ -40,6 +40,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     segments.Add(math.min(start, end) - halfWidth - 4f, math.max(start, end) + halfWidth + 4f, (road, start, end));
                 }
             }
+            var existing = LotLayout.ExistingRoads(request);
             var taken = new bool[lots.Count];
             var missing = new Dictionary<string, int>();
             foreach (var service in wanted)
@@ -53,7 +54,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     {
                         if (taken[index]) continue;
                         var quad = Site(lots[index].Pad, service);
-                        float score = Score(quad, lots[index], service, plan, placed, segments, survey, request);
+                        float score = Score(quad, lots[index], plan, placed, segments, existing, survey, request);
                         if (score < bestScore) { bestScore = score; bestQuad = quad; bestLot = index; }
                     }
                     if (bestQuad == null)
@@ -110,12 +111,17 @@ namespace SteppedStreets.Core.Neighbourhood
         private static float2[] Quad(Pad pad) => new[] { pad.Corners[0].xz, pad.Corners[1].xz, pad.Corners[2].xz, pad.Corners[3].xz };
 
         /// <summary>Lower is better; MaxValue when the site breaks a rule.</summary>
-        private static float Score(float2[] quad, PlannedLot lot, ServiceRequest service, NeighbourhoodPlan plan, List<PlannedBuilding> placed,
-            SpatialBuckets<(int Road, float2 Start, float2 End)> segments, SiteSurvey survey, NeighbourhoodRequest request)
+        private static float Score(float2[] quad, PlannedLot lot, NeighbourhoodPlan plan, List<PlannedBuilding> placed,
+            SpatialBuckets<(int Road, float2 Start, float2 End)> segments, SpatialBuckets<(float2 Start, float2 End, float Clearance)> existing,
+            SiteSurvey survey, NeighbourhoodRequest request)
         {
             float halfWidth = request.RoadHalfWidth;
             foreach (var building in placed)
                 if (Overlap(quad, Quad(building.Pad), 6f)) return float.MaxValue;
+            // The house lot it replaces kept off the roads already there, but the building reaches further back. The whole
+            // outline is tested, not the sample points below: a road could pass between those.
+            foreach (var (start, end, clearance) in existing.Within((quad[0] + quad[2]) * 0.5f, math.distance(quad[0], quad[2]) * 0.5f))
+                if (Overlap(quad, new[] { start, end, end, start }, clearance)) return float.MaxValue;
             float2 origin = quad[0], along = quad[1] - quad[0], back = quad[3] - quad[0];
             float width = math.length(along), depth = math.length(back);
             along /= width;
@@ -156,7 +162,10 @@ namespace SteppedStreets.Core.Neighbourhood
             return best;
         }
 
-        /// <summary>Two convex quads overlap (separating axes), each grown by <paramref name="margin"/>.</summary>
+        /// <summary>
+        /// Two convex quads overlap (separating axes), each grown by <paramref name="margin"/>. A segment passes as the quad
+        /// (start, end, end, start) with a margin above zero: its zero-length edges give no axis, so they never separate.
+        /// </summary>
         internal static bool Overlap(float2[] first, float2[] second, float margin)
         {
             foreach (var quad in new[] { first, second })
