@@ -45,20 +45,20 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<!--A missing picture is silently replaced by a default one-->
 	<Thumbnail Value="Properties/Thumbnail.png" />
 	<!--At most 10: Paradox Mods refuses more-->
+	<Screenshot Value="Properties/Screenshots/20.png" />
+	<Screenshot Value="Properties/Screenshots/21.png" />
+	<Screenshot Value="Properties/Screenshots/22.png" />
+	<Screenshot Value="Properties/Screenshots/23.png" />
 	<Screenshot Value="Properties/Screenshots/01.png" />
-	<Screenshot Value="Properties/Screenshots/02.png" />
 	<Screenshot Value="Properties/Screenshots/03.png" />
-	<Screenshot Value="Properties/Screenshots/04.png" />
-	<Screenshot Value="Properties/Screenshots/08.png" />
-	<Screenshot Value="Properties/Screenshots/11.png" />
+	<Screenshot Value="Properties/Screenshots/24.png" />
 	<Screenshot Value="Properties/Screenshots/16.png" />
 	<Screenshot Value="Properties/Screenshots/17.png" />
-	<Screenshot Value="Properties/Screenshots/18.png" />
-	<Screenshot Value="Properties/Screenshots/19.png" />
+	<Screenshot Value="Properties/Screenshots/25.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.7.1" />
+	<ModVersion Value="2.7.2" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- The layout list's search box now stays at the top while you scroll, and spans the list.&#10;- Each layout's picture sits in its own small box, and the list shows a few more layouts at once.&#10;- From 2.7.0: a picture of its streets beside every layout, the game's scroll bar on long lists, and lighter on the game while the tool is closed.&#10;- The new layouts are still marked experimental until they have been tried in more cities. Tell me how they build." />
+	<ChangeLog Value="- New pictures on this page, taken in the game.&#10;- The Terraced blocks picture in the layout list now shows terraces on a slope, so it no longer looks like Contour suburb.&#10;- From 2.7.1: the layout list's search box stays at the top while you scroll and spans the list, and each layout picture sits in its own box.&#10;- The new layouts are still marked experimental until they have been tried in more cities. Tell me how they build." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
