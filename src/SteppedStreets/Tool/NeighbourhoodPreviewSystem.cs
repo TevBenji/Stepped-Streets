@@ -216,6 +216,8 @@ namespace SteppedStreets.Tool
         internal static Color ZoneColour(string zone)
         {
             string name = (zone ?? "").ToLowerInvariant();
+            // An unzoned lot (no zones in the mix): levelled ground, no zone colour.
+            if (name.Length == 0) return new Color(0.82f, 0.82f, 0.82f);
             if (name.Contains("commercial")) return new Color(0.25f, 0.55f, 0.95f);
             if (name.Contains("office")) return new Color(0.65f, 0.4f, 0.9f);
             if (name.Contains("industrial")) return new Color(0.95f, 0.8f, 0.2f);

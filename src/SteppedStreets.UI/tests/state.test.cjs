@@ -153,8 +153,10 @@ test("zone mix keeps valid rows, drops duplicates and falls back to the default"
     ]), [
         { zone: "Residential Medium Row", share: 60 }, { zone: "Commercial Low", share: 100 }, { zone: "Residential High", share: 12.5 },
     ]);
-    for (const empty of [[], [{ zone: "Office", share: 0 }], "Residential Low", null, {}])
-        assert.deepEqual(mix(empty), [{ zone: "Residential Low", share: 100 }]);
+    for (const broken of [[{ zone: "Office", share: 0 }], [null], "Residential Low", null, {}, undefined])
+        assert.deepEqual(mix(broken), [{ zone: "Residential Low", share: 100 }]);
+    // An empty list is the player's choice of no zoning.
+    assert.deepEqual(mix([]), []);
 });
 
 test("layouts, junctions and the terrain option read leniently", async () => {

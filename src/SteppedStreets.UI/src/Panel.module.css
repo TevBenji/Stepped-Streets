@@ -778,11 +778,13 @@
 }
 
 /* -- the three steps: draw, choose, build -- */
+/* Room on the right, so the last step's name clears the scroll bar (in game "Build" was clipped at the edge). */
 .steps {
     display: flex;
     flex-direction: row;
     align-items: center;
     margin-bottom: 10rem;
+    padding-right: 8rem;
 }
 
 .step {

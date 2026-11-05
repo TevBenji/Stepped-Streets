@@ -18,12 +18,14 @@ interface SliderProps {
     onDragEnd: () => void;
     disabled?: boolean;
 }
-// The game's text box: while it has focus it holds back the game's key shortcuts, so typing doesn't move the camera.
+// The game's text box: while it has focus it holds back the game's key shortcuts, so typing doesn't move the camera. Its
+// ref reaches the <input> itself (the component forwards it), so the panel can give it focus.
 interface TextInputProps {
     value: string;
     placeholder?: string;
     className?: string;
     onChange: (event: { target: { value: string } }) => void;
+    ref?: Ref<HTMLInputElement>;
 }
 // The game's scroll area: the bar it draws can be dragged, which a plain scrolling box in Gameface doesn't show.
 interface ScrollableProps {

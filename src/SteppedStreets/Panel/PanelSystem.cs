@@ -87,9 +87,11 @@ namespace SteppedStreets.Panel
                 {
                     if (value == null || value.Length > 4000) return false;
                     var shares = ZoneShare.ParseList(value);
-                    // Only zones the game has; the rest would zone nothing.
+                    // Only zones the game has; the rest would zone nothing. An empty list is fine (no zoning), but a list whose
+                    // every zone is unknown is refused rather than read as "no zoning".
+                    int sent = shares.Count;
                     if (_zones.Count > 0) shares.RemoveAll(share => !_zones.ContainsKey(share.Zone));
-                    if (shares.Count == 0) return false;
+                    if (sent > 0 && shares.Count == 0) return false;
                     settings.ZoneMix = ZoneShare.WriteList(shares);
                     return true;
                 }));
@@ -272,7 +274,8 @@ namespace SteppedStreets.Panel
 
         /// <summary>
         /// A saved mix may name zones the game doesn't have or can't grow (an earlier version offered Unzoned, or an asset pack
-        /// was removed): those rows go, and an empty mix falls back to Residential Low, so a build always zones something.
+        /// was removed): those rows go, and a mix left empty by that falls back to Residential Low. A mix the player emptied
+        /// on purpose (no zoning) has no rows to remove and stays empty.
         /// </summary>
         private void RepairZoneMix()
         {

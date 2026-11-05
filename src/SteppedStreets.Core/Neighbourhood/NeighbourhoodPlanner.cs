@@ -163,7 +163,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 // (Game.Zones.LotSizeJobs), and that row often sits on the little bank between the shoulder and the pad.
                 lot.LevelCells = AllCells(lot.Pad);
                 plan.Lots.Add(lot);
-                plan.ZonedCells += lot.LevelCells.Count;
+                if (lot.Zone.Length > 0) plan.ZonedCells += lot.LevelCells.Count;
             }
             if (lostToBanks > 0)
                 plan.Messages.Add(lostToBanks + (lostToBanks == 1 ? " lot was" : " lots were") + " left out: the banks between levels needed the room.");
@@ -403,9 +403,11 @@ namespace SteppedStreets.Core.Neighbourhood
             }
             if (plan.Roads.Count > 0)
             {
+                string zoned = plan.ZonedCells > 0 || plan.Lots.Count == 0
+                    ? plan.ZonedCells.ToString(CultureInfo.InvariantCulture) + " cells zoned" : "not zoned";
                 plan.SummaryLine = string.Format(CultureInfo.InvariantCulture,
-                    "{0:0.0} km of road, {1} lots ({2} cells zoned), {3:N0} m³ of earth moved, steepest road {4:0.#}%",
-                    plan.RoadLength / 1000f, plan.Lots.Count, plan.ZonedCells, plan.CutVolume + plan.FillVolume, plan.SteepestRoadGrade * 100f);
+                    "{0:0.0} km of road, {1} lots ({2}), {3:N0} m³ of earth moved, steepest road {4:0.#}%",
+                    plan.RoadLength / 1000f, plan.Lots.Count, zoned, plan.CutVolume + plan.FillVolume, plan.SteepestRoadGrade * 100f);
             }
             plan.Milliseconds = clock.Elapsed.TotalMilliseconds;
             return plan;
