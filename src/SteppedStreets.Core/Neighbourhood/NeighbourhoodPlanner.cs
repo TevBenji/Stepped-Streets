@@ -168,10 +168,11 @@ namespace SteppedStreets.Core.Neighbourhood
             if (lostToBanks > 0)
                 plan.Messages.Add(lostToBanks + (lostToBanks == 1 ? " lot was" : " lots were") + " left out: the banks between levels needed the room.");
             Stage("level cells");
-            var treeless = new List<PlannedLot>(plan.Lots);
-            treeless.AddRange(buildingPads);
-            plan.Trees = Landscaping.Trees(plan, treeless, survey, request, cancellation);
-            plan.Walls = Landscaping.Walls(plan, plan.Lots, request);
+            // Lots and service buildings alike: no trees on them, and no garden wall across their fronts.
+            var occupied = new List<PlannedLot>(plan.Lots);
+            occupied.AddRange(buildingPads);
+            plan.Trees = Landscaping.Trees(plan, occupied, survey, request, cancellation);
+            plan.Walls = Landscaping.Walls(plan, occupied, request);
             Stage("landscape");
             return Finish(plan, clock, request);
         }

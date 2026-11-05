@@ -31,7 +31,6 @@ namespace SteppedStreets.Tool
         private int zonedRuns, requestedRuns, levelCells;
         private EntityQuery blockQuery;
         private int idleBuildFrames;
-        private string taskRoadName, plannedRoadName;
 
         // Every stage calls back within its own frame limits, so a build with no stage running this long is stuck.
         private const int MostIdleBuildFrames = 300;
@@ -40,21 +39,29 @@ namespace SteppedStreets.Tool
         {
             try
             {
+                SetConfirming(false);
                 if (State.Stage != ToolStage.Planned || Plan == null || !Plan.Buildable) { Message("Draw and close an area with a plan before building."); return; }
                 if (BuildSystemsBusy()) { Message("Still building. Wait until it is done."); return; }
+                if (SettingsMoved())
+                {
+                    Replan();
+                    Message("The settings changed. Review the updated plan before building.");
+                    return;
+                }
                 // Buildings, roads and the ground can change while the plan is open.
                 var fresh = SiteSnapshot.Capture(EntityManager, World, corners.ToArray());
                 if (plannedSnapshot == null || fresh.Fingerprint != plannedSnapshot.Fingerprint)
                 {
-                    Message("The site changed. Review the updated plan before building.");
+                    // After the re-plan, which clears the messages.
                     Replan();
+                    Message("The site changed. Review the updated plan before building.");
                     return;
                 }
                 ResetBuild();
                 buildPlan = Plan;
                 buildRequest = PlannedRequest;
-                // The road the plan was laid out for (its half-width), even if the Options page changed it since.
-                buildRoadName = plannedRoadName ?? Mod.Settings?.RoadName ?? Settings.SteppedStreetsSettings.DefaultRoad;
+                // The settings match the plan (checked above), so this is the road it was laid out for.
+                buildRoadName = Mod.Settings?.RoadName ?? Settings.SteppedStreetsSettings.DefaultRoad;
                 State.Stage = ToolStage.Building;
                 State.Progress = 0.05f;
                 State.Summary = "Building the ground...";

@@ -154,7 +154,7 @@ namespace SteppedStreets.Core.Neighbourhood
             return walls;
         }
 
-        // The wall's base with the bank on its right in the plan, the convention WallBuildSystem and StepPlanWalls share.
+        // The wall's base with the bank on its right in the plan, the convention WallBuildSystem builds by.
         private static WallSegment Oriented(float2 start, float2 end, float height, float side, float3[] points)
         {
             float2 direction = end - start;

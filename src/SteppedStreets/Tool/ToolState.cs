@@ -35,6 +35,9 @@ namespace SteppedStreets.Tool
 
         public int Version;
 
+        /// <summary>The panel's "Build this neighbourhood?" dialog is open.</summary>
+        public bool Confirming;
+
         /// <summary>The planned service buildings by prefab name.</summary>
         public List<KeyValuePair<string, int>> ServiceCounts = new List<KeyValuePair<string, int>>();
     }

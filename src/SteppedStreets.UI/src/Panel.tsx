@@ -393,11 +393,11 @@ let moreOpenMemory = false;
 
 function NeighbourhoodPanel() {
     const state = useToolState();
-    const [confirmedPlan, setConfirmedPlan] = useState<ToolState | null>(null);
     const [moreOpen, setMoreOpen] = useState(moreOpenMemory);
     if (state.stage === "Closed") return null;
     const { settings, stats } = state;
-    const confirming = state.stage === "Planned" && confirmedPlan === state;
+    // The tool clears it on Esc, on a new plan and when it builds.
+    const confirming = state.stage === "Planned" && state.confirming;
     const building = state.stage === "Building";
     const disabled = building || confirming;
     const hasPlan = (state.stage === "Planned" || state.stage === "Built" || state.stage === "Failed" || building)
@@ -416,7 +416,7 @@ function NeighbourhoodPanel() {
                     <img className={styles.headerIcon} src={icon} />
                     <div className={styles.title}>Stepped Streets</div>
                     <Button className={styles.close} label="Close" disabled={building}
-                        onSelect={() => { setConfirmedPlan(null); act("close"); }}>
+                        onSelect={() => act("close")}>
                         <img className={styles.closeIcon} src={closeIcon} />
                     </Button>
                 </div>
@@ -544,14 +544,14 @@ function NeighbourhoodPanel() {
 
                 <div className={styles.footer}>
                     <Button className={styles.secondary} disabled={disabled || state.corners === 0}
-                        onSelect={() => { setConfirmedPlan(null); act("clearArea"); }}>
+                        onSelect={() => act("clearArea")}>
                         <img className={styles.buttonIcon} src={trashIcon} /><div>Clear</div>
                     </Button>
                     <Button className={styles.secondary} label="Reroll: another layout" disabled={disabled} onSelect={() => act("reroll")}>
                         <img className={styles.buttonIcon} src={diceIcon} /><div>Reroll</div>
                     </Button>
                     <Button className={styles.primary} disabled={disabled || state.stage !== "Planned"}
-                        onSelect={() => setConfirmedPlan(state)}>
+                        onSelect={() => act("setConfirming", true)}>
                         <div>{buildLabel}</div>
                         {!disabled && state.stage === "Planned" ? <img className={styles.pillIcon} src={circleGoIcon} /> : null}
                     </Button>
@@ -563,11 +563,9 @@ function NeighbourhoodPanel() {
                         <div id="stepped-streets-confirm" className={styles.dialogText}>
                             Ground changes are permanent, like the game's terrain tools. Build?</div>
                         <div className={styles.dialogButtons}>
-                            <Button className={styles.secondary} onSelect={() => setConfirmedPlan(null)}>Cancel</Button>
-                            <Button className={styles.primary} onSelect={() => {
-                                if (confirmedPlan === state && state.stage === "Planned") act("build");
-                                setConfirmedPlan(null);
-                            }}><div>Build</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
+                            <Button className={styles.secondary} onSelect={() => act("setConfirming", false)}>Cancel</Button>
+                            <Button className={styles.primary} onSelect={() => act("build")}>
+                                <div>Build</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
                         </div>
                     </div>
                 </div> : null}

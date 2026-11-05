@@ -94,9 +94,18 @@ namespace SteppedStreets.Tool
                     MarkBox(new float2(x, z) - WaterSpacing * 0.6f, new float2(x, z) + WaterSpacing * 0.6f, _ => true, underWater);
                 }
 
-            BuildingCount = CaptureBuildings(entities, origin, maximum, watchLow, watchHigh, out int watchedBuildings);
+            BuildingCount = CaptureBuildings(entities, origin, maximum, watchLow, watchHigh, out long watchedBuildings);
+            // Sums, so the order the game lists them in doesn't matter; a road moved, widened or replaced changes its term.
+            long roads = 0;
+            foreach (var road in ExistingRoads)
+            {
+                var points = road.Points;
+                roads += math.hash(new int4((int)road.Id, (int)(road.Id >> 32), (int)math.round(road.HalfWidth * 10f), points.Length))
+                    + (long)math.hash(new int4((int2)math.round(points[0].xz), (int2)math.round(points[points.Length - 1].xz)))
+                    + math.hash((int2)math.round(points[points.Length / 2].xz));
+            }
             fingerprint = fingerprint * 31 + watchedBuildings;
-            fingerprint = fingerprint * 31 + ExistingRoads.Length;
+            fingerprint = fingerprint * 31 + roads;
             Fingerprint = fingerprint;
         }
 
@@ -148,7 +157,8 @@ namespace SteppedStreets.Tool
                 }
         }
 
-        private int CaptureBuildings(EntityManager entities, float2 minimum, float2 maximum, float2 watchLow, float2 watchHigh, out int watched)
+        /// <summary>Marks the buildings' lots blocked; <paramref name="watched"/> sums the lots near the area, by where they stand.</summary>
+        private int CaptureBuildings(EntityManager entities, float2 minimum, float2 maximum, float2 watchLow, float2 watchHigh, out long watched)
         {
             int count = 0;
             watched = 0;
@@ -169,7 +179,11 @@ namespace SteppedStreets.Tool
                     float2 upper = math.max(math.max(lot[0], lot[1]), math.max(lot[2], lot[3]));
                     if (math.any(upper < minimum) || math.any(lower > maximum)) continue;
                     count++;
-                    if (math.all(upper >= watchLow) && math.all(lower <= watchHigh)) watched++;
+                    // Its corners, rounded to the metre: a building moved, turned, added or removed changes the sum (a turn can
+                    // keep the same bounding box); one levelling up in place doesn't.
+                    if (math.all(upper >= watchLow) && math.all(lower <= watchHigh))
+                        watched += math.hash(new int4((int2)math.round(lot[0]), (int2)math.round(lot[1])))
+                            + (long)math.hash(new int4((int2)math.round(lot[2]), (int2)math.round(lot[3]))) * 31;
                     // A node a few metres outside the lot still counts, so grading keeps a clear margin round the building.
                     MarkBox(lower - 4f, upper + 4f, node =>
                     {

@@ -56,9 +56,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/17.png" />
 	<Screenshot Value="Properties/Screenshots/25.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.8.0" />
+	<ModVersion Value="2.8.1" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- No zoning if you want: remove the last zone under What to build and you get the roads and level lots, ready for you to zone yourself. Services still work.&#10;- Opening a list puts the cursor in its search box, so typing searches instead of moving the camera.&#10;- The Build step's name no longer touches the edge of the panel.&#10;- From 2.7.3: the Add a zone and Add a service buttons share the panel's width, and the list search boxes span the list.&#10;- The new layouts are still marked experimental until they have been tried in more cities. Tell me how they build." />
+	<ChangeLog Value="- Changing a setting on the Options page now re-plans the area before it builds, instead of building the old plan.&#10;- Build re-plans if a building nearby was moved or a road was moved, widened or replaced since the plan, not only when the count changed.&#10;- Esc while &quot;Build this neighbourhood?&quot; is showing now just closes the question; it no longer clears your area. The map ignores clicks while it is open.&#10;- Service buildings keep clear of roads already in the area, and garden walls no longer run across their fronts.&#10;- Switching tools while dragging a corner puts the corner back.&#10;- A zone mix typed past 100 on the Options page shows in the panel with the same proportions.&#10;- From 2.8.0: no zoning if you want (remove the last zone under What to build), and opening a list puts the cursor in its search box." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />

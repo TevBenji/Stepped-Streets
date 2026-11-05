@@ -21,6 +21,20 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>How far a pad may sit above or below its street: uphill houses sit higher with a short driveway ramp.</summary>
         internal const float PadLift = 1.5f;
 
+        /// <summary>The existing roads' pieces, each with how far a lot or building keeps from it (half its width and a shoulder).</summary>
+        internal static SpatialBuckets<(float2 Start, float2 End, float Clearance)> ExistingRoads(NeighbourhoodRequest request)
+        {
+            var existing = new SpatialBuckets<(float2, float2, float)>(32f);
+            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
+                for (int point = 1; point < (road?.Points?.Length ?? 0); point++)
+                {
+                    float2 start = road.Points[point - 1].xz, end = road.Points[point].xz;
+                    float clearance = road.HalfWidth + Shoulder;
+                    existing.Add(math.min(start, end) - clearance, math.max(start, end) + clearance, (start, end, clearance));
+                }
+            return existing;
+        }
+
         public static List<PlannedLot> Plan(NeighbourhoodPlan plan, List<int> owners, SiteSurvey survey, NeighbourhoodRequest request,
             List<string> messages, CancellationToken cancellation)
         {
@@ -34,14 +48,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     segments.Add(math.min(points[point - 1].xz, points[point].xz) - reach, math.max(points[point - 1].xz, points[point].xz) + reach,
                         new int3(road, point, owners[road]));
             }
-            var existing = new SpatialBuckets<(float2, float2, float)>(32f);
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                for (int point = 1; point < (road?.Points?.Length ?? 0); point++)
-                {
-                    float2 start = road.Points[point - 1].xz, end = road.Points[point].xz;
-                    float clearance = road.HalfWidth + Shoulder;
-                    existing.Add(math.min(start, end) - clearance, math.max(start, end) + clearance, (start, end, clearance));
-                }
+            var existing = ExistingRoads(request);
             var keepAway = new SpatialBuckets<(float2 Centre, float Radius)>(32f);
             foreach (var node in plan.Nodes)
             {

@@ -73,6 +73,8 @@ export interface ToolState {
     stage: ToolStage;
     corners: number;
     areaClosed: boolean;
+    /** The "Build this neighbourhood?" dialog is open; the tool owns it so Esc on the map can close it. */
+    confirming: boolean;
     areaSquareMetres: number;
     summary: string;
     messages: string[];
@@ -120,7 +122,7 @@ const readOption = (row: Record<string, unknown>): Option | null =>
     typeof row.name === "string" && row.name.length > 0 ? withIcon({ name: row.name, label: text(row.label) || row.name }, row.icon) : null;
 const readShare = (row: Record<string, unknown>): ZoneShare | null =>
     typeof row.zone === "string" && row.zone.length > 0 && typeof row.share === "number" && Number.isFinite(row.share) && row.share > 0
-        ? { zone: row.zone, share: Math.min(100, row.share) } : null;
+        ? { zone: row.zone, share: row.share } : null;
 const readServiceCount = (row: Record<string, unknown>): ServiceCount | null =>
     typeof row.name === "string" && row.name.length > 0 && typeof row.count === "number" && Number.isFinite(row.count) && row.count >= 1
         ? { name: row.name, count: whole(row.count, 1, 1, 20) } : null;
@@ -139,11 +141,16 @@ export function readState(raw: unknown): ToolState {
     const state = object(parsed);
     const settings = object(state.settings);
     const stats = object(state.stats);
-    const zoneMix = rows(settings.zoneMix, readShare, share => share.zone);
+    // Shares are weights to the planner; the panel's sliders stop at 100, so a mix typed past that on the Options page is
+    // scaled down whole and keeps its proportions.
+    const shares = rows(settings.zoneMix, readShare, share => share.zone);
+    const largest = Math.max(100, ...shares.map(share => share.share));
+    const zoneMix = shares.map(share => ({ zone: share.zone, share: share.share * 100 / largest }));
     return {
         stage: choice(state.stage, ["Closed", "Drawing", "Planning", "Planned", "Building", "Built", "Failed"], "Closed"),
         corners: whole(state.corners, 0, 0, LARGEST),
         areaClosed: flag(state.areaClosed, false),
+        confirming: flag(state.confirming, false),
         areaSquareMetres: number(state.areaSquareMetres, 0, 0, LARGEST),
         summary: text(state.summary),
         messages: Array.isArray(state.messages) ? state.messages.filter((value): value is string => typeof value === "string") : [],

@@ -59,6 +59,7 @@ namespace SteppedStreets.Panel
                 Trigger("undo", () => _tool.Undo());
                 Trigger("build", () => { if (_tool.State.Stage == ToolStage.Planned) _tool.Build(); });
                 Trigger("reroll", () => _tool.Reroll());
+                Trigger<bool>("setConfirming", value => _tool.SetConfirming(value));
                 Trigger<string>("setStyle", value => ChangeSettings(settings =>
                 {
                     if (!Enum.TryParse(value, out NeighbourhoodStyle style) || !Enum.IsDefined(typeof(NeighbourhoodStyle), style)) return false;
@@ -363,6 +364,7 @@ namespace SteppedStreets.Panel
             String(json, state.Stage.ToString());
             json.Append(",\"corners\":").Append(Integer(state.Corners));
             json.Append(",\"areaClosed\":").Append(state.AreaClosed ? "true" : "false");
+            json.Append(",\"confirming\":").Append(state.Confirming ? "true" : "false");
             json.Append(",\"areaSquareMetres\":").Append(Number(state.AreaSquareMetres));
             json.Append(",\"summary\":"); String(json, state.Summary);
             json.Append(",\"messages\":[");
