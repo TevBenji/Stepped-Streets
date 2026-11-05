@@ -56,9 +56,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/18.png" />
 	<Screenshot Value="Properties/Screenshots/19.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.7.0" />
+	<ModVersion Value="2.7.1" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- Every layout in the picker now has a small picture of its streets, drawn from a real plan of that layout.&#10;- Long lists in the panel have the game's scroll bar, which you can drag to get to the bottom quickly.&#10;- Lighter on the game while the tool is closed: the panel stays idle, and a plan still being worked out stops when you close the tool (it plans again when you open it).&#10;- The new layouts are still marked experimental in the picker until they have been tried in more cities. Tell me how they build." />
+	<ChangeLog Value="- The layout list's search box now stays at the top while you scroll, and spans the list.&#10;- Each layout's picture sits in its own small box, and the list shows a few more layouts at once.&#10;- From 2.7.0: a picture of its streets beside every layout, the game's scroll bar on long lists, and lighter on the game while the tool is closed.&#10;- The new layouts are still marked experimental until they have been tried in more cities. Tell me how they build." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />

@@ -182,18 +182,24 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
             </Button>
             {children}
         </div></SettingTip>
-        {open && !disabled ? <Scroll className={classes(styles.list, !label && styles.listFull)} innerClassName={styles.listInner} nested>
+        {/* The search box sits above the scrolling rows, so it stays in view (Gameface has no sticky positioning). */}
+        {open && !disabled ? <div className={classes(styles.list, !label && styles.listFull)}>
             {searchable && vanilla.TextInput ? <vanilla.TextInput className={styles.search} value={query} placeholder="Search"
                 onChange={event => setQuery(event.target.value)} /> : null}
-            {listed.map((option, index) => <React.Fragment key={option.name}>
-                {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}
-                <Button className={classes(styles.listItem, bigIcons && styles.listItemTall)} selected={option.name === value}
-                    onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>
-                    {option.icon ? <img className={bigIcons ? styles.layoutIcon : styles.optionIcon} src={option.icon} /> : null}<div>{option.label}</div>
-                </Button>
-            </React.Fragment>)}
-            {listed.length === 0 ? <div className={styles.noMatch}>Nothing matches "{query.trim()}"</div> : null}
-        </Scroll> : null}
+            <Scroll className={styles.listScroll} innerClassName={styles.listInner} nested>
+                {listed.map((option, index) => <React.Fragment key={option.name}>
+                    {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}
+                    <Button className={classes(styles.listItem, bigIcons && styles.listItemTall)} selected={option.name === value}
+                        onSelect={() => { setOpen(false); if (option.name !== value) onPick(option.name); }}>
+                        {option.icon ? bigIcons
+                            ? <div className={styles.layoutTile}><img className={styles.layoutIcon} src={option.icon} /></div>
+                            : <img className={styles.optionIcon} src={option.icon} /> : null}
+                        <div>{option.label}</div>
+                    </Button>
+                </React.Fragment>)}
+                {listed.length === 0 ? <div className={styles.noMatch}>Nothing matches "{query.trim()}"</div> : null}
+            </Scroll>
+        </div> : null}
     </>;
 }
 
