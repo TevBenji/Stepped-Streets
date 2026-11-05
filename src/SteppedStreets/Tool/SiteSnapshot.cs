@@ -179,9 +179,11 @@ namespace SteppedStreets.Tool
                     float2 upper = math.max(math.max(lot[0], lot[1]), math.max(lot[2], lot[3]));
                     if (math.any(upper < minimum) || math.any(lower > maximum)) continue;
                     count++;
-                    // Rounded to the metre: a building moved, added or removed changes the sum, one levelling up in place doesn't.
+                    // Its corners, rounded to the metre: a building moved, turned, added or removed changes the sum (a turn can
+                    // keep the same bounding box); one levelling up in place doesn't.
                     if (math.all(upper >= watchLow) && math.all(lower <= watchHigh))
-                        watched += math.hash(new int4((int2)math.round(lower), (int2)math.round(upper)));
+                        watched += math.hash(new int4((int2)math.round(lot[0]), (int2)math.round(lot[1])))
+                            + (long)math.hash(new int4((int2)math.round(lot[2]), (int2)math.round(lot[3]))) * 31;
                     // A node a few metres outside the lot still counts, so grading keeps a clear margin round the building.
                     MarkBox(lower - 4f, upper + 4f, node =>
                     {
