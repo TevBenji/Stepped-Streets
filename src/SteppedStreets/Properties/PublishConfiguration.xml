@@ -5,7 +5,7 @@
 	<ShortDescription Value="Draw an area and get a whole neighbourhood: streets that follow the hill, or a grid, rings or a fan on flat ground, with level lots, zoning and service buildings. Preview it, reroll it, build it." />
 	<!--Every upload sends exactly this page: change it here, not on the website, or the next upload overwrites the website-->
 	<LongDescription>
-Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets does it for you: draw an area on a hillside and it lays out a whole neighbourhood the way a careful builder would.
+Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets does it for you: draw an area on a hillside and it lays out a whole neighbourhood the way a careful builder would. Already have streets? **Use existing** zones them with your own zone mix, without new roads.
 
 ### What it builds
 
@@ -14,6 +14,7 @@ Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets doe
 - **A connection to your nearest road** within 400 m, or a neighbourhood of its own when there is none
 - **Level lots stepped down the hill** with soft banks, graded before anything is zoned
 - **Zoning that grows**: the game's own zone cells along the new roads, as deep as each levelled lot, in the mix you choose (or none, to zone the lots yourself)
+- **Zoning for streets you already have**: pick **Use existing**, draw around them, and their empty zone cells get your mix (Random, Clumps or Even, zone packs included), with no new roads and no ground changes; cells you zoned yourself stay as they are
 - **Service buildings** mixed in: police, fire, clinics and hospitals, schools, parks, utilities, any unlocked roadside service building, each on a level site of its own facing the road
 - **Trees if you want them**: forest on ground too steep to build and trees on the banks (off by default), optional garden walls
 
@@ -21,9 +22,9 @@ Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets doe
 
 1. Click **Stepped Streets** in the bottom toolbar beside Zones, or press **Ctrl+Shift+S**.
 2. Click corners on the ground; click the first corner to close the area. Drag corners to reshape, right-click removes one, Ctrl+Z undoes.
-3. Pick a **layout** and **what to build**: add zones with their shares and services with how many of each.
+3. Pick **Build new** and a **layout**, or **Use existing** for streets you already have; then **what to build**: zones with their shares and services with how many of each.
 4. The plan appears on the ground. **Reroll** for another layout.
-5. Press **Build**.
+5. Press **Build** (it says **Zone** for existing streets).
 
 **Layouts**: Contour suburb, Terraced blocks and Mountain lane follow the hill. Nine grids suit flat or gentle ground (Square, Rectangular, Irregular, Skewed, Fragmented, Curved, Warped, Diagonal avenues and Radial grid), with **crossroads**, **staggered** T-junctions or a **traffic**-optimised through road. Star, Rings, Spiderweb and Fan spread streets from a centre. Spine, Ladder, Comb, Fishbone, Tree, Cul-de-sacs, Loops, Loops and lollipops, and Lollipops on a stick run trunk streets in from your road with side streets off them. Triangular mesh, Hexagonal and Hexagons with spokes tile the area; Ridge and Valley put a main road along the crest or the valley floor; Coastal follows the shore; Winding is one long road back and forth. Organic mesh, Hybrid, Polycentric, Superblock, Radburn, Fused grid, Filtered grid and Barcelona superblock follow planners' models. Everything but the three hillside layouts is new and marked experimental until it has been built in more cities. Untick **Shape the ground** to leave the terrain exactly as it is.
 
@@ -56,9 +57,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/17.png" />
 	<Screenshot Value="Properties/Screenshots/25.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.8.1" />
+	<ModVersion Value="2.9.0" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- Changing a setting on the Options page now re-plans the area before it builds, instead of building the old plan.&#10;- Build re-plans if a building nearby was moved or a road was moved, widened or replaced since the plan, not only when the count changed.&#10;- Esc while &quot;Build this neighbourhood?&quot; is showing now just closes the question; it no longer clears your area. The map ignores clicks while it is open.&#10;- Service buildings keep clear of roads already in the area, and garden walls no longer run across their fronts.&#10;- Switching tools while dragging a corner puts the corner back.&#10;- A zone mix typed past 100 on the Options page shows in the panel with the same proportions.&#10;- From 2.8.0: no zoning if you want (remove the last zone under What to build), and opening a list puts the cursor in its search box." />
+	<ChangeLog Value="- New: Use existing. Pick it at the top of the panel and draw around streets you already have: Stepped Streets zones their empty cells with your zone mix (Random, Clumps or Even, zone packs included). No new roads and no ground changes, and cells you zoned yourself stay as they are. Thanks to ddsmillenium for the idea.&#10;- From 2.8.1: changing a setting on the Options page re-plans before building, Esc on the Build question only closes it, and other fixes from a full code review." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />

@@ -32,7 +32,7 @@ and read defensively by `src/lib/state.ts` (`readState` never throws and clamps 
 open; the tool clears it on Esc, a new plan and the build), `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
 `connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
-`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `junctions` and `serviceMix` as `name`/`count` rows), and the catalogues `zones` and
+`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions` and `serviceMix` as `name`/`count` rows), and the catalogues `zones` and
 `roads` (`name`/`label`) and `services` (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read
 again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
 the game's own menu icon path (ImageSystem.GetIconOrGroupIcon); it is left out when the game has none. While Planning and Building, `summary` is the current step; once Built,
@@ -60,6 +60,7 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setTreeDensity`, `setSeed` | double | 10–100 %, 1–99999 |
 | `setLevelLots`, `setRetainingWalls`, `setTrees` | bool | Switches |
 | `setShapeGround` | bool | Off: no terrain changes at all (and no level lots) |
+| `setExistingStreets` | bool | On: zone the empty cells along streets already in the area; no roads, ground or trees |
 | `setSteepGround` | bool | Steep hills; on lifts `steepestBuildablePercent` to at least 50 and `earthworkLimit` to at least 8, off caps them at 30 and 8 |
 
 Numeric triggers reject NaN/infinity and clamp before saving. Valid writes call `Mod.Settings.ApplyAndSave()` and then

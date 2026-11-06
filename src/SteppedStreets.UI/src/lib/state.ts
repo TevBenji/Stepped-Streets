@@ -40,6 +40,8 @@ export interface Settings {
     steepGround: boolean;
     /** Change the terrain at all; off, nothing is graded. */
     shapeGround: boolean;
+    /** Zone the streets already in the area instead of building new ones. */
+    existingStreets: boolean;
     /** How a grid's cross streets meet its main streets. */
     junctions: JunctionPattern;
     zoneMix: ZoneShare[];
@@ -174,6 +176,7 @@ export function readState(raw: unknown): ToolState {
             steepestBuildablePercent: number(settings.steepestBuildablePercent, 15, 8, 60),
             steepGround: flag(settings.steepGround, false),
             shapeGround: flag(settings.shapeGround, true),
+            existingStreets: flag(settings.existingStreets, false),
             junctions: choice(settings.junctions, ["Crossroads", "Staggered", "TrafficOptimised"], "Staggered"),
             // An empty list is the player's choice of no zoning; a missing or unreadable one takes the default (as the tool's
             // ZoneShare.ParseList does).
@@ -208,15 +211,16 @@ export function statusDetail(state: ToolState): string {
 }
 
 export function statusLine(state: ToolState): string {
+    const existing = state.settings.existingStreets;
     switch (state.stage) {
         case "Drawing":
             if (state.corners < 3) return "Click the ground to place corners.";
             // ponytail: a closed area still in Drawing has no buildable plan; the tool's summary says why, if it sent one.
             return state.areaClosed ? state.summary || "Area closed" : "Click the first corner, or press Close area, to finish.";
         case "Planning": return "Planning...";
-        case "Planned": return "Neighbourhood planned";
-        case "Building": return "Building...";
-        case "Built": return "Built";
+        case "Planned": return existing ? "Ready to zone" : "Neighbourhood planned";
+        case "Building": return existing ? "Zoning..." : "Building...";
+        case "Built": return existing ? "Zoned" : "Built";
         case "Failed": return state.summary || "Failed";
         default: return "";
     }

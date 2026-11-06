@@ -33,6 +33,10 @@ namespace SteppedStreets.Settings
             SetDefaults();
         }
 
+        /// <summary>Zone the streets already in the area instead of building new ones: no roads, no ground changes.</summary>
+        [SettingsUISection(Section, Group)]
+        public bool UseExistingStreets { get; set; }
+
         [SettingsUISection(Section, Group)]
         public NeighbourhoodStyle Style { get; set; }
 
@@ -146,6 +150,7 @@ namespace SteppedStreets.Settings
 
         public override void SetDefaults()
         {
+            UseExistingStreets = false;
             Style = NeighbourhoodStyle.ContourSuburb;
             Junctions = JunctionPattern.Staggered;
             ShapeGround = true;
@@ -251,6 +256,7 @@ namespace SteppedStreets.Settings
                 labels[GetOptionDescLocaleID(property)] = description;
             }
 
+            Label(nameof(UseExistingStreets), "Use existing streets", "Zone the empty cells along streets already in the area with your zone mix, instead of building new streets. No new roads and no ground changes; cells already zoned stay as they are.");
             Label(nameof(Style), "Layout", "Hillside layouts follow the contours: contour suburb, terraced blocks or one winding mountain lane. Grid layouts suit flat or gentle ground.");
             Label(nameof(Junctions), "Junctions", "For grid layouts: crossroads, staggered T-junctions, or traffic-optimised, where one through road carries the traffic and is the only road that meets yours.");
             Label(nameof(ShapeGround), "Shape the ground", "Grade roads and lots into the hill. Off: no terrain changes at all; roads follow the ground as the game builds them and lots aren't levelled.");

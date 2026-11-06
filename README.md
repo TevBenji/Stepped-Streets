@@ -3,7 +3,7 @@
 <img align="right" src="src/SteppedStreets/Properties/Thumbnail.png" alt="Stepped Streets" width="260">
 
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods: Stepped Streets" src="https://img.shields.io/badge/Paradox%20Mods-Stepped%20Streets-2ea44f"></a>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.8.1-1f6feb"></a>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.9.0-1f6feb"></a>
 <img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490">
 <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c"></a>
 
@@ -52,6 +52,8 @@ In the game:
 - **Zoning that grows**: the game's own zone cells along the new roads, as deep as each levelled lot, in the mix of zones
   you choose. Lots are 4 cells deep by default, so every low-density house fits on level ground. Remove every zone and the
   lots are levelled but left for you to zone.
+- **Zoning for streets you already have**: pick **Use existing**, draw around them, and their empty zone cells get your mix
+  (Random, Clumps or Even, zone packs included), with no new roads and no ground changes. Cells you zoned yourself stay.
 - **Service buildings in the mix**: police, fire, health, schools, parks, utilities, any unlocked roadside service building,
   each on a level site of its own, facing the road.
 - **Trees if you want them**: forest on ground too steep to build and trees on the banks (off by default), and optional
@@ -105,10 +107,12 @@ mod browser, and restart the game.
 
 1. Open the tool: click **Stepped Streets** in the bottom toolbar beside Zones, or press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>.
 2. **Draw the area.** Click corners on the ground and click the first corner again to close it.
-3. **Choose what to build.** Pick a layout, then add zones with their shares and services with how many of each.
+3. **Choose what to build.** Pick **Build new** and a layout, then add zones with their shares and services with how many
+   of each. Or pick **Use existing** to zone the streets already in the area with your zone mix, without new roads.
 4. **Check the preview.** The plan appears on the ground within moments and updates with every change. Press **Reroll** for
    another layout.
-5. **Build.** The ground is graded, the roads are laid, the lots are zoned, and the services and trees are placed.
+5. **Build.** The ground is graded, the roads are laid, the lots are zoned, and the services and trees are placed. With
+   **Use existing** the button says **Zone**, and only the empty cells along your streets are zoned.
 
 | Control | Action |
 |---|---|
@@ -202,6 +206,7 @@ The panel shows the essentials; everything else is under **More settings**. One 
 
 | Setting | Range | Default | What it does |
 |---|---|---|---|
+| Roads | Build new, Use existing | Build new | Lay out new streets, or zone the empty cells along streets already in the area. |
 | Layout | see above | Contour suburb | The kind of layout. |
 | Junctions | Crossroads, Staggered, Traffic | Staggered | How a grid's cross streets meet its main streets. |
 | Shape the ground | on / off | on | Grade roads and lots. Off: no terrain changes at all; roads follow the ground. |
@@ -266,6 +271,7 @@ thread, so the game keeps running while a big area is planned.
 - Every group of streets is joined to your roads. A group that no gentle road can join is left out, and the panel tells
   you so.
 - Houses grow only where the city has demand for that zone; the panel tells you when a chosen zone has none yet.
+- **Use existing** zones only; it places no service buildings, and you pick streets by drawing around them.
 - English only.
 
 Found a problem? [Open an issue](https://github.com/TevBenji/Stepped-Streets/issues) with a screenshot and the log at

@@ -14,7 +14,7 @@ async function stateModule() {
 const DEFAULT_SETTINGS = {
     style: "ContourSuburb", road: "Small Road", blockDepth: 90, maxRoadGradePercent: 8, steepestBuildablePercent: 15,
     steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 4,
-    shapeGround: true, junctions: "Staggered",
+    shapeGround: true, existingStreets: false, junctions: "Staggered",
     levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: false,
     treeDensityPercent: 50, seed: 1,
 };
@@ -175,6 +175,16 @@ test("layouts, junctions and the terrain option read leniently", async () => {
     assert.equal(bad.settings.style, "ContourSuburb");
     assert.equal(bad.settings.junctions, "Staggered");
     assert.equal(bad.settings.shapeGround, true);
+});
+
+test("existing streets read only a real true, and the status says zone instead of build", async () => {
+    const { readState, statusLine } = await stateModule();
+    assert.equal(readState({ settings: { existingStreets: true } }).settings.existingStreets, true);
+    for (const value of ["true", 1, null, undefined]) assert.equal(readState({ settings: { existingStreets: value } }).settings.existingStreets, false);
+    const line = stage => statusLine(readState({ stage, settings: { existingStreets: true } }));
+    assert.equal(line("Planned"), "Ready to zone");
+    assert.equal(line("Building"), "Zoning...");
+    assert.equal(line("Built"), "Zoned");
 });
 
 test("the radial, linear and branching layouts are read, and only grids offer junctions", async () => {

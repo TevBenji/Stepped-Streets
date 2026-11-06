@@ -43,6 +43,7 @@ namespace SteppedStreets.Core.Neighbourhood
             var clock = Stopwatch.StartNew();
             Validate(request);
             var plan = new NeighbourhoodPlan();
+            if (request.ExistingStreets) return ZoneExisting(request, plan, clock, cancellation);
             var stages = new System.Text.StringBuilder();
             double mark = 0;
             void Stage(string name)
@@ -175,6 +176,27 @@ namespace SteppedStreets.Core.Neighbourhood
             plan.Walls = Landscaping.Walls(plan, occupied, request);
             Stage("landscape");
             return Finish(plan, clock, request);
+        }
+
+        /// <summary>
+        /// Existing streets: the empty cells along the streets already in the area, zoned from the mix. No roads, no ground, no
+        /// trees, so there is no survey either; cells already zoned stay as the player painted them.
+        /// </summary>
+        private static NeighbourhoodPlan ZoneExisting(NeighbourhoodRequest request, NeighbourhoodPlan plan, Stopwatch clock, CancellationToken cancellation)
+        {
+            foreach (var lot in ExistingStreetLots.Plan(request, cancellation))
+            {
+                lot.LevelCells = AllCells(lot.Pad);
+                plan.Lots.Add(lot);
+                if (lot.Zone.Length > 0) plan.ZonedCells += lot.LevelCells.Count;
+            }
+            if (plan.Lots.Count == 0) plan.Messages.Add("No empty zone cells along streets in this area. Draw it over streets whose zoning is still empty.");
+            else if (plan.ZonedCells == 0) plan.Messages.Add("The zone mix is empty, so there is nothing to zone. Add a zone.");
+            if ((request.Services?.Length ?? 0) > 0) plan.Messages.Add("Service buildings are only placed with new streets.");
+            Finish(plan, clock, request);
+            if (plan.ZonedCells > 0)
+                plan.SummaryLine = string.Format(CultureInfo.InvariantCulture, "{0} lots, {1} cells to zone along existing streets", plan.Lots.Count, plan.ZonedCells);
+            return plan;
         }
 
         private static List<Street> Lane(SiteSurvey survey, NeighbourhoodRequest request, float radius, CancellationToken cancellation)
