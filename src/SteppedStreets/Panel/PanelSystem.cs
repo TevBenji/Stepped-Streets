@@ -120,6 +120,7 @@ namespace SteppedStreets.Panel
                 BoolTrigger("setTrees", (settings, value) => settings.Trees = value);
                 BoolTrigger("setSteepGround", (settings, value) => settings.SetSteepGround(value));
                 BoolTrigger("setShapeGround", (settings, value) => settings.ShapeGround = value);
+                BoolTrigger("setExistingStreets", (settings, value) => settings.UseExistingStreets = value);
             }
             catch (Exception exception)
             {
@@ -327,6 +328,7 @@ namespace SteppedStreets.Panel
             json.Append(",\"steepestBuildablePercent\":").Append(Integer(settings.SteepestBuildablePercent));
             json.Append(",\"steepGround\":").Append(settings.SteepGround ? "true" : "false");
             json.Append(",\"shapeGround\":").Append(settings.ShapeGround ? "true" : "false");
+            json.Append(",\"existingStreets\":").Append(settings.UseExistingStreets ? "true" : "false");
             json.Append(",\"junctions\":"); String(json, settings.Junctions.ToString());
             json.Append(",\"zoneMix\":[");
             var shares = settings.ZoneShares();

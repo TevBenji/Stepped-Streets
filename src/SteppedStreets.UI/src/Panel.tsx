@@ -303,13 +303,15 @@ function Measure({ text, className }: { text: string; className?: string }) {
 }
 
 const STEPS = ["Draw", "Choose", "Build"];
+const ZONE_STEPS = ["Draw", "Choose", "Zone"];
+const STREET_MODES: ["new" | "existing", string][] = [["new", "Build new"], ["existing", "Use existing"]];
 
 /** Where the player is: draw the area, choose what to build, build. A finished step shows a tick. */
 function Steps({ state }: { state: ToolState }) {
     const current = state.stage === "Building" || state.stage === "Built" ? 2 : state.areaClosed ? 1 : 0;
     const finished = state.stage === "Built";
     return <div className={styles.steps}>
-        {STEPS.map((name, index) => {
+        {(state.settings.existingStreets ? ZONE_STEPS : STEPS).map((name, index) => {
             const done = index < current || finished;
             return <React.Fragment key={name}>
                 {index > 0 ? <div className={styles.stepLine} /> : null}
@@ -406,7 +408,10 @@ function NeighbourhoodPanel() {
     const messages = state.messages.filter(message => message !== state.summary);
     const zoneLabel = (name: string) => state.zones.find(zone => zone.name === name)?.label ?? name;
     const serviceLabel = (name: string) => state.services.find(service => service.name === name)?.label ?? name;
-    const buildLabel = building ? "Building..." : state.stage === "Built" ? "Built" : "Build";
+    // Existing streets: no roads, ground or trees, so only the zoning settings show.
+    const existing = settings.existingStreets;
+    const buildLabel = existing ? (building ? "Zoning..." : state.stage === "Built" ? "Zoned" : "Zone")
+        : building ? "Building..." : state.stage === "Built" ? "Built" : "Build";
 
     return <div className={styles.dock}>
         <div className={styles.wrap}>
@@ -446,7 +451,16 @@ function NeighbourhoodPanel() {
                         </div> : null}
                     </div>
 
-                    <Section title="Layout">
+                    <Section title="Streets">
+                        <Row label="Roads">
+                            <Segmented options={STREET_MODES} value={existing ? "existing" : "new"} disabled={disabled}
+                                onChange={mode => act("setExistingStreets", mode === "existing")} />
+                        </Row>
+                        {existing ? <div className={styles.layoutTip}>Zones the empty cells along streets already in the area. No new
+                            roads and no ground changes; cells already zoned stay as they are.</div> : null}
+                    </Section>
+
+                    {existing ? null : <Section title="Layout">
                         <Picker options={LAYOUTS} value={settings.style} disabled={disabled} bigIcons onPick={style => act("setStyle", style)} />
                         <div className={styles.layoutTip}>{LAYOUT_TIPS[settings.style]}</div>
                         {isExperimental(settings.style)
@@ -455,28 +469,37 @@ function NeighbourhoodPanel() {
                             <Segmented options={JUNCTIONS} value={settings.junctions} disabled={disabled}
                                 onChange={junctions => act("setJunctions", junctions)} />
                         </Row> : null}
-                    </Section>
+                    </Section>}
 
                     <Section title="What to build">
-                        <Mix mix={settings.zoneMix} zones={state.zones} services={settings.serviceMix} serviceOptions={state.services} disabled={disabled} />
+                        {/* Service buildings need new streets; the mix keeps them for Build new. */}
+                        <Mix mix={settings.zoneMix} zones={state.zones} services={existing ? [] : settings.serviceMix}
+                            serviceOptions={existing ? [] : state.services} disabled={disabled} />
                         {settings.zoneMix.length > 1 ? <Row label="Mix mode">
                             <Segmented options={MIX_PATTERNS} value={settings.mixPattern} disabled={disabled}
                                 onChange={pattern => act("setMixPattern", pattern)} />
                         </Row> : null}
                     </Section>
 
-                    <Section title="Ground">
+                    {existing ? null : <Section title="Ground">
                         <ToggleRow label="Shape the ground" value={settings.shapeGround} trigger="setShapeGround" disabled={disabled} />
                         <ToggleRow label="Steep hills" value={settings.steepGround} trigger="setSteepGround" disabled={disabled} />
                         <ToggleRow label="Trees" value={settings.trees} trigger="setTrees" disabled={disabled} />
-                    </Section>
+                    </Section>}
 
                     <Button className={styles.moreButton} selected={moreOpen} onSelect={() => { moreOpenMemory = !moreOpen; setMoreOpen(!moreOpen); }}>
                         <div className={styles.pickerLabel}>{moreOpen ? "Fewer settings" : "More settings"}</div>
                         <img className={classes(styles.chevron, moreOpen && styles.chevronOpen)} src={chevronIcon} />
                     </Button>
 
-                    {moreOpen ? <>
+                    {moreOpen && existing ? <Section title="Lots">
+                        <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
+                            format={cells} trigger="setLotWidth" disabled={disabled} />
+                        <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
+                            format={cells} trigger="setLotDepth" disabled={disabled} />
+                    </Section> : null}
+
+                    {moreOpen && !existing ? <>
                         <Section title="Roads">
                             <Picker label="Road" options={state.roads} value={settings.road} disabled={disabled} onPick={road => act("setRoad", road)} />
                             <NumberRow label="Block depth" value={settings.blockDepth} minimum={60} maximum={200} step={5}
@@ -515,7 +538,11 @@ function NeighbourhoodPanel() {
                     </> : null}
 
                     {hasPlan || messages.length > 0 ? <Section title={state.stage === "Built" ? "Result" : "Plan"}>
-                        {hasPlan ? <div className={styles.card}>
+                        {hasPlan && existing ? <div className={styles.card}>
+                            <Stat label="Lots" value={thousands(stats.lots)} />
+                            <Stat label="Cells to zone" value={thousands(stats.zonedCells)} />
+                        </div> : null}
+                        {hasPlan && !existing ? <div className={styles.card}>
                             <Stat label="Roads" value={`${stats.roadKilometres.toFixed(1)} km`} />
                             <Stat label="Lots" value={thousands(stats.lots)} />
                             <Stat label="Zoned cells" value={thousands(stats.zonedCells)} />
@@ -559,13 +586,14 @@ function NeighbourhoodPanel() {
 
                 {confirming ? <div className={styles.backdrop}>
                     <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="stepped-streets-confirm">
-                        <div className={styles.dialogTitle}>Build this neighbourhood?</div>
+                        <div className={styles.dialogTitle}>{existing ? "Zone these streets?" : "Build this neighbourhood?"}</div>
                         <div id="stepped-streets-confirm" className={styles.dialogText}>
-                            Ground changes are permanent, like the game's terrain tools. Build?</div>
+                            {existing ? "Only empty cells are zoned. You can repaint any of them with the game's zoning tools."
+                                : "Ground changes are permanent, like the game's terrain tools. Build?"}</div>
                         <div className={styles.dialogButtons}>
                             <Button className={styles.secondary} onSelect={() => act("setConfirming", false)}>Cancel</Button>
                             <Button className={styles.primary} onSelect={() => act("build")}>
-                                <div>Build</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
+                                <div>{existing ? "Zone" : "Build"}</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
                         </div>
                     </div>
                 </div> : null}

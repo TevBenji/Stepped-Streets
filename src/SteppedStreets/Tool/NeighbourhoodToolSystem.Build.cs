@@ -48,6 +48,7 @@ namespace SteppedStreets.Tool
                     Message("The settings changed. Review the updated plan before building.");
                     return;
                 }
+                if (PlannedRequest?.ExistingStreets == true) { ZoneExistingStreets(); return; }
                 // Buildings, roads and the ground can change while the plan is open.
                 var fresh = SiteSnapshot.Capture(EntityManager, World, corners.ToArray());
                 if (plannedSnapshot == null || fresh.Fingerprint != plannedSnapshot.Fingerprint)
@@ -73,6 +74,24 @@ namespace SteppedStreets.Tool
                 World.GetOrCreateSystemManaged<TerrainBuildSystem>().Begin(() => ground.ToRaster(), AfterGround);
             }
             catch (Exception exception) { BuildFailed(exception, "The build could not start. Nothing was changed."); }
+        }
+
+        /// <summary>
+        /// Existing streets go straight to zoning: no ground, no roads, and their zone blocks are already there. No site check
+        /// either: the zoning reads the live cells and only paints the free ones, so houses growing along the streets while the
+        /// plan is open can't spoil it, and in a living city they would otherwise send every Build back to re-plan.
+        /// </summary>
+        private void ZoneExistingStreets()
+        {
+            ResetBuild();
+            buildPlan = Plan;
+            buildRequest = PlannedRequest;
+            State.Stage = ToolStage.Building;
+            State.Progress = 0.3f;
+            State.Summary = "Zoning...";
+            Touch();
+            Log(Invariant($"zoning existing streets: {buildPlan.Lots.Count} lots, {buildPlan.ZonedCells} cells"));
+            StartZoning();
         }
 
         private bool BuildSystemsBusy() =>
@@ -235,10 +254,8 @@ namespace SteppedStreets.Tool
                     for (int row = area.z; row < area.w; row++)
                         for (int column = area.x; column < area.y; column++)
                         {
-                            var cell = cells[row * block.m_Size.x + column];
                             // Free cells only: the player's zoning, buildings and cells the game blocked stay as they are.
-                            if ((cell.m_State & (CellFlags.Blocked | CellFlags.Occupied)) != 0 || (cell.m_State & CellFlags.Visible) == 0) continue;
-                            if (!cell.m_Zone.Equals(ZoneType.None)) continue;
+                            if (!SiteSnapshot.FreeCell(cells[row * block.m_Size.x + column])) continue;
                             float2 centre = ZoneUtils.GetCellPosition(block, new int2(column, row)).xz;
                             string zone = null;
                             foreach (int index in buckets.Near(centre))
@@ -410,7 +427,8 @@ namespace SteppedStreets.Tool
             if (report != null) { Log("walls: " + report.Summary); buildReport.Add(Invariant($"{report.Placed} wall pieces")); }
             State.Stage = ToolStage.Built;
             State.Progress = 1f;
-            State.Summary = Invariant($"Built {buildPlan.RoadLength / 1000f:0.0} km of road and {buildPlan.Lots.Count} lots: ") + string.Join(", ", buildReport) + ".";
+            State.Summary = (buildRequest.ExistingStreets ? Invariant($"Zoned {buildPlan.Lots.Count} lots along existing streets: ")
+                : Invariant($"Built {buildPlan.RoadLength / 1000f:0.0} km of road and {buildPlan.Lots.Count} lots: ")) + string.Join(", ", buildReport) + ".";
             Log(State.Summary);
             // The built area is history now: its plan cannot be built twice, and the preview stops drawing it over the real thing.
             Plan = null;

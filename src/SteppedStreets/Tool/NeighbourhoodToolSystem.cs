@@ -498,7 +498,7 @@ namespace SteppedStreets.Tool
             var settings = Mod.Settings ?? throw new InvalidOperationException("Stepped Streets settings are unavailable.");
             var boundary = corners.ToArray();
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            var snapshot = SiteSnapshot.Capture(EntityManager, World, boundary);
+            var snapshot = SiteSnapshot.Capture(EntityManager, World, boundary, settings.UseExistingStreets);
             var request = BuildRequest(boundary, snapshot, settings);
             double captureMilliseconds = clock.Elapsed.TotalMilliseconds;
             var cancel = new CancellationTokenSource();
@@ -516,7 +516,7 @@ namespace SteppedStreets.Tool
             }), cancel.Token);
             State.Stage = ToolStage.Planning;
             Touch();
-            Log(Invariant($"planning an area of {State.AreaSquareMetres / 10000f:0.0} ha with {boundary.Length} corners; snapshot {captureMilliseconds:0} ms, {snapshot.ExistingRoads.Length} existing road edges, {snapshot.BuildingCount} buildings"));
+            Log(Invariant($"planning an area of {State.AreaSquareMetres / 10000f:0.0} ha with {boundary.Length} corners; snapshot {captureMilliseconds:0} ms, {snapshot.ExistingRoads.Length} existing road edges, {snapshot.BuildingCount} buildings{(request.ExistingStreets ? Invariant($", existing streets: {snapshot.ZoneCells.Length} free zone cells nearby") : "")}"));
         }
 
         private void AdoptFinishedPlan()
@@ -588,6 +588,8 @@ namespace SteppedStreets.Tool
                 Water = snapshot.Water,
                 ExistingRoads = snapshot.ExistingRoads,
                 Style = settings.Style,
+                ExistingStreets = settings.UseExistingStreets,
+                ZoneCells = snapshot.ZoneCells,
                 Junctions = settings.Junctions,
                 ShapeGround = settings.ShapeGround,
                 RoadHalfWidth = road?.HalfWidth ?? 6f,
@@ -664,7 +666,9 @@ namespace SteppedStreets.Tool
             {
                 State.Summary = "";
                 State.Messages = corners.Count == 0
-                    ? new[] { "Draw the area on a hillside: click corners, then click the first corner to close it." }
+                    ? new[] { Mod.Settings?.UseExistingStreets == true
+                        ? "Draw around the streets to zone: click corners, then click the first corner to close it."
+                        : "Draw the area on a hillside: click corners, then click the first corner to close it." }
                     : new string[0];
             }
             Touch();

@@ -289,6 +289,24 @@ namespace SteppedStreets.Core.Neighbourhood
         }
     }
 
+    /// <summary>One free cell of one of the game's zone blocks near the area, for zoning streets that already exist.</summary>
+    public struct ZoneCell
+    {
+        /// <summary>The block it belongs to: the same number for every cell of one block.</summary>
+        public int Block;
+
+        /// <summary>Column along the road, and row back from it (row 0 is against the road).</summary>
+        public int Column, Row;
+
+        public float2 Centre;
+
+        /// <summary>The block's height, for drawing the lot: nothing is levelled on existing streets.</summary>
+        public float Height;
+
+        /// <summary>The block's direction in (x, z): a unit vector from the back of the block towards its road.</summary>
+        public float2 Forward;
+    }
+
     /// <summary>The drawn area, the site and the player's settings.</summary>
     public sealed class NeighbourhoodRequest
     {
@@ -311,6 +329,12 @@ namespace SteppedStreets.Core.Neighbourhood
         public ExistingRoad[] ExistingRoads = new ExistingRoad[0];
 
         public NeighbourhoodStyle Style = NeighbourhoodStyle.ContourSuburb;
+
+        /// <summary>Zone the streets already in the area from <see cref="ZoneCells"/>: no new roads, no ground changes, no trees.</summary>
+        public bool ExistingStreets;
+
+        /// <summary>The free cells of the game's zone blocks near the area; only filled for <see cref="ExistingStreets"/>.</summary>
+        public ZoneCell[] ZoneCells = new ZoneCell[0];
 
         /// <summary>Half the new road's width, centreline to kerb.</summary>
         public float RoadHalfWidth = 6f;

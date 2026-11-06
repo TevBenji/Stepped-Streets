@@ -111,8 +111,11 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>How many streets the layout planned, and how many of them the road rules then dropped (for the tests).</summary>
         internal int StreetsPlanned, StreetsDropped;
 
-        /// <summary>At least one road. The area need not touch a road, so a standalone network is buildable too.</summary>
-        public bool Buildable => Roads.Count > 0;
+        /// <summary>
+        /// At least one road (the area need not touch a road, so a standalone network is buildable too), or, on existing
+        /// streets, at least one cell to zone.
+        /// </summary>
+        public bool Buildable => Roads.Count > 0 || ZonedCells > 0;
 
         public float RoadLength;
         public float SteepestRoadGrade;
