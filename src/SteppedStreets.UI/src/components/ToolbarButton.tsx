@@ -2,8 +2,9 @@
 // on the right with the other mods, no round black background, beside the zones). The vanilla ToolbarButtonStrip is extended;
 // our button is rendered into its first group (a portal into the game's own element, re-attached if the game redraws it) with
 // the strip's own button classes and the transparent-button theme its buttons use, so it looks and behaves like its neighbours.
-// The icon is the area-tool tile with a path and a tree (the user's pick, F3): assets/toolbar/placemaker3d.svg.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: single Stepped Streets toggle, original stepped-lots icon and redraw observation.
+// The icon (assets/stepped-streets.svg, the owner's pick) is drawn like the game's own toolbar icons: a flat isometric tile of
+// terraced streets with houses on level pads. The strip's IconButton shows an untinted src as a plain image, so it keeps its colours.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: single Stepped Streets toggle, original terraces icon and redraw observation.
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { createPortal, findDOMNode } from "react-dom";
 import { getModule, ModuleRegistryExtend } from "cs2/modding";
