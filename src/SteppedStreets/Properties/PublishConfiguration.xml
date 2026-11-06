@@ -57,9 +57,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/17.png" />
 	<Screenshot Value="Properties/Screenshots/25.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.9.0" />
+	<ModVersion Value="2.9.1" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- New: Use existing. Pick it at the top of the panel and draw around streets you already have: Stepped Streets zones their empty cells with your zone mix (Random, Clumps or Even, zone packs included). No new roads and no ground changes, and cells you zoned yourself stay as they are. Thanks to ddsmillenium for the idea.&#10;- From 2.8.1: changing a setting on the Options page re-plans before building, Esc on the Build question only closes it, and other fixes from a full code review." />
+	<ChangeLog Value="- A new toolbar icon, drawn in the game's own style: terraced streets with houses on level pads.&#10;- From 2.9.0: Use existing. Pick it at the top of the panel and draw around streets you already have: their empty zone cells get your zone mix (Random, Clumps or Even, zone packs included), with no new roads and no ground changes." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
