@@ -300,6 +300,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         public float2 Centre;
 
+        /// <summary>The block's height, for drawing the lot: nothing is levelled on existing streets.</summary>
+        public float Height;
+
         /// <summary>The block's direction in (x, z): a unit vector from the back of the block towards its road.</summary>
         public float2 Forward;
     }

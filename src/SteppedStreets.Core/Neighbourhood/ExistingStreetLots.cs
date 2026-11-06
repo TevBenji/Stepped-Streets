@@ -38,7 +38,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 for (int lot = 0; lot < count; lot++)
                 {
                     int first = lot * run.Count / count, end = (lot + 1) * run.Count / count;
-                    if (end > first) lots.Add(Lot(run, first, end, runDepth, block, request));
+                    if (end > first) lots.Add(Lot(run, first, end, runDepth, block));
                 }
                 run.Clear();
             }
@@ -60,7 +60,7 @@ namespace SteppedStreets.Core.Neighbourhood
         }
 
         /// <summary>Columns <paramref name="first"/> to <paramref name="end"/> of a run as one lot, corners in the pad's order.</summary>
-        private static PlannedLot Lot(List<ZoneCell> run, int first, int end, int depth, int block, NeighbourhoodRequest request)
+        private static PlannedLot Lot(List<ZoneCell> run, int first, int end, int depth, int block)
         {
             ZoneCell start = run[first], last = run[end - 1];
             float2 forward = math.normalizesafe(start.Forward, new float2(0f, 1f));
@@ -69,7 +69,7 @@ namespace SteppedStreets.Core.Neighbourhood
             float2 frontStart = start.Centre - along * half + forward * half, frontEnd = last.Centre + along * half + forward * half;
             float2 back = -forward * StepPlanner.CellSize * depth;
             // Only for drawing the lot: nothing is levelled.
-            float height = request.GroundHeight((frontStart + frontEnd + back) * 0.5f);
+            float height = (start.Height + last.Height) * 0.5f;
             float3 Corner(float2 point) => new float3(point.x, height, point.y);
             return new PlannedLot
             {

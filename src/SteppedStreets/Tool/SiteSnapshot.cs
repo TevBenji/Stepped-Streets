@@ -52,8 +52,21 @@ namespace SteppedStreets.Tool
         {
             float2 low = new float2(float.MaxValue), high = new float2(float.MinValue);
             foreach (var corner in boundary) { low = math.min(low, corner); high = math.max(high, corner); }
+            if (zoneCells)
+            {
+                // Zoning existing streets needs only the free cells (with their blocks' heights), so the heights, water,
+                // buildings and roads that cost most of a big area's snapshot are left out; there are no roads to plan.
+                ZoneCells = CaptureZoneCells(entities, low, high);
+                ExistingRoads = new ExistingRoad[0];
+                origin = low;
+                HeightSpacing = FinestSpacing;
+                columns = rows = 2;
+                heights = new float[4];
+                blocked = new bool[4];
+                underWater = new bool[4];
+                return;
+            }
             ExistingRoads = CaptureRoads(entities, low - RoadReach, high + RoadReach);
-            if (zoneCells) ZoneCells = CaptureZoneCells(entities, low, high);
             float nearestRoad = float.MaxValue;
             foreach (var road in ExistingRoads)
                 foreach (var point in road.Points)
@@ -255,6 +268,7 @@ namespace SteppedStreets.Tool
                             {
                                 Block = index, Column = column, Row = row,
                                 Centre = Game.Zones.ZoneUtils.GetCellPosition(block, new int2(column, row)).xz,
+                                Height = block.m_Position.y,
                                 Forward = block.m_Direction,
                             });
                         }
