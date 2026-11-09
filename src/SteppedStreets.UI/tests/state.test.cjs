@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS = {
     steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 4,
     shapeGround: true, existingStreets: false, junctions: "Staggered",
     levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: false,
-    treeDensityPercent: 50, seed: 1,
+    treeDensityPercent: 50, seed: 1, panelCollapsed: false, panelLeft: -1, panelTop: -1,
 };
 const EMPTY_STATS = {
     roadKilometres: 0, lots: 0, zonedCells: 0, earthCubicMetres: 0, steepestRoadPercent: 0, wildPercent: 0, connected: false, trees: 0,
@@ -61,6 +61,27 @@ test("partial state keeps defaults and preserves escaped player-facing text", as
     assert.deepEqual(state.zoneCounts, [{ zone: name, lots: 3 }]);
     assert.equal(state.settings.blockDepth, 90);
     assert.equal(state.settings.seed, 1);
+});
+
+test("the panel's fold and place read safely and a dragged panel stays whole on screen", async () => {
+    const { readState, panelFraction } = await stateModule();
+    const panel = settings => {
+        const { panelCollapsed, panelLeft, panelTop } = readState({ settings }).settings;
+        return [panelCollapsed, panelLeft, panelTop];
+    };
+    assert.deepEqual(panel({ panelCollapsed: true, panelLeft: 0.25, panelTop: 0.5 }), [true, 0.25, 0.5]);
+    assert.deepEqual(panel({ panelCollapsed: "yes", panelLeft: 7, panelTop: -7 }), [false, 1, -1]);
+    assert.deepEqual(panel({ panelLeft: null, panelTop: "0.5" }), [false, -1, -1]);
+
+    assert.equal(readState({}).discord, false);
+    assert.equal(readState({ discord: "yes" }).discord, false);
+    assert.equal(readState({ discord: true }).discord, true);
+
+    assert.equal(panelFraction(500, 400, 2000), 0.25);
+    assert.equal(panelFraction(-30, 400, 2000), 0);
+    assert.equal(panelFraction(1900, 400, 2000), 0.8);
+    assert.equal(panelFraction(100, 3000, 2000), 0);
+    assert.equal(panelFraction(100, 400, 0), 0);
 });
 
 test("every number is clamped to its range", async () => {

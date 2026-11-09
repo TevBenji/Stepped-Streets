@@ -21,19 +21,18 @@ export function useToolState() {
 }
 
 export type Action = "toggleTool" | "close" | "clearArea" | "closeArea" | "undo" | "build" | "reroll";
-export type TextTrigger = "setStyle" | "setJunctions" | "setRoad" | "setMixPattern" | "setZoneMix" | "setServiceMix";
+export type TextTrigger = "setStyle" | "setJunctions" | "setRoad" | "setMixPattern" | "setZoneMix" | "setServiceMix" | "openLink";
 export type NumberTrigger = "setBlockDepth" | "setMaxRoadGrade" | "setSteepestBuildable" | "setLotWidth" | "setLotDepth"
     | "setEarthworkLimit" | "setBankGrade" | "setLotSpacing" | "setTreeDensity" | "setSeed";
 export type ToggleTrigger = "setLevelLots" | "setRetainingWalls" | "setTrees" | "setSteepGround" | "setShapeGround" | "setExistingStreets";
 export function act(name: Action): void;
 export function act(name: TextTrigger, value: string): void;
 export function act(name: NumberTrigger, value: number): void;
-export function act(name: ToggleTrigger | "setConfirming", value: boolean): void;
-export function act(name: Action | TextTrigger | NumberTrigger | ToggleTrigger | "setConfirming", value?: string | number | boolean): void {
-    try {
-        if (value === undefined) trigger(GROUP, name);
-        else trigger(GROUP, name, value);
-    } catch (error) { console.error(`[SteppedStreets] Trigger ${name} failed`, error); }
+export function act(name: ToggleTrigger | "setConfirming" | "setPanelCollapsed", value: boolean): void;
+export function act(name: "setPanelPosition", left: number, top: number): void;
+export function act(name: string, ...values: (string | number | boolean)[]): void {
+    try { trigger(GROUP, name, ...values); }
+    catch (error) { console.error(`[SteppedStreets] Trigger ${name} failed`, error); }
 }
 
 /** The game's own UI sounds, through its audio binding; silent when the binding is missing. */

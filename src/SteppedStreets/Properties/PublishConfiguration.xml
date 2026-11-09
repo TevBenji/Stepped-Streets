@@ -26,6 +26,8 @@ Building on hills in Cities: Skylines II is slow and fiddly. Stepped Streets doe
 4. The plan appears on the ground. **Reroll** for another layout.
 5. Press **Build** (it says **Zone** for existing streets).
 
+The panel can get out of your way: the arrow in its title bar folds it, dragging the title bar moves it, and a double-click puts it back.
+
 **Layouts**: Contour suburb, Terraced blocks and Mountain lane follow the hill. Nine grids suit flat or gentle ground (Square, Rectangular, Irregular, Skewed, Fragmented, Curved, Warped, Diagonal avenues and Radial grid), with **crossroads**, **staggered** T-junctions or a **traffic**-optimised through road. Star, Rings, Spiderweb and Fan spread streets from a centre. Spine, Ladder, Comb, Fishbone, Tree, Cul-de-sacs, Loops, Loops and lollipops, and Lollipops on a stick run trunk streets in from your road with side streets off them. Triangular mesh, Hexagonal and Hexagons with spokes tile the area; Ridge and Valley put a main road along the crest or the valley floor; Coastal follows the shore; Winding is one long road back and forth. Organic mesh, Hybrid, Polycentric, Superblock, Radburn, Fused grid, Filtered grid and Barcelona superblock follow planners' models. Everything but the three hillside layouts is new and marked experimental until it has been built in more cities. Untick **Shape the ground** to leave the terrain exactly as it is.
 
 Turn on **Steep hills** for steep slopes and mountain sides. Everything else (road type, block depth, grades, lot size, grading, trees) is under **More settings**.
@@ -36,6 +38,12 @@ Turn on **Steep hills** for steep slopes and mountain sides. Everything else (ro
 - Houses grow where the city has demand for that zone.
 - Big areas (up to 6.4 km across) take a while to plan and lay a lot of road at once.
 - Early release: expect rough edges and tell me what you find.
+
+### Found a bug?
+
+Press **Report a bug** in the panel, or open an issue at https://github.com/TevBenji/Stepped-Streets/issues. Please add a screenshot and your SteppedStreets.log.
+
+For questions and ideas, press **Discord** in the panel. This mod's thread is in the official Cities: Skylines Discord: https://discord.com/channels/263634513861541888/1567221017829576795
 
 Built for game version **1.6.***.
 
@@ -57,9 +65,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/17.png" />
 	<Screenshot Value="Properties/Screenshots/25.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.9.1" />
+	<ModVersion Value="2.10.0" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- A new toolbar icon, drawn in the game's own style: terraced streets with houses on level pads.&#10;- From 2.9.0: Use existing. Pick it at the top of the panel and draw around streets you already have: their empty zone cells get your zone mix (Random, Clumps or Even, zone packs included), with no new roads and no ground changes." />
+	<ChangeLog Value="- The panel folds down to its title bar: press the arrow beside the close button. The tool keeps working while it is folded.&#10;- Drag the title bar to move the panel anywhere; double-click it to put it back. Both are remembered.&#10;- Report a bug and Discord buttons in the panel.&#10;- From 2.9.1: a new toolbar icon in the game's own style.&#10;- From 2.9.0: Use existing. Pick it at the top of the panel and draw around streets you already have: their empty zone cells get your zone mix (Random, Clumps or Even, zone packs included), with no new roads and no ground changes." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />

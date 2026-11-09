@@ -619,9 +619,11 @@ namespace SteppedStreets.Tool
         /// <summary>True when a setting changed since the current plan was made (the Options page doesn't re-plan).</summary>
         private bool SettingsMoved() => Plan != null && plannedSettings != SettingsSignature(Mod.Settings);
 
+        // Hidden settings are the panel's fold and place: moving the panel must not make a ready plan stale.
         private static string SettingsSignature(Settings.SteppedStreetsSettings settings) => settings == null ? "" : string.Join("|",
             typeof(Settings.SteppedStreetsSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                 .Where(property => property.CanRead && property.GetIndexParameters().Length == 0
+                    && !property.IsDefined(typeof(Game.Settings.SettingsUIHiddenAttribute), false)
                     && (property.PropertyType.IsPrimitive || property.PropertyType.IsEnum || property.PropertyType == typeof(string)))
                 .Select(property => Convert.ToString(property.GetValue(settings), CultureInfo.InvariantCulture)));
 

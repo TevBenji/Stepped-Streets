@@ -39,5 +39,16 @@ try {
     }
     finally { [Globalization.CultureInfo]::CurrentCulture = $previousCulture }
     'Panel JSON self-check: 5 string cases and 3 numeric cases passed.'
+
+    # Moving or folding the panel must not make a ready plan stale; a real setting still must.
+    $settingsType = $assembly.GetType('SteppedStreets.Settings.SteppedStreetsSettings', $true)
+    $signature = $assembly.GetType('SteppedStreets.Tool.NeighbourhoodToolSystem', $true).GetMethod('SettingsSignature', $flags)
+    $settings = [Runtime.CompilerServices.RuntimeHelpers]::GetUninitializedObject($settingsType)
+    $before = $signature.Invoke($null, @($settings))
+    $settings.PanelLeft = 0.5; $settings.PanelTop = 0.5; $settings.PanelCollapsed = $true
+    if ($signature.Invoke($null, @($settings)) -cne $before) { throw 'The panel fold or place changed the plan signature.' }
+    $settings.BlockDepth = 120
+    if ($signature.Invoke($null, @($settings)) -ceq $before) { throw 'A real setting did not change the plan signature.' }
+    'Plan signature self-check: the panel leaves a plan ready and a setting does not.'
 }
 finally { [AppDomain]::CurrentDomain.remove_AssemblyResolve($resolver) }

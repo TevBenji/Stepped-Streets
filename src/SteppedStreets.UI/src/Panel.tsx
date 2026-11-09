@@ -3,12 +3,12 @@
 // rows. The look is the game's own: its panel colours, its green primary pill, tick boxes and pill-shaped choices.
 // Plain elements rather than cs2/ui components, so nothing depends on the vanilla themes, which left the first version
 // unstyled; the game's slider and text box are used where the registry has them.
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./lib/bindings";
 import { ErrorBoundary } from "./lib/errorBoundary";
 import { LAYOUT_TIPS, SettingTip } from "./lib/tips";
 import {
-    formatArea, isExperimental, JunctionPattern, MixPattern, Option, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
+    formatArea, isExperimental, JunctionPattern, MixPattern, Option, panelFraction, PanelPlace, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
 } from "./lib/state";
 import { vanilla } from "./lib/vanilla";
 import { LAYOUT_ICONS } from "./lib/layoutIcons";
@@ -21,9 +21,16 @@ import circleGoIcon from "./assets/circle-go.svg";
 import checkIcon from "./assets/check.svg";
 import undoIcon from "./assets/undo.svg";
 import trashIcon from "./assets/trash.svg";
+import bugIcon from "./assets/bug.svg";
+import chatIcon from "./assets/chat.svg";
 import styles from "./Panel.module.css";
 
-const classes = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
+const classes = (...names: (string | false | undefined | null)[]) => names.filter(Boolean).join(" ");
+
+const LINKS = [
+    { key: "bug", label: "Report a bug", icon: bugIcon },
+    { key: "discord", label: "Discord", icon: chatIcon },
+];
 
 function Button({ children, onSelect, disabled = false, selected = false, className, label, sound = "select-item" }: React.PropsWithChildren<{
     onSelect: () => void; disabled?: boolean; selected?: boolean; className?: string; label?: string;
@@ -168,6 +175,8 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
     // Typing goes into the search box as soon as the list opens; without focus, the keys reached the game's shortcuts and
     // moved the camera (in-game test, 5 November 2026).
     useEffect(() => { if (open) search.current?.focus(); else setQuery(""); }, [open]);
+    // Collapsing or closing the panel removes the search box: it lets go of the keyboard first (the ref is gone by a plain effect).
+    useLayoutEffect(() => () => search.current?.blur(), []);
     // A saved choice the game no longer lists still shows, so the button never reads blank.
     const shown = options.some(option => option.name === value) ? options : [{ name: value, label: value }, ...options];
     const chosen = shown.find(option => option.name === value);
@@ -393,11 +402,59 @@ function statusTone(state: ToolState) {
 // The fine settings stay folded away unless the player opened them last time.
 let moreOpenMemory = false;
 
+// A press that wanders less than this (pixels) is a click, so a click or double-click doesn't undock the panel.
+const DRAG_FROM = 3;
+
+/** Moves the panel by its header. A place is a fraction of the screen; null is the usual docked place. */
+function usePanelDrag(panel: React.RefObject<HTMLDivElement>, left: number, top: number) {
+    const [dragged, setDragged] = useState<PanelPlace | null>(null);
+    const stopDrag = useRef<(() => void) | null>(null);
+    useEffect(() => () => stopDrag.current?.(), []);
+    // A released drag stays until the tool sends it back, so the panel doesn't jump to its old place first.
+    useEffect(() => { if (!stopDrag.current) setDragged(null); }, [left, top]);
+
+    const beginDrag = (start: React.MouseEvent) => {
+        const box = panel.current?.getBoundingClientRect();
+        if (start.button !== 0 || !box) return;
+        start.preventDefault();
+        stopDrag.current?.();
+        let place: PanelPlace | null = null;
+        const release = () => {
+            stopDrag.current?.();
+            if (place) act("setPanelPosition", place.left, place.top);
+        };
+        const move = (event: MouseEvent) => {
+            // A release the page never saw (the game lost focus) still ends the drag.
+            if (event.buttons === 0) { release(); return; }
+            const across = event.clientX - start.clientX, down = event.clientY - start.clientY;
+            if (!place && Math.abs(across) + Math.abs(down) < DRAG_FROM) return;
+            place = {
+                left: panelFraction(box.left + across, box.width, window.innerWidth),
+                top: panelFraction(box.top + down, box.height, window.innerHeight),
+            };
+            setDragged(place);
+        };
+        stopDrag.current = () => {
+            document.removeEventListener("mousemove", move);
+            document.removeEventListener("mouseup", release);
+            stopDrag.current = null;
+        };
+        document.addEventListener("mousemove", move);
+        document.addEventListener("mouseup", release);
+    };
+    const resetPlace = () => { setDragged(null); act("setPanelPosition", -1, -1); };
+    return { place: dragged ?? (left >= 0 && top >= 0 ? { left, top } : null), beginDrag, resetPlace };
+}
+
 function NeighbourhoodPanel() {
     const state = useToolState();
     const [moreOpen, setMoreOpen] = useState(moreOpenMemory);
+    const panel = useRef<HTMLDivElement>(null);
+    const { place, beginDrag, resetPlace } = usePanelDrag(panel, state.settings.panelLeft, state.settings.panelTop);
     if (state.stage === "Closed") return null;
     const { settings, stats } = state;
+    const collapsed = settings.panelCollapsed;
+    const links = LINKS.filter(link => link.key !== "discord" || state.discord);
     // The tool clears it on Esc, on a new plan and when it builds.
     const confirming = state.stage === "Planned" && state.confirming;
     const building = state.stage === "Building";
@@ -413,190 +470,218 @@ function NeighbourhoodPanel() {
     const buildLabel = existing ? (building ? "Zoning..." : state.stage === "Built" ? "Zoned" : "Zone")
         : building ? "Building..." : state.stage === "Built" ? "Built" : "Build";
 
-    return <div className={styles.dock}>
-        <div className={styles.wrap}>
-            <div className={styles.panel} onMouseDown={event => event.stopPropagation()} aria-busy={building}>
-                <div className={styles.header}>
-                    <div className={styles.accentBar} />
-                    <img className={styles.headerIcon} src={icon} />
-                    <div className={styles.title}>Stepped Streets</div>
+    return <div className={classes(styles.dock, place && styles.dockMoved)}>
+        {place ? <div className={styles.gap} style={{ width: `${100 * place.left}%` }} /> : null}
+        <div className={classes(styles.wrap, place ? styles.wrapMoved : styles.wrapDocked)}>
+            {place ? <div className={styles.gap} style={{ height: `${100 * place.top}%` }} /> : null}
+            <div ref={panel} className={classes(styles.panel, place && styles.panelMoved)} onMouseDown={event => event.stopPropagation()} aria-busy={building}>
+                <div className={classes(styles.header, collapsed && styles.headerCollapsed)}>
+                    {/* Only this part drags, so a press on the buttons beside it is never a drag. */}
+                    <div className={styles.dragArea} onMouseDown={beginDrag} onDoubleClick={resetPlace}>
+                        <div className={styles.accentBar} />
+                        <img className={styles.headerIcon} src={icon} />
+                        <div className={styles.title}>Stepped Streets</div>
+                    </div>
+                    <Button className={styles.close} label={collapsed ? "Expand" : "Collapse"}
+                        onSelect={() => act("setPanelCollapsed", !collapsed)}>
+                        <img className={classes(styles.chevron, !collapsed && styles.chevronOpen)} src={chevronIcon} />
+                    </Button>
+                    {links.map(link => <SettingTip key={link.key} label={link.label}><div>
+                        <Button className={styles.close} label={link.label} onSelect={() => act("openLink", link.key)}>
+                            <img className={styles.closeIcon} src={link.icon} />
+                        </Button>
+                    </div></SettingTip>)}
                     <Button className={styles.close} label="Close" disabled={building}
                         onSelect={() => act("close")}>
                         <img className={styles.closeIcon} src={closeIcon} />
                     </Button>
                 </div>
 
-                <Scroll className={styles.content} innerClassName={styles.contentInner}>
-                    <Steps state={state} />
-                    <div className={classes(styles.status, statusTone(state))} aria-live="polite">
-                        <div className={styles.statusHead}>
-                            {statusTone(state) === styles.toneGood ? <div className={styles.statusTick}><img className={styles.stepTick} src={checkIcon} /></div> : null}
-                            <div className={styles.statusText}>{statusLine(state)}</div>
-                            {state.corners >= 3 ? <Measure className={styles.areaChip} text={formatArea(state.areaSquareMetres)} /> : null}
+                {collapsed ? null : <>
+                    <Scroll className={styles.content} innerClassName={styles.contentInner}>
+                        <Steps state={state} />
+                        <div className={classes(styles.status, statusTone(state))} aria-live="polite">
+                            <div className={styles.statusHead}>
+                                {statusTone(state) === styles.toneGood ? <div className={styles.statusTick}><img className={styles.stepTick} src={checkIcon} /></div> : null}
+                                <div className={styles.statusText}>{statusLine(state)}</div>
+                                {state.corners >= 3 ? <Measure className={styles.areaChip} text={formatArea(state.areaSquareMetres)} /> : null}
+                            </div>
+                            {statusDetail(state) ? <div className={styles.statusDetail}>{statusDetail(state)}</div> : null}
+                            {building ? <div className={styles.progressTrack}>
+                                <div className={styles.progress} style={{ width: `${100 * state.progress}%` }} />
+                            </div> : null}
+                            {!building && state.stage !== "Built" ? <div className={styles.hints}>
+                                <div>{state.areaClosed ? "Drag corners to reshape. Right-click to remove." : "Click the ground to add corners. Click the first one to finish."}</div>
+                                <div>Ctrl+Z to undo · Esc to go back</div>
+                            </div> : null}
+                            {state.corners > 0 ? <div className={styles.statusButtons}>
+                                {state.stage === "Drawing" && state.corners >= 3 && !state.areaClosed
+                                    ? <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("closeArea")}>Close area</Button> : null}
+                                <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("undo")}>
+                                    <img className={styles.buttonIcon} src={undoIcon} /><div>Undo</div>
+                                </Button>
+                            </div> : null}
                         </div>
-                        {statusDetail(state) ? <div className={styles.statusDetail}>{statusDetail(state)}</div> : null}
-                        {building ? <div className={styles.progressTrack}>
-                            <div className={styles.progress} style={{ width: `${100 * state.progress}%` }} />
-                        </div> : null}
-                        {!building && state.stage !== "Built" ? <div className={styles.hints}>
-                            <div>{state.areaClosed ? "Drag corners to reshape. Right-click to remove." : "Click the ground to add corners. Click the first one to finish."}</div>
-                            <div>Ctrl+Z to undo · Esc to go back</div>
-                        </div> : null}
-                        {state.corners > 0 ? <div className={styles.statusButtons}>
-                            {state.stage === "Drawing" && state.corners >= 3 && !state.areaClosed
-                                ? <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("closeArea")}>Close area</Button> : null}
-                            <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("undo")}>
-                                <img className={styles.buttonIcon} src={undoIcon} /><div>Undo</div>
-                            </Button>
-                        </div> : null}
-                    </div>
 
-                    <Section title="Streets">
-                        <Row label="Roads">
-                            <Segmented options={STREET_MODES} value={existing ? "existing" : "new"} disabled={disabled}
-                                onChange={mode => act("setExistingStreets", mode === "existing")} />
-                        </Row>
-                        {existing ? <div className={styles.layoutTip}>Zones the empty cells along streets already in the area. No new
-                            roads and no ground changes; cells already zoned stay as they are.</div> : null}
-                    </Section>
-
-                    {existing ? null : <Section title="Layout">
-                        <Picker options={LAYOUTS} value={settings.style} disabled={disabled} bigIcons onPick={style => act("setStyle", style)} />
-                        <div className={styles.layoutTip}>{LAYOUT_TIPS[settings.style]}</div>
-                        {isExperimental(settings.style)
-                            ? <div className={styles.layoutNote}>New and not yet tried in many cities: tell us how it builds.</div> : null}
-                        {usesJunctions(settings.style) ? <Row label="Junctions">
-                            <Segmented options={JUNCTIONS} value={settings.junctions} disabled={disabled}
-                                onChange={junctions => act("setJunctions", junctions)} />
-                        </Row> : null}
-                    </Section>}
-
-                    <Section title="What to build">
-                        {/* Service buildings need new streets; the mix keeps them for Build new. */}
-                        <Mix mix={settings.zoneMix} zones={state.zones} services={existing ? [] : settings.serviceMix}
-                            serviceOptions={existing ? [] : state.services} disabled={disabled} />
-                        {settings.zoneMix.length > 1 ? <Row label="Mix mode">
-                            <Segmented options={MIX_PATTERNS} value={settings.mixPattern} disabled={disabled}
-                                onChange={pattern => act("setMixPattern", pattern)} />
-                        </Row> : null}
-                    </Section>
-
-                    {existing ? null : <Section title="Ground">
-                        <ToggleRow label="Shape the ground" value={settings.shapeGround} trigger="setShapeGround" disabled={disabled} />
-                        <ToggleRow label="Steep hills" value={settings.steepGround} trigger="setSteepGround" disabled={disabled} />
-                        <ToggleRow label="Trees" value={settings.trees} trigger="setTrees" disabled={disabled} />
-                    </Section>}
-
-                    <Button className={styles.moreButton} selected={moreOpen} onSelect={() => { moreOpenMemory = !moreOpen; setMoreOpen(!moreOpen); }}>
-                        <div className={styles.pickerLabel}>{moreOpen ? "Fewer settings" : "More settings"}</div>
-                        <img className={classes(styles.chevron, moreOpen && styles.chevronOpen)} src={chevronIcon} />
-                    </Button>
-
-                    {moreOpen && existing ? <Section title="Lots">
-                        <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
-                            format={cells} trigger="setLotWidth" disabled={disabled} />
-                        <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
-                            format={cells} trigger="setLotDepth" disabled={disabled} />
-                    </Section> : null}
-
-                    {moreOpen && !existing ? <>
-                        <Section title="Roads">
-                            <Picker label="Road" options={state.roads} value={settings.road} disabled={disabled} onPick={road => act("setRoad", road)} />
-                            <NumberRow label="Block depth" value={settings.blockDepth} minimum={60} maximum={200} step={5}
-                                format={metres} trigger="setBlockDepth" disabled={disabled} />
-                            <NumberRow label="Max road grade" value={settings.maxRoadGradePercent} minimum={4} maximum={12} step={1}
-                                format={percent} trigger="setMaxRoadGrade" disabled={disabled} />
-                            <NumberRow label="Steepest buildable" value={settings.steepestBuildablePercent} minimum={8}
-                                maximum={settings.steepGround ? 60 : 30} step={1} format={percent} trigger="setSteepestBuildable" disabled={disabled} />
+                        <Section title="Streets">
+                            <Row label="Roads">
+                                <Segmented options={STREET_MODES} value={existing ? "existing" : "new"} disabled={disabled}
+                                    onChange={mode => act("setExistingStreets", mode === "existing")} />
+                            </Row>
+                            {existing ? <div className={styles.layoutTip}>Zones the empty cells along streets already in the area. No new
+                                roads and no ground changes; cells already zoned stay as they are.</div> : null}
                         </Section>
 
-                        <Section title="Lots">
+                        {existing ? null : <Section title="Layout">
+                            <Picker options={LAYOUTS} value={settings.style} disabled={disabled} bigIcons onPick={style => act("setStyle", style)} />
+                            <div className={styles.layoutTip}>{LAYOUT_TIPS[settings.style]}</div>
+                            {isExperimental(settings.style)
+                                ? <div className={styles.layoutNote}>New and not yet tried in many cities: tell us how it builds.</div> : null}
+                            {usesJunctions(settings.style) ? <Row label="Junctions">
+                                <Segmented options={JUNCTIONS} value={settings.junctions} disabled={disabled}
+                                    onChange={junctions => act("setJunctions", junctions)} />
+                            </Row> : null}
+                        </Section>}
+
+                        <Section title="What to build">
+                            {/* Service buildings need new streets; the mix keeps them for Build new. */}
+                            <Mix mix={settings.zoneMix} zones={state.zones} services={existing ? [] : settings.serviceMix}
+                                serviceOptions={existing ? [] : state.services} disabled={disabled} />
+                            {settings.zoneMix.length > 1 ? <Row label="Mix mode">
+                                <Segmented options={MIX_PATTERNS} value={settings.mixPattern} disabled={disabled}
+                                    onChange={pattern => act("setMixPattern", pattern)} />
+                            </Row> : null}
+                        </Section>
+
+                        {existing ? null : <Section title="Ground">
+                            <ToggleRow label="Shape the ground" value={settings.shapeGround} trigger="setShapeGround" disabled={disabled} />
+                            <ToggleRow label="Steep hills" value={settings.steepGround} trigger="setSteepGround" disabled={disabled} />
+                            <ToggleRow label="Trees" value={settings.trees} trigger="setTrees" disabled={disabled} />
+                        </Section>}
+
+                        <Button className={styles.moreButton} selected={moreOpen} onSelect={() => { moreOpenMemory = !moreOpen; setMoreOpen(!moreOpen); }}>
+                            <div className={styles.pickerLabel}>{moreOpen ? "Fewer settings" : "More settings"}</div>
+                            <img className={classes(styles.chevron, moreOpen && styles.chevronOpen)} src={chevronIcon} />
+                        </Button>
+
+                        {moreOpen && existing ? <Section title="Lots">
                             <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
                                 format={cells} trigger="setLotWidth" disabled={disabled} />
                             <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
                                 format={cells} trigger="setLotDepth" disabled={disabled} />
-                            <Row label="Space between lots">
-                                <Segmented options={SPACINGS} value={String(settings.lotSpacing)} disabled={disabled}
-                                    onChange={spacing => act("setLotSpacing", Number(spacing))} />
-                            </Row>
-                        </Section>
+                        </Section> : null}
 
-                        <Section title="Grading">
-                            <ToggleRow label="Level the lots" value={settings.levelLots} trigger="setLevelLots" disabled={disabled} />
-                            <NumberRow label="Most earth" value={settings.earthworkLimit} minimum={1} maximum={settings.steepGround ? 12 : 8} step={0.5}
-                                format={tenthMetres} trigger="setEarthworkLimit" disabled={disabled} />
-                            <NumberRow label="Steepest bank" value={settings.bankGradePercent} minimum={20} maximum={50} step={5}
-                                format={percent} trigger="setBankGrade" disabled={disabled} />
-                        </Section>
+                        {moreOpen && !existing ? <>
+                            <Section title="Roads">
+                                <Picker label="Road" options={state.roads} value={settings.road} disabled={disabled} onPick={road => act("setRoad", road)} />
+                                <NumberRow label="Block depth" value={settings.blockDepth} minimum={60} maximum={200} step={5}
+                                    format={metres} trigger="setBlockDepth" disabled={disabled} />
+                                <NumberRow label="Max road grade" value={settings.maxRoadGradePercent} minimum={4} maximum={12} step={1}
+                                    format={percent} trigger="setMaxRoadGrade" disabled={disabled} />
+                                <NumberRow label="Steepest buildable" value={settings.steepestBuildablePercent} minimum={8}
+                                    maximum={settings.steepGround ? 60 : 30} step={1} format={percent} trigger="setSteepestBuildable" disabled={disabled} />
+                            </Section>
 
-                        <Section title="Landscape">
-                            <ToggleRow label="Retaining walls" value={settings.retainingWalls} trigger="setRetainingWalls" disabled={disabled} />
-                            {settings.trees ? <NumberRow label="Tree density" value={settings.treeDensityPercent} minimum={10} maximum={100}
-                                step={5} format={percent} trigger="setTreeDensity" disabled={disabled} /> : null}
-                            <Row label="Seed"><div className={styles.seedValue}>{settings.seed}</div></Row>
-                        </Section>
-                    </> : null}
+                            <Section title="Lots">
+                                <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
+                                    format={cells} trigger="setLotWidth" disabled={disabled} />
+                                <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
+                                    format={cells} trigger="setLotDepth" disabled={disabled} />
+                                <Row label="Space between lots">
+                                    <Segmented options={SPACINGS} value={String(settings.lotSpacing)} disabled={disabled}
+                                        onChange={spacing => act("setLotSpacing", Number(spacing))} />
+                                </Row>
+                            </Section>
 
-                    {hasPlan || messages.length > 0 ? <Section title={state.stage === "Built" ? "Result" : "Plan"}>
-                        {hasPlan && existing ? <div className={styles.card}>
-                            <Stat label="Lots" value={thousands(stats.lots)} />
-                            <Stat label="Cells to zone" value={thousands(stats.zonedCells)} />
-                        </div> : null}
-                        {hasPlan && !existing ? <div className={styles.card}>
-                            <Stat label="Roads" value={`${stats.roadKilometres.toFixed(1)} km`} />
-                            <Stat label="Lots" value={thousands(stats.lots)} />
-                            <Stat label="Zoned cells" value={thousands(stats.zonedCells)} />
-                            <Stat label="Earth moved" value={`${thousands(stats.earthCubicMetres)} m3`} />
-                            <Stat label="Steepest road" value={`${stats.steepestRoadPercent.toFixed(1)}%`} />
-                            <Stat label="Forest" value={percent(stats.wildPercent)} />
-                            <Stat label="Connected" value={stats.connected ? "Yes" : "No - built on its own"} />
-                            <Stat label="Trees" value={thousands(stats.trees)} />
-                        </div> : null}
-                        {hasPlan ? state.zoneCounts.map(count => <div key={count.zone} className={styles.zoneCount}>
-                            <div className={styles.zoneDot} style={{ backgroundColor: zoneColour(count.zone) }} />
-                            <div className={styles.zoneName}>{zoneLabel(count.zone)}</div>
-                            <div className={styles.zoneLots}>{lots(count.lots)}</div>
-                        </div>) : null}
-                        {hasPlan ? state.serviceCounts.map(count => <div key={count.name} className={styles.zoneCount}>
-                            <div className={classes(styles.zoneDot, styles.serviceDot)} />
-                            <div className={styles.zoneName}>{serviceLabel(count.name)}</div>
-                            <div className={styles.zoneLots}>{`${count.count} ${count.count === 1 ? "building" : "buildings"}`}</div>
-                        </div>) : null}
-                        {messages.map((message, index) => <div key={index} className={styles.message}>
-                            <div className={styles.messageDot} />
-                            <div className={styles.messageText}>{message}</div>
-                        </div>)}
-                    </Section> : null}
-                </Scroll>
+                            <Section title="Grading">
+                                <ToggleRow label="Level the lots" value={settings.levelLots} trigger="setLevelLots" disabled={disabled} />
+                                <NumberRow label="Most earth" value={settings.earthworkLimit} minimum={1} maximum={settings.steepGround ? 12 : 8} step={0.5}
+                                    format={tenthMetres} trigger="setEarthworkLimit" disabled={disabled} />
+                                <NumberRow label="Steepest bank" value={settings.bankGradePercent} minimum={20} maximum={50} step={5}
+                                    format={percent} trigger="setBankGrade" disabled={disabled} />
+                            </Section>
 
-                <div className={styles.footer}>
-                    <Button className={styles.secondary} disabled={disabled || state.corners === 0}
-                        onSelect={() => act("clearArea")}>
-                        <img className={styles.buttonIcon} src={trashIcon} /><div>Clear</div>
-                    </Button>
-                    <Button className={styles.secondary} label="Reroll: another layout" disabled={disabled} onSelect={() => act("reroll")}>
-                        <img className={styles.buttonIcon} src={diceIcon} /><div>Reroll</div>
-                    </Button>
-                    <Button className={styles.primary} disabled={disabled || state.stage !== "Planned"}
-                        onSelect={() => act("setConfirming", true)}>
-                        <div>{buildLabel}</div>
-                        {!disabled && state.stage === "Planned" ? <img className={styles.pillIcon} src={circleGoIcon} /> : null}
-                    </Button>
-                </div>
+                            <Section title="Landscape">
+                                <ToggleRow label="Retaining walls" value={settings.retainingWalls} trigger="setRetainingWalls" disabled={disabled} />
+                                {settings.trees ? <NumberRow label="Tree density" value={settings.treeDensityPercent} minimum={10} maximum={100}
+                                    step={5} format={percent} trigger="setTreeDensity" disabled={disabled} /> : null}
+                                <Row label="Seed"><div className={styles.seedValue}>{settings.seed}</div></Row>
+                            </Section>
+                        </> : null}
 
-                {confirming ? <div className={styles.backdrop}>
-                    <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="stepped-streets-confirm">
-                        <div className={styles.dialogTitle}>{existing ? "Zone these streets?" : "Build this neighbourhood?"}</div>
-                        <div id="stepped-streets-confirm" className={styles.dialogText}>
-                            {existing ? "Only empty cells are zoned. You can repaint any of them with the game's zoning tools."
-                                : "Ground changes are permanent, like the game's terrain tools. Build?"}</div>
-                        <div className={styles.dialogButtons}>
-                            <Button className={styles.secondary} onSelect={() => act("setConfirming", false)}>Cancel</Button>
-                            <Button className={styles.primary} onSelect={() => act("build")}>
-                                <div>{existing ? "Zone" : "Build"}</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
+                        {hasPlan || messages.length > 0 ? <Section title={state.stage === "Built" ? "Result" : "Plan"}>
+                            {hasPlan && existing ? <div className={styles.card}>
+                                <Stat label="Lots" value={thousands(stats.lots)} />
+                                <Stat label="Cells to zone" value={thousands(stats.zonedCells)} />
+                            </div> : null}
+                            {hasPlan && !existing ? <div className={styles.card}>
+                                <Stat label="Roads" value={`${stats.roadKilometres.toFixed(1)} km`} />
+                                <Stat label="Lots" value={thousands(stats.lots)} />
+                                <Stat label="Zoned cells" value={thousands(stats.zonedCells)} />
+                                <Stat label="Earth moved" value={`${thousands(stats.earthCubicMetres)} m3`} />
+                                <Stat label="Steepest road" value={`${stats.steepestRoadPercent.toFixed(1)}%`} />
+                                <Stat label="Forest" value={percent(stats.wildPercent)} />
+                                <Stat label="Connected" value={stats.connected ? "Yes" : "No - built on its own"} />
+                                <Stat label="Trees" value={thousands(stats.trees)} />
+                            </div> : null}
+                            {hasPlan ? state.zoneCounts.map(count => <div key={count.zone} className={styles.zoneCount}>
+                                <div className={styles.zoneDot} style={{ backgroundColor: zoneColour(count.zone) }} />
+                                <div className={styles.zoneName}>{zoneLabel(count.zone)}</div>
+                                <div className={styles.zoneLots}>{lots(count.lots)}</div>
+                            </div>) : null}
+                            {hasPlan ? state.serviceCounts.map(count => <div key={count.name} className={styles.zoneCount}>
+                                <div className={classes(styles.zoneDot, styles.serviceDot)} />
+                                <div className={styles.zoneName}>{serviceLabel(count.name)}</div>
+                                <div className={styles.zoneLots}>{`${count.count} ${count.count === 1 ? "building" : "buildings"}`}</div>
+                            </div>) : null}
+                            {messages.map((message, index) => <div key={index} className={styles.message}>
+                                <div className={styles.messageDot} />
+                                <div className={styles.messageText}>{message}</div>
+                            </div>)}
+                        </Section> : null}
+                    </Scroll>
+
+                    <div className={styles.footer}>
+                        <div className={styles.footerButtons}>
+                            <Button className={styles.secondary} disabled={disabled || state.corners === 0}
+                                onSelect={() => act("clearArea")}>
+                                <img className={styles.buttonIcon} src={trashIcon} /><div>Clear</div>
+                            </Button>
+                            <Button className={styles.secondary} label="Reroll: another layout" disabled={disabled} onSelect={() => act("reroll")}>
+                                <img className={styles.buttonIcon} src={diceIcon} /><div>Reroll</div>
+                            </Button>
+                            <Button className={styles.primary} disabled={disabled || state.stage !== "Planned"}
+                                onSelect={() => act("setConfirming", true)}>
+                                <div>{buildLabel}</div>
+                                {!disabled && state.stage === "Planned" ? <img className={styles.pillIcon} src={circleGoIcon} /> : null}
+                            </Button>
+                        </div>
+                        <div className={styles.links}>
+                            {links.map((link, index) => <SettingTip key={link.key} label={link.label}>
+                                <div className={classes(styles.linkCell, index + 1 < links.length && styles.linkGap)}>
+                                    <Button className={styles.link} onSelect={() => act("openLink", link.key)}>
+                                        <img className={styles.linkIcon} src={link.icon} />
+                                        <div>{link.label}</div>
+                                    </Button>
+                                </div>
+                            </SettingTip>)}
                         </div>
                     </div>
-                </div> : null}
+
+                    {confirming ? <div className={styles.backdrop}>
+                        <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="stepped-streets-confirm">
+                            <div className={styles.dialogTitle}>{existing ? "Zone these streets?" : "Build this neighbourhood?"}</div>
+                            <div id="stepped-streets-confirm" className={styles.dialogText}>
+                                {existing ? "Only empty cells are zoned. You can repaint any of them with the game's zoning tools."
+                                    : "Ground changes are permanent, like the game's terrain tools. Build?"}</div>
+                            <div className={styles.dialogButtons}>
+                                <Button className={styles.secondary} onSelect={() => act("setConfirming", false)}>Cancel</Button>
+                                <Button className={styles.primary} onSelect={() => act("build")}>
+                                    <div>{existing ? "Zone" : "Build"}</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
+                            </div>
+                        </div>
+                    </div> : null}
+                </>}
             </div>
         </div>
     </div>;
