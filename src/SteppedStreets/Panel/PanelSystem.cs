@@ -29,7 +29,7 @@ namespace SteppedStreets.Panel
         private const string Group = "SteppedStreets";
         private const string BugLink = "https://github.com/TevBenji/Stepped-Streets/issues/new";
         // Empty hides the panel's Discord buttons.
-        private const string DiscordLink = "https://discord.com/channels/263634513861541888/1568265920902594560";
+        private const string DiscordLink = "https://discord.com/channels/263634513861541888/1567221017829576795";
         private NeighbourhoodToolSystem _tool;
         private PrefabSystem _prefabs;
         private ImageSystem _images;

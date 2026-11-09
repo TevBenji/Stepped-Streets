@@ -283,7 +283,7 @@ Press **Report a bug** in the panel, or [open an issue](https://github.com/TevBe
 and the log at `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\SteppedStreets.log`.
 
 For questions and ideas, press **Discord** in the panel or join
-[the channel](https://discord.com/channels/263634513861541888/1568265920902594560) in the official Cities: Skylines Discord.
+[this mod's thread](https://discord.com/channels/263634513861541888/1567221017829576795) in the official Cities: Skylines Discord.
 
 ## Building from source
 

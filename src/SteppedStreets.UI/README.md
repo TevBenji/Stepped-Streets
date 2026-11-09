@@ -22,7 +22,7 @@ The toolbar extension portals one button into the first toolbar group beside Zon
 
 Build is enabled only for Planned state. It opens the permanent-ground-change confirmation, with Build and Cancel. Changing the published state dismisses that confirmation. Building disables the controls, and the binding system also rejects setting changes during Building.
 
-After a Release build, `pwsh -File tools/check-panel-json.ps1` checks the actual compiled C# JSON writers for escaped text and culture-independent/non-finite numbers without creating game systems. Use `-ManagedPath` and `-AssemblyPath` for other reference or output locations.
+After a Release build, `pwsh -File tools/check-panel-json.ps1` checks the actual compiled C# JSON writers for escaped text and culture-independent/non-finite numbers, and that moving or folding the panel leaves a ready plan ready, without creating game systems. Use `-ManagedPath` and `-AssemblyPath` for other reference or output locations.
 
 ## Binding contract
 
