@@ -28,6 +28,8 @@ export const SETTING_TIPS: Record<string, string> = {
     "Retaining walls": "Garden walls where a road runs through a cutting.",
     "Tree density": "How many trees to plant.",
     "Seed": "Which layout you get. Reroll picks another; the same seed and settings always give the same plan.",
+    "Report a bug": "Opens a new issue on GitHub. Add a screenshot and your SteppedStreets.log.",
+    "Discord": "Questions, ideas and news.",
 };
 
 /** What each layout makes, shown under the layout picker. */

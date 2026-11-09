@@ -18,7 +18,7 @@ After `npm ci`, `dotnet build SteppedStreets.sln -c Release` also runs webpack a
 
 If `node_modules` is missing or `-p:SkipUI=true` is supplied, the C# build skips webpack and reports `UI bundle skipped: run npm ci in src/SteppedStreets.UI`. Old bundle files, if present, remain in the output folder. Webpack never cleans the shared DLL output directory. The UI project is a sibling of the C# project, outside its source glob.
 
-The toolbar extension portals one button into the first toolbar group beside Zones. It observes group redraws and removes its slot when unmounted. A class host and React 18's `findDOMNode` locate the strip without adding a sibling marker that would interfere with Placemaker's own extension. This legacy React lookup needs replacement if the game upgrades React or exposes a forwarded host ref. There is no second launcher. The panel docks on the right and is built from plain elements styled by our CSS (themed cs2/ui components lose their styling). Its vanilla slider commits on release; plus/minus buttons also work if that lookup fails. Panel and toolbar have separate error boundaries with null fallbacks. A missing binding or malformed JSON falls back to closed state and the saved-setting defaults.
+The toolbar extension portals one button into the first toolbar group beside Zones. It observes group redraws and removes its slot when unmounted. A class host and React 18's `findDOMNode` locate the strip without adding a sibling marker that would interfere with Placemaker's own extension. This legacy React lookup needs replacement if the game upgrades React or exposes a forwarded host ref. There is no second launcher. The panel docks on the right, folds to its header and moves by dragging the header, and is built from plain elements styled by our CSS (themed cs2/ui components lose their styling). Its vanilla slider commits on release; plus/minus buttons also work if that lookup fails. Panel and toolbar have separate error boundaries with null fallbacks. A missing binding or malformed JSON falls back to closed state and the saved-setting defaults.
 
 Build is enabled only for Planned state. It opens the permanent-ground-change confirmation, with Build and Cancel. Changing the published state dismisses that confirmation. Building disables the controls, and the binding system also rejects setting changes during Building.
 
@@ -32,7 +32,7 @@ and read defensively by `src/lib/state.ts` (`readState` never throws and clamps 
 open; the tool clears it on Esc, a new plan and the build), `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
 `connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
-`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions` and `serviceMix` as `name`/`count` rows), and the catalogues `zones` and
+`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), and the catalogues `zones` and
 `roads` (`name`/`label`) and `services` (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read
 again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
 the game's own menu icon path (ImageSystem.GetIconOrGroupIcon); it is left out when the game has none. While Planning and Building, `summary` is the current step; once Built,
@@ -62,6 +62,9 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setShapeGround` | bool | Off: no terrain changes at all (and no level lots) |
 | `setExistingStreets` | bool | On: zone the empty cells along streets already in the area; no roads, ground or trees |
 | `setSteepGround` | bool | Steep hills; on lifts `steepestBuildablePercent` to at least 50 and `earthworkLimit` to at least 8, off caps them at 30 and 8 |
+| `setPanelCollapsed` | bool | Fold the panel to its header. Saved; no re-plan; works during a build |
+| `setPanelPosition` | double, double | Left and top as fractions of the screen (above 1 is capped); negative puts the panel back in its usual place. Saved; no re-plan; works during a build |
+| `openLink` | string | `bug` or `discord`, mapped in C# to a fixed address; anything else does nothing |
 
 Numeric triggers reject NaN/infinity and clamp before saving. Valid writes call `Mod.Settings.ApplyAndSave()` and then
 `tool.SettingsChanged()`, which re-plans the area. All triggers catch exceptions and log through `Mod.Logger`. The zone and road

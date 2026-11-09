@@ -27,6 +27,9 @@ namespace SteppedStreets.Panel
     public sealed partial class PanelSystem : UISystemBase
     {
         private const string Group = "SteppedStreets";
+        private const string BugLink = "https://github.com/TevBenji/Stepped-Streets/issues/new";
+        // Empty hides the panel's Discord buttons.
+        private const string DiscordLink = "https://discord.com/channels/263634513861541888/1568265920902594560";
         private NeighbourhoodToolSystem _tool;
         private PrefabSystem _prefabs;
         private ImageSystem _images;
@@ -121,6 +124,18 @@ namespace SteppedStreets.Panel
                 BoolTrigger("setSteepGround", (settings, value) => settings.SetSteepGround(value));
                 BoolTrigger("setShapeGround", (settings, value) => settings.ShapeGround = value);
                 BoolTrigger("setExistingStreets", (settings, value) => settings.UseExistingStreets = value);
+                // A key, not an address, so nothing the panel sends can open any other link.
+                Trigger<string>("openLink", key =>
+                {
+                    string link = key == "bug" ? BugLink : key == "discord" ? DiscordLink : "";
+                    if (link.Length > 0) UnityEngine.Application.OpenURL(link);
+                });
+                Trigger<bool>("setPanelCollapsed", value => SavePanel(settings => settings.PanelCollapsed = value));
+                AddBinding(new TriggerBinding<double, double>(Group, "setPanelPosition", (left, top) => Safe("setPanelPosition", () =>
+                {
+                    if (double.IsNaN(left) || double.IsInfinity(left) || double.IsNaN(top) || double.IsInfinity(top)) return;
+                    SavePanel(settings => { settings.PanelLeft = PanelFraction(left); settings.PanelTop = PanelFraction(top); });
+                })));
             }
             catch (Exception exception)
             {
@@ -163,6 +178,19 @@ namespace SteppedStreets.Panel
             // Replanning still happens if saving fails, so the visible settings never leave a stale plan buildable.
             try { settings.ApplyAndSave(); }
             finally { _tool.SettingsChanged(); }
+        }
+
+        // Negative is the usual docked place.
+        private static float PanelFraction(double value) => value < 0 ? -1f : (float)Math.Min(value, 1);
+
+        // The panel's fold and place: saved like a setting, but the plan doesn't depend on them, so unlike ChangeSettings this
+        // doesn't re-plan and still works during a build.
+        private static void SavePanel(Action<SteppedStreetsSettings> write)
+        {
+            var settings = Mod.Settings;
+            if (settings == null) return;
+            write(settings);
+            settings.ApplyAndSave();
         }
 
         [Preserve]
@@ -357,6 +385,9 @@ namespace SteppedStreets.Panel
             json.Append(",\"trees\":").Append(settings.Trees ? "true" : "false");
             json.Append(",\"treeDensityPercent\":").Append(Integer(settings.TreeDensityPercent));
             json.Append(",\"seed\":").Append(Integer(settings.Seed));
+            json.Append(",\"panelCollapsed\":").Append(settings.PanelCollapsed ? "true" : "false");
+            json.Append(",\"panelLeft\":").Append(Number(settings.PanelLeft));
+            json.Append(",\"panelTop\":").Append(Number(settings.PanelTop));
             return json.Append('}').ToString();
         }
 
@@ -400,6 +431,7 @@ namespace SteppedStreets.Panel
             }
             json.Append("],\"progress\":").Append(Number(state.Progress));
             json.Append(",\"settings\":").Append(settingsJson);
+            json.Append(",\"discord\":").Append(DiscordLink.Length > 0 ? "true" : "false");
             return json.Append(",\"zones\":").Append(_zonesJson).Append(",\"roads\":").Append(_roadsJson)
                 .Append(",\"services\":").Append(_servicesJson).Append('}').ToString();
         }

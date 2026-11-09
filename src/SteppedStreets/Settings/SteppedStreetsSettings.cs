@@ -144,6 +144,17 @@ namespace SteppedStreets.Settings
         [SettingsUISection(Section, Group)]
         public int Seed { get; set; }
 
+        /// <summary>The panel is folded down to its header. Saved here, set from the panel, so not on the Options page.</summary>
+        [SettingsUIHidden]
+        public bool PanelCollapsed { get; set; }
+
+        /// <summary>Where the panel was moved to, as fractions of the screen so another resolution keeps it; negative is the usual docked place.</summary>
+        [SettingsUIHidden]
+        public float PanelLeft { get; set; }
+
+        [SettingsUIHidden]
+        public float PanelTop { get; set; }
+
         [SettingsUIKeyboardBinding(BindingKeyboard.S, StepStreetAction, ctrl: true, shift: true)]
         [SettingsUISection(Section, Group)]
         public ProxyBinding StepStreetBinding { get; set; }
@@ -177,6 +188,9 @@ namespace SteppedStreets.Settings
             Trees = false;
             TreeDensityPercent = 50;
             Seed = 1;
+            PanelCollapsed = false;
+            PanelLeft = -1f;
+            PanelTop = -1f;
         }
 
         /// <summary>The zone mix rows, read leniently: a broken string falls back to the default mix.</summary>

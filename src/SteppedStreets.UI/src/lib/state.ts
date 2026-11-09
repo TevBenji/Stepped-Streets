@@ -58,7 +58,15 @@ export interface Settings {
     trees: boolean;
     treeDensityPercent: number;
     seed: number;
+    /** The panel is folded down to its header. */
+    panelCollapsed: boolean;
+    /** Where the panel was moved to, as fractions of the screen; negative is the usual docked place. */
+    panelLeft: number;
+    panelTop: number;
 }
+
+/** A moved panel's top-left corner, as fractions of the screen. */
+export interface PanelPlace { left: number; top: number }
 
 export interface Stats {
     roadKilometres: number;
@@ -89,6 +97,8 @@ export interface ToolState {
     roads: Option[];
     services: ServiceOption[];
     serviceCounts: ServiceCount[];
+    /** The mod has a Discord link, so the panel shows its Discord buttons. */
+    discord: boolean;
 }
 
 // Counters and areas have no natural ceiling; this only keeps absurd values out of the layout.
@@ -194,12 +204,21 @@ export function readState(raw: unknown): ToolState {
             trees: flag(settings.trees, false),
             treeDensityPercent: number(settings.treeDensityPercent, 50, 10, 100),
             seed: whole(settings.seed, 1, 1, 99999),
+            panelCollapsed: flag(settings.panelCollapsed, false),
+            panelLeft: number(settings.panelLeft, -1, -1, 1),
+            panelTop: number(settings.panelTop, -1, -1, 1),
         },
         zones: rows(state.zones, readOption, option => option.name),
         roads: rows(state.roads, readOption, option => option.name),
         services: rows(state.services, readService, service => service.name),
         serviceCounts: rows(state.serviceCounts, readServiceCount, service => service.name),
+        discord: flag(state.discord, false),
     };
+}
+
+/** One side of a dragged panel's place as a fraction of the screen, stopped where the whole panel still fits. */
+export function panelFraction(position: number, size: number, screen: number): number {
+    return screen > 0 ? Math.max(0, Math.min(position, screen - size)) / screen : 0;
 }
 
 /**

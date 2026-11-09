@@ -3,7 +3,7 @@
 <img align="right" src="src/SteppedStreets/Properties/Thumbnail.png" alt="Stepped Streets" width="260">
 
 <a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Paradox Mods: Stepped Streets" src="https://img.shields.io/badge/Paradox%20Mods-Stepped%20Streets-2ea44f"></a>
-<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.9.1-1f6feb"></a>
+<a href="https://mods.paradoxplaza.com/mods/166090/Windows"><img alt="Version" src="https://img.shields.io/badge/version-2.10.0-1f6feb"></a>
 <img alt="Game version" src="https://img.shields.io/badge/Cities%3A%20Skylines%20II-1.6-0e7490">
 <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-c2410c"></a>
 
@@ -17,6 +17,7 @@ builder would, previews it on the ground, and builds it when you say so. Forty l
 <a href="#how-to-use">How to use</a> ·
 <a href="#settings">Settings</a> ·
 <a href="#how-it-works">How it works</a> ·
+<a href="#found-a-bug">Found a bug?</a> ·
 <a href="#building-from-source">Building from source</a> ·
 <a href="#credits">Credits</a>
 
@@ -123,6 +124,8 @@ mod browser, and restart the game.
 | <kbd>Enter</kbd> | Close the area |
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Undo |
 | <kbd>Esc</kbd> | Clear the area; press again to close the tool |
+| Arrow in the panel's title bar | Fold the panel down to its title bar; the tool keeps working |
+| Drag the panel's title bar | Move the panel; double-click the title bar to put it back |
 
 > [!IMPORTANT]
 > Ground changes are permanent, like the game's own terrain tools. **Back up your save before a big build.**
@@ -274,8 +277,13 @@ thread, so the game keeps running while a big area is planned.
 - **Use existing** zones only; it places no service buildings, and you pick streets by drawing around them.
 - English only.
 
-Found a problem? [Open an issue](https://github.com/TevBenji/Stepped-Streets/issues) with a screenshot and the log at
-`%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\SteppedStreets.log`.
+## Found a bug?
+
+Press **Report a bug** in the panel, or [open an issue](https://github.com/TevBenji/Stepped-Streets/issues), with a screenshot
+and the log at `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\SteppedStreets.log`.
+
+For questions and ideas, press **Discord** in the panel or join
+[the channel](https://discord.com/channels/263634513861541888/1568265920902594560) in the official Cities: Skylines Discord.
 
 ## Building from source
 
