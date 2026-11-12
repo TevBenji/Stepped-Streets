@@ -476,7 +476,7 @@ function NeighbourhoodPanel() {
     const messages = state.messages.filter(message => message !== state.summary);
     const zoneLabel = (name: string) => state.zones.find(zone => zone.name === name)?.label ?? name;
     const serviceLabel = (name: string) => state.services.find(service => service.name === name)?.label ?? name;
-    // Existing streets: no roads, ground or trees, so only the zoning settings show.
+    // Existing streets: no roads, so only the zoning, lot and greenery settings show.
     const existing = settings.existingStreets;
     const buildLabel = existing ? (building ? "Zoning..." : state.stage === "Built" ? "Zoned" : "Zone")
         : building ? "Building..." : state.stage === "Built" ? "Built" : "Build";
@@ -661,6 +661,8 @@ function NeighbourhoodPanel() {
                             {hasPlan && existing ? <div className={styles.card}>
                                 <Stat label="Lots" value={thousands(stats.lots)} />
                                 <Stat label="Cells to zone" value={thousands(stats.zonedCells)} />
+                                {settings.levelExistingLots ? <Stat label="Earth moved" value={`${thousands(stats.earthCubicMetres)} m3`} /> : null}
+                                {settings.trees ? <Stat label="Greenery" value={thousands(stats.trees)} /> : null}
                             </div> : null}
                             {hasPlan && !existing ? <div className={styles.card}>
                                 <Stat label="Roads" value={`${stats.roadKilometres.toFixed(1)} km`} />

@@ -31,7 +31,7 @@ and read defensively by `src/lib/state.ts` (`readState` never throws and clamps 
 `stage` (Closed, Drawing, Planning, Planned, Building, Built, Failed), `corners`, `areaClosed`, `confirming` (the Build dialog is
 open; the tool clears it on Esc, a new plan and the build), `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
-`connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
+`connected`, `trees`: every planned tree, bush, flower and rock), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings and pocket parks), `progress` (0–1),
 `settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `crosswalks`, `streetTrees`, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), and the catalogues `zones` and
 `roads` (`name`/`label`, read again each time the tool opens, so Road Builder roads made since appear) and `services`
 (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
