@@ -1054,3 +1054,46 @@
     line-height: 1.4;
     color: rgba(255, 196, 92, 0.9);
 }
+
+/* -- presets and Remove -- */
+/* A list row with a delete button beside its option. */
+.listRow {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.listRowItem {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* The preset's name box: the search box's look, filling the row beside its Save button. */
+.presetName {
+    flex: 1 1 auto;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 28rem;
+    line-height: 26rem;
+    padding: 0 12rem;
+    border: 1rem solid rgba(255, 255, 255, 0.22);
+    border-radius: 14rem;
+    background-color: rgba(0, 0, 0, 0.35);
+    color: #ffffff;
+    font-family: var(--fontFamily);
+    font-size: 13rem;
+}
+
+.button.presetSave {
+    flex-shrink: 0;
+    margin-left: 6rem;
+    margin-right: 0;
+}
+
+.dialogDetail {
+    margin-top: 8rem;
+    font-size: 12rem;
+    line-height: 1.4;
+    color: rgba(234, 242, 246, 0.6);
+}

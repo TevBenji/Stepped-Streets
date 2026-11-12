@@ -119,6 +119,9 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     {
                         var street = Street(survey, request, line, RoadKind.Street);
                         if (street == null) continue;
+                        // Every fourth row from the middle one is an avenue, about one every 400 m; a traffic-optimised grid has
+                        // its through road instead, and a filtered or organic grid carries no through traffic.
+                        street.Main = !traffic && !filtered && !organic && (row - offsets.Count / 2) % 4 == 0;
                         stretches.Add((streets.Count, start));
                         streets.Add(street);
                     }
@@ -179,7 +182,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     float road = collector + (offsets[row] - offsets[0]) * lean, roadNext = road + (offsets[row + 1] - offsets[row]) * lean;
                     if (traffic && (math.abs(at - road) < crossSpacing * 0.35f || math.abs(next - roadNext) < crossSpacing * 0.35f
                         || (at - road) * (next - roadNext) < 0f)) continue;
-                    Cross(survey, request, streets, rows[row], rows[row + 1], along, at, next);
+                    int avenue = Cross(survey, request, streets, rows[row], rows[row + 1], along, at, next);
+                    if (avenue >= 0) streets[avenue].Main = true;
                 }
             for (int row = 0; row + 1 < rows.Count; row++)
             {
@@ -243,9 +247,10 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     // An end of the through road that meets no city road would be a road to nowhere, unless no city road is near
                     // at all; then both stay, for a winding connection to find.
                     if (reached) { joined = true; through.Add(stub); }
-                    else if ((request.ExistingRoads?.Length ?? 0) > 0) end.Broken = true;
+                    else if (request.AnyJoinable) end.Broken = true;
                     else through.Add(stub);
                 }
+                foreach (int index in through) streets[index].Main = true;
                 return streets;
             }
 
@@ -445,7 +450,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             for (int index = 1; index < line.Count - 1; index++)
             {
                 if (request.Blocked != null && request.Blocked(line[index])) return false;
-                if (math.distance(line[index], hit.xz) > target.HalfWidth + request.RoadHalfWidth + 8f && survey.ConnectionRoomAt(line[index]) < 0f
+                if (math.distance(line[index], hit.xz) > target.HalfWidth + RoadNetwork.MainHalfWidth(request) + 8f && survey.ConnectionRoomAt(line[index]) < 0f
                     && survey.StreetRoomAt(line[index]) < 0f) return false;
             }
             // An even grade from the grid to the city's road: the landings a longer road gets don't fit in a short join on a slope.
@@ -475,8 +480,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             targetT = 0f;
             if (math.lengthsq(direction) < 0.5f) return false;
             float best = ReachLength;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                for (int index = 1; index < (road?.Points?.Length ?? 0); index++)
+            foreach (var road in request.JoinableRoads)
+                for (int index = 1; index < (road.Points?.Length ?? 0); index++)
                 {
                     float3 a = road.Points[index - 1], b = road.Points[index];
                     float2 edge = b.xz - a.xz;
@@ -504,8 +509,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         {
             float best = 400f;
             float2 facing = float2.zero;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                for (int point = 1; point < (road?.Points?.Length ?? 0); point++)
+            foreach (var road in request.JoinableRoads)
+                for (int point = 1; point < (road.Points?.Length ?? 0); point++)
                 {
                     float2 start = road.Points[point - 1].xz, end = road.Points[point].xz, middle = (start + end) * 0.5f;
                     if (math.distance(start, end) < 1f) continue;

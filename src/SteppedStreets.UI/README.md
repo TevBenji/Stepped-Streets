@@ -29,10 +29,14 @@ After a Release build, `pwsh -File tools/check-panel-json.ps1` checks the actual
 Group: `SteppedStreets`. Value: `state`, a `ValueBinding<string>` carrying JSON, written by `src/SteppedStreets/Panel/PanelSystem.cs`
 and read defensively by `src/lib/state.ts` (`readState` never throws and clamps every field):
 `stage` (Closed, Drawing, Planning, Planned, Building, Built, Failed), `corners`, `areaClosed`, `confirming` (the Build dialog is
-open; the tool clears it on Esc, a new plan and the build), `areaSquareMetres`, `summary`,
+open; the tool clears it on Esc, a new plan and the build), `confirmingRemove` (the Remove dialog is open; the tool clears it on
+Esc, when the removal starts and when there is no build left to remove), `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
-`connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
-`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `crosswalks`, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), and the catalogues `zones` and
+`connected`, `trees`: every planned tree, bush, flower and rock), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings and pocket parks), `progress` (0–1),
+`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `crosswalks`, `streetTrees`, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), `presets` (the saved presets' names, trimmed,
+1–40 characters, at most 20), `canRemoveLast` (the last build can still be removed: built in this game session, no build
+since), `removeLastSummary` (what removing it takes away, for the dialog), `removing` (the Building stage is that removal),
+and the catalogues `zones` and
 `roads` (`name`/`label`, read again each time the tool opens, so Road Builder roads made since appear) and `services`
 (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
 the game's own menu icon path (ImageSystem.GetIconOrGroupIcon); it is left out when the game has none. While Planning and Building, `summary` is the current step; once Built,
@@ -43,11 +47,19 @@ it is the build report (the panel shows it under the status line). The state is 
 | `toggleTool`, `close` | none | Open/close the tool |
 | `clearArea`, `closeArea`, `undo` | none | Area editing |
 | `setConfirming` | bool | Open (only when Planned) or close the Build dialog; while it is open the tool ignores the map |
+| `setConfirmingRemove` | bool | Open (only while `canRemoveLast` and not Building) or close the Remove dialog; while it is open the tool ignores the map |
 | `build` | none | Build when Planned, after the UI confirmation; closes the dialog |
 | `reroll` | none | A new seed |
+| `removeLast` | none | Remove what the last build placed (roads, zoning, greenery, service buildings, walls, and houses grown on its lots) the way the bulldozer does; the ground stays. Refused while Building or when there is nothing to remove. Ends in Drawing with the report as the summary |
+| `savePreset` | string | Save every plan setting, `crosswalks` and `streetTrees` (not the panel's fold or place) under the trimmed name, 1–40 characters; the same name in any case is replaced in its place; a new one is refused once there are 20. Saved; no re-plan |
+| `loadPreset` | string | Put that preset's settings back, each checked as its own trigger checks it (zones, services and roads the game no longer has fall back as saved settings do), save and re-plan; refused while Building |
+| `deletePreset` | string | Delete that preset. Saved; no re-plan |
 | `setStyle` | string | ContourSuburb / TerracedBlocks / MountainLane / SquareGrid / RectangularGrid / IrregularGrid / SkewedGrid / FragmentedGrid / DiagonalGrid / CurvedGrid / WarpedGrid / RadialGrid / Star / Rings / Spiderweb / Fan / Spine / Ladder / Comb / Fishbone / Tree / CulDeSacs / Loops / LoopsAndLollipops / Lollipops / TriangularMesh / Hexagonal / HexagonalSpokes / Ridge / Valley / Coastal / Winding / OrganicMesh / Hybrid / Polycentric / Superblock / Radburn / FusedGrid / FilteredGrid / BarcelonaSuperblock |
 | `setJunctions` | string | Crossroads / Staggered / TrafficOptimised (grid layouts) |
 | `setRoad` | string | A road `name` from the catalogue |
+| `setMainRoad` | string | A road `name` for main streets and connectors; empty: the same road for every street |
+| `setCornerZone`, `setMainStreetZone` | string | A zone `name` for corner lots / lots on a main street; empty: from the mix |
+| `setStreetTrees` | string | None / Grass / Trees: the game's planting upgrade on the streets built or zoned. Saved; no re-plan |
 | `setMixPattern` | string | Random / Clumps / Even |
 | `setZoneMix` | string | `[{"zone":"...","share":N},...]`; zones not in the catalogue are dropped (a list of only those is refused); `[]` means no zoning: lots are levelled but left unzoned |
 | `setServiceMix` | string | `[{"name":"...","count":N},...]` (N 1–20); buildings not in the `services` catalogue are dropped; `[]` is allowed |
@@ -60,7 +72,9 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setTreeDensity`, `setSeed` | double | 10–100 %, 1–99999 |
 | `setLevelLots`, `setRetainingWalls`, `setTrees` | bool | Switches |
 | `setShapeGround` | bool | Off: no terrain changes at all (and no level lots) |
-| `setExistingStreets` | bool | On: zone the empty cells along streets already in the area; no roads, ground or trees |
+| `setExistingStreets` | bool | On: zone the empty cells along streets already in the area; no new roads |
+| `setFootpaths`, `setPocketParks` | bool | Paths through long blocks; small parks on frontage too short for a lot |
+| `setLevelExistingLots` | bool | Use existing: level the lots before zoning (changes the ground) |
 | `setSteepGround` | bool | Steep hills; on lifts `steepestBuildablePercent` to at least 50 and `earthworkLimit` to at least 8, off caps them at 30 and 8 |
 | `setCrosswalks` | bool | Off: the new streets' junctions get the game's crosswalk-removal upgrade. Saved; no re-plan; read when the roads are built |
 | `setPanelCollapsed` | bool | Fold the panel to its header. Saved; no re-plan; works during a build |

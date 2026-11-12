@@ -65,9 +65,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/17.png" />
 	<Screenshot Value="Properties/Screenshots/25.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.11.0" />
+	<ModVersion Value="2.12.0" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- Road Builder roads in the road picker: the list is read again each time you open the tool, so roads you make or rename in Road Builder show up with their own names. A road needs zoning turned on to be listed.&#10;- Crosswalks switch under More settings, Roads: turn it off for no painted crossings where the new streets meet. Your existing roads keep theirs.&#10;- If the chosen road is no longer in the game, the plan now says which road it uses instead.&#10;- From 2.10.0: the panel folds and moves; Report a bug and Discord buttons." />
+	<ChangeLog Value="- Use existing does much more: greenery (trees, bushes, flowers, rocks) on the empty land, your service buildings along the streets, Space between lots, and Level lots (off by default).&#10;- Main road type: a wider road for the main streets and the links to your roads.&#10;- Street trees: the game's own grass or tree upgrade on new streets, or on the streets you zone with Use existing.&#10;- Footpaths through long blocks, joining the sidewalks without a crossing (new streets).&#10;- Pocket parks on frontage too short for a lot.&#10;- Corner lots and main-street lots can take their own zone: shops on the corners.&#10;- Presets: save all your settings under a name and load them in any city.&#10;- Remove last build: takes away the roads, zoning, greenery and buildings the last build placed (until your next build; the ground stays).&#10;- Bushes, flowers and rocks among the trees in Build new too, and hover tips on everything in the panel.&#10;- From 2.11.0: Road Builder roads in the road picker, and a Crosswalks switch." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />

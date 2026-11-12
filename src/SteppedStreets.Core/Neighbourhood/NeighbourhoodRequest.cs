@@ -268,6 +268,12 @@ namespace SteppedStreets.Core.Neighbourhood
         public float HalfWidth = 6f;
 
         /// <summary>
+        /// New streets may join it. False for a highway: a street joined to one at grade cuts into the highway's traffic (the
+        /// in-game test joined a residential street into a one-way highway). New roads still keep clear of it.
+        /// </summary>
+        public bool Joinable = true;
+
+        /// <summary>
         /// How far along the edge from either end a new road may join it. An edge ends at a node of the player's network,
         /// often a junction; a new junction closer than this crowds it and the game's shapes for the two overlap (owner's
         /// in-game test of 2.1.1, 3 November 2026).
@@ -289,7 +295,7 @@ namespace SteppedStreets.Core.Neighbourhood
         }
     }
 
-    /// <summary>One free cell of one of the game's zone blocks near the area, for zoning streets that already exist.</summary>
+    /// <summary>One cell of one of the game's zone blocks near the area, for zoning streets that already exist.</summary>
     public struct ZoneCell
     {
         /// <summary>The block it belongs to: the same number for every cell of one block.</summary>
@@ -300,11 +306,14 @@ namespace SteppedStreets.Core.Neighbourhood
 
         public float2 Centre;
 
-        /// <summary>The block's height, for drawing the lot: nothing is levelled on existing streets.</summary>
+        /// <summary>The block's height (its road's), for drawing the lot and as the level a lot starts from when it is levelled.</summary>
         public float Height;
 
         /// <summary>The block's direction in (x, z): a unit vector from the back of the block towards its road.</summary>
         public float2 Forward;
+
+        /// <summary>Zoned, built on or blocked: no lot, building or greenery goes on it. False for a free cell.</summary>
+        public bool Taken;
     }
 
     /// <summary>The drawn area, the site and the player's settings.</summary>
@@ -328,12 +337,32 @@ namespace SteppedStreets.Core.Neighbourhood
         /// <summary>Existing road edges within 400 m of the area (the connection's reach); may be empty.</summary>
         public ExistingRoad[] ExistingRoads = new ExistingRoad[0];
 
+        /// <summary>The existing roads new streets may join: every one but the highways.</summary>
+        internal IEnumerable<ExistingRoad> JoinableRoads
+        {
+            get
+            {
+                foreach (var road in ExistingRoads ?? new ExistingRoad[0])
+                    if (road != null && road.Joinable) yield return road;
+            }
+        }
+
+        /// <summary>Some existing road within reach may be joined.</summary>
+        internal bool AnyJoinable
+        {
+            get
+            {
+                foreach (var _ in JoinableRoads) return true;
+                return false;
+            }
+        }
+
         public NeighbourhoodStyle Style = NeighbourhoodStyle.ContourSuburb;
 
-        /// <summary>Zone the streets already in the area from <see cref="ZoneCells"/>: no new roads, no ground changes, no trees.</summary>
+        /// <summary>Zone the streets already in the area from <see cref="ZoneCells"/>: no new roads.</summary>
         public bool ExistingStreets;
 
-        /// <summary>The free cells of the game's zone blocks near the area; only filled for <see cref="ExistingStreets"/>.</summary>
+        /// <summary>The cells of the game's zone blocks near the area, free and taken; only filled for <see cref="ExistingStreets"/>.</summary>
         public ZoneCell[] ZoneCells = new ZoneCell[0];
 
         /// <summary>Half the new road's width, centreline to kerb.</summary>
@@ -398,5 +427,26 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>The same request and seed give the same plan; another seed gives another layout.</summary>
         public uint Seed = 1;
+
+        /// <summary>Half width of the road for main streets and connectors; 0 uses <see cref="RoadHalfWidth"/> for every street.</summary>
+        public float MainRoadHalfWidth;
+
+        /// <summary>Paths for people on foot through long blocks, from street to street.</summary>
+        public bool Footpaths;
+
+        /// <summary>Frontage too short for a lot becomes a small park instead of grass.</summary>
+        public bool PocketParks;
+
+        /// <summary>The small park buildings the game has, with their lot sizes, for <see cref="PocketParks"/> (counts unused).</summary>
+        public ServiceRequest[] Parks = new ServiceRequest[0];
+
+        /// <summary>Existing streets: grade each lot into a level pad, as new streets do. Off unless asked: it changes the ground.</summary>
+        public bool LevelExistingLots;
+
+        /// <summary>The zone for corner lots; empty takes the mix.</summary>
+        public string CornerZone = "";
+
+        /// <summary>The zone for lots on a main street; empty takes the mix.</summary>
+        public string MainStreetZone = "";
     }
 }

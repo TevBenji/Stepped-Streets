@@ -6,7 +6,7 @@
 // source fills the basin. Zoning follows GridRoadGenerator's Zoning
 // definitions (Ti4goc, GPL-3.0): ZoningFlags.Zone|Marquee without Overwrite never repaints cells
 // that are already zoned.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: extracted zoning only; named prefab lookup, live corner heights, owned definitions, centre-cell verification of the requested zone and a completion report.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: extracted zoning only; named prefab lookup, live corner heights, owned definitions, centre-cell verification of the requested zone, a completion report, and dezoning for Remove last neighbourhood.
 
 using System;
 using System.Collections.Generic;
@@ -50,6 +50,8 @@ namespace SteppedStreets.Build
         private int _emitFrame = -1;
         private bool _applyRequested;
         private bool _listedZonePrefabs;
+        // Remove last neighbourhood: take the zone off the cells instead of painting it.
+        private bool _dezone;
 
         public bool Busy { get; private set; }
 
@@ -110,6 +112,17 @@ namespace SteppedStreets.Build
             {
                 Finish(0, "could not begin: " + exception.Message);
             }
+        }
+
+        /// <summary>
+        /// Takes the zoning off these cells again, with the game's dezoning marquee (Dezone with Overwrite, as its zone tool does).
+        /// A cell counts as done once it is empty or gone with its block.
+        /// </summary>
+        public void BeginRemove(IReadOnlyList<float2[]> quads, string zonePrefabName, Action<ZoneBuildReport> whenDone)
+        {
+            if (Busy) { Logger.Warn("Stepped Streets zoning: BeginRemove ignored while a build is busy."); return; }
+            _dezone = true;
+            Begin(quads, zonePrefabName, whenDone);
         }
 
         private Entity FindZonePrefab(string name)
@@ -207,8 +220,8 @@ namespace SteppedStreets.Build
                 EntityManager.AddComponentData(definition, new Zoning
                 {
                     m_Position = position,
-                    // Overwrite would repaint zoning the player already chose.
-                    m_Flags = ZoningFlags.Zone | ZoningFlags.Marquee
+                    // Painting with Overwrite would repaint zoning the player already chose; dezoning takes whatever is there.
+                    m_Flags = _dezone ? ZoningFlags.Dezone | ZoningFlags.Marquee | ZoningFlags.Overwrite : ZoningFlags.Zone | ZoningFlags.Marquee
                 });
                 EntityManager.AddComponent<Updated>(definition);
             }
@@ -274,7 +287,8 @@ namespace SteppedStreets.Build
             }
             var details = new List<string>();
             foreach (var cause in causes) details.Add($"{cause.Key} x{cause.Value}");
-            Finish(counts[(int)CellState.Zoned], $"zone '{_zoneName}'; empty {counts[(int)CellState.Empty]}, "
+            int done = _dezone ? counts[(int)CellState.Empty] + counts[(int)CellState.Missing] : counts[(int)CellState.Zoned];
+            Finish(done, $"{(_dezone ? "dezone" : "zone")} '{_zoneName}'; empty {counts[(int)CellState.Empty]}, "
                 + $"other zone kept {counts[(int)CellState.OtherZone]}, blocked {counts[(int)CellState.Blocked]}, "
                 + $"hidden {counts[(int)CellState.Hidden]}, not found {counts[(int)CellState.Missing]}"
                 + (details.Count == 0 ? "" : "; " + string.Join("; ", details)));
@@ -318,6 +332,7 @@ namespace SteppedStreets.Build
             var whenDone = _whenDone;
             _whenDone = null;
             _quads = null;
+            _dezone = false;
             Busy = false;
             if (zoned == requested) Logger.Info(report.Summary); else Logger.Warn(report.Summary);
             try { whenDone?.Invoke(report); }

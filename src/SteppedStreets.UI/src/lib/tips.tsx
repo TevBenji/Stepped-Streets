@@ -15,7 +15,15 @@ export const SETTING_TIPS: Record<string, string> = {
     "Mix mode": "How a mix of zones is spread: Random picks for each lot, Clumps makes runs of neighbouring lots, Even spreads them out evenly.",
     "Steep hills": "Build on slopes up to 60 %, with up to 12 m of earthwork. Connectors may switch back to climb.",
     "Trees": "Forest on ground too steep to build, and trees on the banks and between lots.",
+    "Greenery": "Trees, bushes and rocks on the empty land in the area once it is zoned. Never on roads, buildings or lots.",
     "Road": "The road used for every new street. Road Builder roads are listed too, if zoning is on for them.",
+    "Main road": "The road for main streets and the links to your roads. Same as streets: one road for every street.",
+    "Street trees": "The game's own grass strip or trees on the new streets, or on the streets you zone with Use existing.",
+    "Footpaths": "Paths for people on foot through blocks longer than 180 m, from one street to the next. New streets only.",
+    "Pocket parks": "A stretch of frontage too short for a lot becomes a small park.",
+    "Corner lots": "The zone for lots on a corner, for shops on the corners. On short blocks most lots are corners. From the mix: no special zone.",
+    "Main street lots": "The zone for lots facing a main street, for shops or denser homes along it. With Use existing, a main street is one wider than the narrowest you zone along. From the mix: no special zone.",
+    "Level lots": "Grade each lot into a level pad before it is zoned, as Build new does. Changes the ground of the streets you zone.",
     "Crosswalks": "Painted crossings where the new streets meet. Off: none, and people cross there less often. Your existing roads keep theirs.",
     "Block depth": "The distance between neighbouring streets along the hill. Deeper blocks leave room for deeper lots.",
     "Max road grade": "No new road is steeper than this.",
@@ -29,6 +37,9 @@ export const SETTING_TIPS: Record<string, string> = {
     "Retaining walls": "Garden walls where a road runs through a cutting.",
     "Tree density": "How many trees to plant.",
     "Seed": "Which layout you get. Reroll picks another; the same seed and settings always give the same plan.",
+    "Preset": "Puts a saved set of settings back and plans the area again. The cross beside a preset deletes it.",
+    "Save as": "Saves every setting under this name, to load again in any city. The same name replaces that preset.",
+    "Remove": "Removes what the last build placed: its roads, zoning, greenery and buildings, and houses grown on its lots. The ground changes stay. Only until the next build, or until you load a city or quit.",
     "Report a bug": "Opens a new issue on GitHub. Add a screenshot and your SteppedStreets.log.",
     "Discord": "Questions, ideas and news.",
 };
@@ -77,9 +88,25 @@ export const LAYOUT_TIPS: Record<string, string> = {
     BarcelonaSuperblock: "Three-by-three superblocks whose inner streets turn back to the edge round a central square.",
 };
 
-/** A setting's description on hover, in the game's tooltip bubble; rows without one are left as they are. */
-export function SettingTip({ label, children }: { label?: string; children: React.ReactElement }) {
-    const text = label ? SETTING_TIPS[label] : undefined;
+/** What each number in the plan and result means. */
+export const STAT_TIPS: Record<string, string> = {
+    "Roads": "Length of the new roads.",
+    "Lots": "Lots to zone. Each grows a house or shop once the city has demand for its zone.",
+    "Zoned cells": "Zone cells the lots cover, each 8 m square.",
+    "Cells to zone": "Empty zone cells along the streets that get your zone mix, each 8 m square.",
+    "Earth moved": "Cut and fill to level the roads and lots.",
+    "Steepest road": "The steepest grade on any new road.",
+    "Forest": "Share of the area too steep to build on, left as forest.",
+    "Connected": "Whether the new streets join your road network.",
+    "Greenery": "Trees, bushes, flowers and rocks to plant.",
+};
+
+/**
+ * A description on hover, in the game's tooltip bubble: the setting's own, or the text given for anything else.
+ * Without either it is left as it is.
+ */
+export function SettingTip({ label, text: given, children }: { label?: string; text?: string; children: React.ReactElement }) {
+    const text = given ?? (label ? SETTING_TIPS[label] : undefined);
     if (!text || !ui.Tooltip) return children;
     return <ui.Tooltip direction="right" delayTime={400} hideOnInteraction tooltip={<div className={styles.tip}>
         <strong>{label}</strong>

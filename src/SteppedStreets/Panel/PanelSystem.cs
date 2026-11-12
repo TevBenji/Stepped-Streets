@@ -62,7 +62,10 @@ namespace SteppedStreets.Panel
                 Trigger("undo", () => _tool.Undo());
                 Trigger("build", () => { if (_tool.State.Stage == ToolStage.Planned) _tool.Build(); });
                 Trigger("reroll", () => _tool.Reroll());
+                Trigger("removeLast", () => _tool.RemoveLast());
+                AddPresetTriggers();
                 Trigger<bool>("setConfirming", value => _tool.SetConfirming(value));
+                Trigger<bool>("setConfirmingRemove", value => _tool.SetConfirmingRemove(value));
                 Trigger<string>("setStyle", value => ChangeSettings(settings =>
                 {
                     if (!Enum.TryParse(value, out NeighbourhoodStyle style) || !Enum.IsDefined(typeof(NeighbourhoodStyle), style)) return false;
@@ -86,6 +89,30 @@ namespace SteppedStreets.Panel
                     if (string.IsNullOrWhiteSpace(value) || value.Length > 200) return false;
                     settings.RoadName = value;
                     return true;
+                }));
+                // Empty means "the same road for every street".
+                Trigger<string>("setMainRoad", value => ChangeSettings(settings =>
+                {
+                    if (value == null || value.Length > 200) return false;
+                    settings.MainRoadName = value;
+                    return true;
+                }));
+                // Empty means "from the zone mix"; otherwise only a zone the game has.
+                Trigger<string>("setCornerZone", value => ChangeSettings(settings =>
+                {
+                    if (!ZoneOrMix(value)) return false;
+                    settings.CornerZone = value;
+                    return true;
+                }));
+                Trigger<string>("setMainStreetZone", value => ChangeSettings(settings =>
+                {
+                    if (!ZoneOrMix(value)) return false;
+                    settings.MainStreetZone = value;
+                    return true;
+                }));
+                Trigger<string>("setStreetTrees", value => SaveOnly(settings =>
+                {
+                    if (Enum.TryParse(value, out StreetPlanting planting) && Enum.IsDefined(typeof(StreetPlanting), planting)) settings.StreetTrees = planting;
                 }));
                 Trigger<string>("setZoneMix", value => ChangeSettings(settings =>
                 {
@@ -124,6 +151,9 @@ namespace SteppedStreets.Panel
                 BoolTrigger("setSteepGround", (settings, value) => settings.SetSteepGround(value));
                 BoolTrigger("setShapeGround", (settings, value) => settings.ShapeGround = value);
                 BoolTrigger("setExistingStreets", (settings, value) => settings.UseExistingStreets = value);
+                BoolTrigger("setFootpaths", (settings, value) => settings.Footpaths = value);
+                BoolTrigger("setPocketParks", (settings, value) => settings.PocketParks = value);
+                BoolTrigger("setLevelExistingLots", (settings, value) => settings.LevelExistingLots = value);
                 // A key, not an address, so nothing the panel sends can open any other link.
                 Trigger<string>("openLink", key =>
                 {
@@ -181,10 +211,12 @@ namespace SteppedStreets.Panel
             finally { _tool.SettingsChanged(); }
         }
 
+        private bool ZoneOrMix(string value) => value != null && value.Length <= 200 && (value.Length == 0 || _zones.Count == 0 || _zones.ContainsKey(value));
+
         // Negative is the usual docked place.
         private static float PanelFraction(double value) => value < 0 ? -1f : (float)Math.Min(value, 1);
 
-        // Crosswalks and the panel's fold and place: saved like a setting, but the plan doesn't depend on them, so unlike
+        // Crosswalks, street trees and the panel's fold and place: saved like a setting, but the plan doesn't depend on them, so unlike
         // ChangeSettings this doesn't re-plan and still works during a build.
         private static void SaveOnly(Action<SteppedStreetsSettings> write)
         {
@@ -300,6 +332,7 @@ namespace SteppedStreets.Panel
             _zonesJson = json.Append(']').ToString();
             _zonesBuilt = true;
             RepairZoneMix();
+            RepairPositionZones();
             return true;
         }
 
@@ -389,6 +422,13 @@ namespace SteppedStreets.Panel
             json.Append(",\"lotSpacing\":").Append(Integer(settings.LotSpacing));
             json.Append(",\"retainingWalls\":").Append(settings.RetainingWalls ? "true" : "false");
             json.Append(",\"crosswalks\":").Append(settings.Crosswalks ? "true" : "false");
+            json.Append(",\"mainRoad\":"); String(json, settings.MainRoadName ?? "");
+            json.Append(",\"streetTrees\":"); String(json, settings.StreetTrees.ToString());
+            json.Append(",\"footpaths\":").Append(settings.Footpaths ? "true" : "false");
+            json.Append(",\"pocketParks\":").Append(settings.PocketParks ? "true" : "false");
+            json.Append(",\"levelExistingLots\":").Append(settings.LevelExistingLots ? "true" : "false");
+            json.Append(",\"cornerZone\":"); String(json, settings.CornerZone ?? "");
+            json.Append(",\"mainStreetZone\":"); String(json, settings.MainStreetZone ?? "");
             json.Append(",\"trees\":").Append(settings.Trees ? "true" : "false");
             json.Append(",\"treeDensityPercent\":").Append(Integer(settings.TreeDensityPercent));
             json.Append(",\"seed\":").Append(Integer(settings.Seed));
@@ -405,6 +445,7 @@ namespace SteppedStreets.Panel
             json.Append(",\"corners\":").Append(Integer(state.Corners));
             json.Append(",\"areaClosed\":").Append(state.AreaClosed ? "true" : "false");
             json.Append(",\"confirming\":").Append(state.Confirming ? "true" : "false");
+            json.Append(",\"confirmingRemove\":").Append(state.ConfirmingRemove ? "true" : "false");
             json.Append(",\"areaSquareMetres\":").Append(Number(state.AreaSquareMetres));
             json.Append(",\"summary\":"); String(json, state.Summary);
             json.Append(",\"messages\":[");
@@ -439,6 +480,10 @@ namespace SteppedStreets.Panel
             json.Append("],\"progress\":").Append(Number(state.Progress));
             json.Append(",\"settings\":").Append(settingsJson);
             json.Append(",\"discord\":").Append(DiscordLink.Length > 0 ? "true" : "false");
+            json.Append(",\"presets\":").Append(PresetNamesJson(Mod.Settings));
+            json.Append(",\"canRemoveLast\":").Append(state.CanRemoveLast && state.Stage != ToolStage.Building ? "true" : "false");
+            json.Append(",\"removeLastSummary\":"); String(json, state.RemoveLastSummary);
+            json.Append(",\"removing\":").Append(state.Removing && state.Stage == ToolStage.Building ? "true" : "false");
             return json.Append(",\"zones\":").Append(_zonesJson).Append(",\"roads\":").Append(_roadsJson)
                 .Append(",\"services\":").Append(_servicesJson).Append('}').ToString();
         }

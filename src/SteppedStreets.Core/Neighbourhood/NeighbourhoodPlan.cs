@@ -34,6 +34,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>How many new roads end here.</summary>
         public int Degree;
+
+        /// <summary>Half the width of the widest new road ending here, centreline to kerb.</summary>
+        public float HalfWidth;
     }
 
     public sealed class PlannedRoad
@@ -50,6 +53,25 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>The steepest grade along the road, rise over run.</summary>
         public float SteepestGrade;
+
+        /// <summary>A main street or connector: built with the main road type, and its lots can take the main-street zone.</summary>
+        public bool Main;
+
+        /// <summary>Half the road's width, centreline to kerb: the main road's for a main street when one is chosen.</summary>
+        public float HalfWidth;
+    }
+
+    /// <summary>
+    /// A footpath through a long block, straight from one street to the street behind or opposite it, each round end a quarter
+    /// metre off the road's edge so the game joins it to the sidewalk.
+    /// </summary>
+    public sealed class PlannedPath
+    {
+        /// <summary>The ends, at the planned height of the street each one meets; the path climbs evenly between them.</summary>
+        public float3 Start, End;
+
+        /// <summary>Indexes into <see cref="NeighbourhoodPlan.Roads"/> of the streets the path joins.</summary>
+        public int StartRoad, EndRoad;
     }
 
     public sealed class PlannedLot
@@ -82,7 +104,8 @@ namespace SteppedStreets.Core.Neighbourhood
         public float2 Forward;
     }
 
-    public enum TreeKind { Conifer, Broadleaf }
+    /// <summary>What to plant: trees, then the low greenery and the rocks set among them.</summary>
+    public enum TreeKind { Conifer, Broadleaf, Bush, Flower, Rock, Boulder }
 
     public struct PlannedTree
     {
@@ -101,6 +124,7 @@ namespace SteppedStreets.Core.Neighbourhood
         public List<PlannedBuilding> Buildings = new List<PlannedBuilding>();
         public List<PlannedTree> Trees = new List<PlannedTree>();
         public List<WallSegment> Walls = new List<WallSegment>();
+        public List<PlannedPath> Paths = new List<PlannedPath>();
 
         /// <summary>The planned ground; null when nothing changes.</summary>
         public GroundField Ground;
@@ -113,9 +137,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>
         /// At least one road (the area need not touch a road, so a standalone network is buildable too), or, on existing
-        /// streets, at least one cell to zone.
+        /// streets, anything to do: a cell to zone, a building to place, greenery to plant or ground to level.
         /// </summary>
-        public bool Buildable => Roads.Count > 0 || ZonedCells > 0;
+        public bool Buildable => Roads.Count > 0 || ZonedCells > 0 || Buildings.Count > 0 || Trees.Count > 0 || Ground != null;
 
         public float RoadLength;
         public float SteepestRoadGrade;

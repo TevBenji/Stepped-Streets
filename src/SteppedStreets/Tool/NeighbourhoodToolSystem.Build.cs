@@ -23,7 +23,7 @@ namespace SteppedStreets.Tool
 
         private NeighbourhoodPlan buildPlan;
         private NeighbourhoodRequest buildRequest;
-        private string buildRoadName;
+        private string buildRoadName, buildMainRoadName;
         private readonly List<string> buildReport = new List<string>();
         private bool waitingForBlocks;
         private int blocksWaitStart, blockCount = -1, blocksStableSince;
@@ -48,7 +48,17 @@ namespace SteppedStreets.Tool
                     Message("The settings changed. Review the updated plan before building.");
                     return;
                 }
-                if (PlannedRequest?.ExistingStreets == true) { ZoneExistingStreets(); return; }
+                if (PlannedRequest?.ExistingStreets == true)
+                {
+                    if (Plan.Ground != null && LevelledGroundTaken(Plan))
+                    {
+                        Replan();
+                        Message("The site changed. Review the updated plan before building.");
+                        return;
+                    }
+                    ZoneExistingStreets();
+                    return;
+                }
                 // Buildings, roads and the ground can change while the plan is open.
                 var fresh = SiteSnapshot.Capture(EntityManager, World, corners.ToArray());
                 if (plannedSnapshot == null || fresh.Fingerprint != plannedSnapshot.Fingerprint)
@@ -63,11 +73,13 @@ namespace SteppedStreets.Tool
                 buildRequest = PlannedRequest;
                 // The settings match the plan (checked above), so this is the road it was laid out for.
                 buildRoadName = Mod.Settings?.RoadName ?? Settings.SteppedStreetsSettings.DefaultRoad;
+                buildMainRoadName = Mod.Settings?.MainRoadName ?? "";
+                TrackBuild();
                 State.Stage = ToolStage.Building;
                 State.Progress = 0.05f;
                 State.Summary = "Building the ground...";
                 Touch();
-                Log(Invariant($"build: {buildPlan.Roads.Count} roads, {buildPlan.Lots.Count} lots, {buildPlan.Trees.Count} trees, {buildPlan.Walls.Count} wall pieces"));
+                Log(Invariant($"build: {buildPlan.Roads.Count} roads, {buildPlan.Paths.Count} footpaths, {buildPlan.Lots.Count} lots, {buildPlan.Trees.Count} trees, {buildPlan.Walls.Count} wall pieces"));
                 if (buildPlan.Ground == null) { AfterGround(null); return; }
                 var ground = buildPlan.Ground;
                 // The planner already held buildings, water and existing roads at their own ground, so no blend can reach them.
@@ -77,27 +89,158 @@ namespace SteppedStreets.Tool
         }
 
         /// <summary>
-        /// Existing streets go straight to zoning: no ground, no roads, and their zone blocks are already there. No site check
-        /// either: the zoning reads the live cells and only paints the free ones, so houses growing along the streets while the
-        /// plan is open can't spoil it, and in a living city they would otherwise send every Build back to re-plan.
+        /// Existing streets: no roads, and their zone blocks are already there, so the lots are levelled (when asked) and zoned
+        /// straight away; then the services, parks and greenery as on new streets. No full site check: the zoning reads the
+        /// live cells and only paints the free ones, so houses growing along the streets while the plan is open can't spoil it,
+        /// and in a living city they would otherwise send every Build back to re-plan. Levelling checks only the ground it
+        /// changes (<see cref="LevelledGroundTaken"/>).
         /// </summary>
         private void ZoneExistingStreets()
         {
             ResetBuild();
             buildPlan = Plan;
             buildRequest = PlannedRequest;
+            TrackBuild();
             State.Stage = ToolStage.Building;
-            State.Progress = 0.3f;
+            State.Progress = 0.1f;
+            State.Summary = buildPlan.Ground != null ? "Levelling the lots..." : "Zoning...";
+            Touch();
+            Log(Invariant($"zoning existing streets: {buildPlan.Lots.Count} lots, {buildPlan.ZonedCells} cells, {buildPlan.Buildings.Count} buildings, {buildPlan.Trees.Count} trees and plants, ground {(buildPlan.Ground != null ? "levelled" : "as it is")}"));
+            if (buildPlan.Ground == null) { ZoneExistingLots(); return; }
+            var ground = buildPlan.Ground;
+            World.GetOrCreateSystemManaged<TerrainBuildSystem>().Begin(() => ground.ToRaster(), AfterExistingGround);
+        }
+
+        /// <summary>
+        /// Level lots on existing streets: true when, since the plan was made, a cell where the planned ground changes (under a
+        /// pad or on its banks) was zoned or built on, or a new building stands there. What was taken or built when the plan was
+        /// made is held at its own ground already, so only what is new counts (<see cref="SiteGeometry.LevellingMeetsNewWork"/>);
+        /// and only that ground is read, so growth elsewhere doesn't re-plan.
+        /// </summary>
+        private bool LevelledGroundTaken(NeighbourhoodPlan plan)
+        {
+            var ground = plan.Ground;
+            float2 low = ground.Origin, high = ground.Origin + new float2(ground.Columns - 1, ground.Rows - 1) * ground.Cell;
+            bool Within(float2 point) => math.all(point >= low) && math.all(point <= high);
+            var pads = plan.Lots.Select(lot => lot.Pad).Concat(plan.Buildings.Select(building => building.Pad))
+                .Select(pad => new[] { pad.Corners[0].xz, pad.Corners[1].xz, pad.Corners[2].xz, pad.Corners[3].xz }).ToList();
+            var takenThen = new HashSet<long>((plannedSnapshot?.ZoneCells ?? new ZoneCell[0]).Where(cell => cell.Taken).Select(cell => SiteGeometry.CellKey(cell.Centre)));
+            var buildingsThen = plannedSnapshot?.BuildingLots ?? new List<float2[]>();
+
+            var takenNow = new List<float2>();
+            using (var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Block>(), ComponentType.ReadOnly<Cell>(),
+                ComponentType.Exclude<Game.Tools.Temp>(), ComponentType.Exclude<Game.Common.Deleted>()))
+            using (var blocks = query.ToEntityArray(Unity.Collections.Allocator.Temp))
+                foreach (var entity in blocks)
+                {
+                    var block = EntityManager.GetComponentData<Block>(entity);
+                    float extent = math.length((float2)block.m_Size) * 4f;
+                    if (math.any(block.m_Position.xz < low - extent) || math.any(block.m_Position.xz > high + extent)) continue;
+                    var cells = EntityManager.GetBuffer<Cell>(entity, true);
+                    if (cells.Length < block.m_Size.x * block.m_Size.y) continue;
+                    var area = EntityManager.HasComponent<ValidArea>(entity) ? EntityManager.GetComponentData<ValidArea>(entity).m_Area
+                        : new int4(0, block.m_Size.x, 0, block.m_Size.y);
+                    for (int row = area.z; row < area.w; row++)
+                        for (int column = area.x; column < area.y; column++)
+                        {
+                            var cell = cells[row * block.m_Size.x + column];
+                            if ((cell.m_State & CellFlags.Visible) == 0 || SiteSnapshot.FreeCell(cell)) continue;
+                            float2 centre = ZoneUtils.GetCellPosition(block, new int2(column, row)).xz;
+                            if (Within(centre)) takenNow.Add(centre);
+                        }
+                }
+
+            var buildingsNow = new List<float2[]>();
+            using (var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Game.Buildings.Building>(),
+                ComponentType.ReadOnly<Game.Objects.Transform>(), ComponentType.ReadOnly<Game.Prefabs.PrefabRef>(),
+                ComponentType.Exclude<Game.Tools.Temp>(), ComponentType.Exclude<Game.Common.Deleted>()))
+            using (var buildings = query.ToEntityArray(Unity.Collections.Allocator.Temp))
+                foreach (var entity in buildings)
+                {
+                    var prefab = EntityManager.GetComponentData<Game.Prefabs.PrefabRef>(entity).m_Prefab;
+                    if (!EntityManager.HasComponent<Game.Prefabs.BuildingData>(prefab)) continue;
+                    float2 size = (float2)EntityManager.GetComponentData<Game.Prefabs.BuildingData>(prefab).m_LotSize * 8f;
+                    if (!math.all(size > 0f)) continue;
+                    var transform = EntityManager.GetComponentData<Game.Objects.Transform>(entity);
+                    // The same corners the snapshot takes, so a building that stood then matches itself.
+                    var corners = Game.Objects.ObjectUtils.CalculateBaseCorners(transform.m_Position, transform.m_Rotation, size);
+                    var lot = new[] { corners.a.xz, corners.b.xz, corners.c.xz, corners.d.xz };
+                    float2 lower = math.min(math.min(lot[0], lot[1]), math.min(lot[2], lot[3])), upper = math.max(math.max(lot[0], lot[1]), math.max(lot[2], lot[3]));
+                    if (math.any(upper < low) || math.any(lower > high)) continue;
+                    buildingsNow.Add(lot);
+                }
+
+            string found = SiteGeometry.LevellingMeetsNewWork(ground.ChangeAt, pads, takenNow, takenThen, buildingsNow, buildingsThen);
+            if (found != null) Log("levelling: " + found);
+            return found != null;
+        }
+
+        private void AfterExistingGround(TerrainBuildReport report)
+        {
+            try
+            {
+                if (State.Stage != ToolStage.Building) return;
+                Log("ground: " + report.Summary);
+                buildReport.Add(report.Reached
+                    ? Invariant($"lots levelled in {report.Passes} passes")
+                    : Invariant($"lots levelled within {report.WorstError:0.0} m of the plan ({100f - report.FractionOff * 100f:0}% exact)"));
+                ZoneExistingLots();
+            }
+            catch (Exception exception) { BuildFailed(exception, "Zoning failed to start. The ground changes remain."); }
+        }
+
+        /// <summary>
+        /// Use existing, once the lots are levelled (when asked): the street planting the player picked, as the game's own grass
+        /// or tree upgrade on the streets in the area, then the zoning. Read now, as Crosswalks is for new streets: it doesn't
+        /// change the plan.
+        /// </summary>
+        private void ZoneExistingLots()
+        {
+            try
+            {
+                var planting = Mod.Settings?.StreetTrees ?? Settings.StreetPlanting.None;
+                if (planting == Settings.StreetPlanting.None) { ZoneOrPlace(); return; }
+                State.Summary = "Planting the streets...";
+                Touch();
+                World.GetOrCreateSystemManaged<NetBuildSystem>().BeginPlanting(corners.ToArray(), planting, AfterStreetPlanting);
+            }
+            catch (Exception exception) { BuildFailed(exception, "Planting the streets failed. Nothing was zoned."); }
+        }
+
+        private void AfterStreetPlanting(NetBuildReport report)
+        {
+            try
+            {
+                if (State.Stage != ToolStage.Building) return;
+                Log("street planting: " + report.Summary);
+                if (StoppedByAnotherTool("planting the streets")) return;
+                buildReport.Add(Invariant($"{report.Built} streets planted"));
+                if (report.Skipped > 0)
+                    Message(Invariant($"{report.Skipped} streets kept their bike lanes or wide sidewalks, so they got no grass."));
+                ZoneOrPlace();
+            }
+            catch (Exception exception) { BuildFailed(exception, "Planting the streets failed. Nothing was zoned."); }
+        }
+
+        private void ZoneOrPlace()
+        {
+            // Nothing to zone (an empty mix): the services, parks and greenery still go in.
+            if (buildPlan.ZonedCells == 0)
+            {
+                buildReport.Add("nothing to zone");
+                PlaceServices();
+                return;
+            }
+            State.Progress = 0.4f;
             State.Summary = "Zoning...";
             Touch();
-            Log(Invariant($"zoning existing streets: {buildPlan.Lots.Count} lots, {buildPlan.ZonedCells} cells"));
             StartZoning();
         }
 
         private bool BuildSystemsBusy() =>
             World.GetOrCreateSystemManaged<TerrainBuildSystem>().Busy || World.GetOrCreateSystemManaged<NetBuildSystem>().Busy
             || World.GetOrCreateSystemManaged<ZoneBuildSystem>().Busy || World.GetOrCreateSystemManaged<ObjectBuildSystem>().Busy
-            || World.GetOrCreateSystemManaged<WallBuildSystem>().Busy;
+            || World.GetOrCreateSystemManaged<WallBuildSystem>().Busy || World.GetOrCreateSystemManaged<RemoveBuildSystem>().Busy;
 
         private void AfterGround(TerrainBuildReport report)
         {
@@ -116,7 +259,7 @@ namespace SteppedStreets.Tool
                 State.Progress = 0.35f;
                 State.Summary = "Building the roads...";
                 Touch();
-                World.GetOrCreateSystemManaged<NetBuildSystem>().Begin(buildPlan, buildRoadName, AfterRoads);
+                World.GetOrCreateSystemManaged<NetBuildSystem>().Begin(buildPlan, buildRoadName, buildMainRoadName, AfterRoads);
             }
             catch (Exception exception) { BuildFailed(exception, "Building the roads failed. The ground changes remain."); }
         }
@@ -129,6 +272,7 @@ namespace SteppedStreets.Tool
                 Log("roads: " + report.Summary);
                 if (StoppedByAnotherTool("laying the roads")) return;
                 buildReport.Add(Invariant($"{report.Built} of {report.Pieces} road pieces"));
+                if (report.PathPieces > 0) buildReport.Add(Invariant($"{report.PathsBuilt} of {report.PathPieces} footpath pieces"));
                 if (report.Built == 0)
                 {
                     Stop("The game did not build the roads, so nothing was zoned. The ground changes remain.");
@@ -160,6 +304,7 @@ namespace SteppedStreets.Tool
             zoneQueue = null;
             idleBuildFrames = 0;
             buildReport.Clear();
+            ForgetLastBuild();
         }
 
         /// <summary>
@@ -196,6 +341,7 @@ namespace SteppedStreets.Tool
             try
             {
                 var byZone = ZoneCells();
+                RememberZoning(byZone);
                 zoneQueue = new Queue<(string, List<float2[]>)>(byZone.Select(pair => (pair.Key, pair.Value)));
                 zonedRuns = requestedRuns = 0;
                 Log(Invariant($"zoning: {levelCells} cells in {byZone.Count} zones"));
@@ -356,7 +502,10 @@ namespace SteppedStreets.Tool
             try
             {
                 if (State.Stage != ToolStage.Building) return;
-                var catalogue = ServiceCatalog.List(EntityManager, World.GetOrCreateSystemManaged<Game.Prefabs.PrefabSystem>(), Panel.PanelSystem.Localised);
+                var prefabs = World.GetOrCreateSystemManaged<Game.Prefabs.PrefabSystem>();
+                var catalogue = ServiceCatalog.List(EntityManager, prefabs, Panel.PanelSystem.Localised);
+                // Pocket parks come from the game's park buildings, which the services list may not hold.
+                catalogue.AddRange(ServiceCatalog.Parks(EntityManager, prefabs, Panel.PanelSystem.Localised));
                 var placements = new List<ObjectBuildSystem.Placement>();
                 foreach (var building in buildPlan.Buildings)
                 {
@@ -410,7 +559,7 @@ namespace SteppedStreets.Tool
             {
                 if (State.Stage != ToolStage.Building) return;
                 if (report != null && StoppedByAnotherTool("planting trees")) return;
-                if (report != null) { Log("trees: " + report.Summary); buildReport.Add(Invariant($"{report.Placed} trees")); }
+                if (report != null) { Log("trees: " + report.Summary); buildReport.Add(Invariant($"{report.Placed} trees, bushes and rocks")); }
                 if (buildPlan.Walls.Count == 0) { FinishBuild(null); return; }
                 State.Progress = 0.93f;
                 State.Summary = "Building walls...";
@@ -427,7 +576,8 @@ namespace SteppedStreets.Tool
             if (report != null) { Log("walls: " + report.Summary); buildReport.Add(Invariant($"{report.Placed} wall pieces")); }
             State.Stage = ToolStage.Built;
             State.Progress = 1f;
-            State.Summary = (buildRequest.ExistingStreets ? Invariant($"Zoned {buildPlan.Lots.Count} lots along existing streets: ")
+            FinishTracking();
+            State.Summary = (buildRequest.ExistingStreets ? (buildPlan.ZonedCells > 0 ? Invariant($"Zoned {buildPlan.Lots.Count} lots along existing streets: ") : "Along existing streets: ")
                 : Invariant($"Built {buildPlan.RoadLength / 1000f:0.0} km of road and {buildPlan.Lots.Count} lots: ")) + string.Join(", ", buildReport) + ".";
             Log(State.Summary);
             // The built area is history now: its plan cannot be built twice, and the preview stops drawing it over the real thing.

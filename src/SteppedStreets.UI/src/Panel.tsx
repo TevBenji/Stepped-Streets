@@ -6,9 +6,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./lib/bindings";
 import { ErrorBoundary } from "./lib/errorBoundary";
-import { LAYOUT_TIPS, SettingTip } from "./lib/tips";
+import { LAYOUT_TIPS, SettingTip, STAT_TIPS } from "./lib/tips";
 import {
-    formatArea, isExperimental, JunctionPattern, MixPattern, Option, panelFraction, PanelPlace, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
+    formatArea, isExperimental, JunctionPattern, MixPattern, Option, panelFraction, PanelPlace, ServiceCount, ServiceOption, Settings, StreetPlanting, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
+    LONGEST_PRESET_NAME, MOST_PRESETS, nextPresetName,
 } from "./lib/state";
 import { vanilla } from "./lib/vanilla";
 import { LAYOUT_ICONS } from "./lib/layoutIcons";
@@ -159,10 +160,13 @@ function Scroll({ className, innerClassName, nested = false, children }: React.P
         : <div ref={scroller} className={classes(styles.scroll, styles.plainScroll, className)}>{inner}</div>;
 }
 
-/** A button that opens an inline list. Without a label it spans the row, and children sit beside it. */
-function Picker({ label, options, value, disabled, onPick, initiallyOpen = false, bigIcons = false, children }: React.PropsWithChildren<{
+/**
+ * A button that opens an inline list. Without a label it spans the row, and children sit beside it. A placeholder shows while
+ * nothing listed is chosen; onRemove gives each listed option a delete button.
+ */
+function Picker({ label, options, value, disabled, onPick, initiallyOpen = false, bigIcons = false, placeholder, onRemove, tipTitle, tip, children }: React.PropsWithChildren<{
     label?: string; options: Option[]; value: string; disabled: boolean; onPick: (name: string) => void; initiallyOpen?: boolean;
-    bigIcons?: boolean;
+    bigIcons?: boolean; placeholder?: string; onRemove?: (name: string) => void; tipTitle?: string; tip?: string;
 }>) {
     // A row just added opens its list at once, so adding is one click to choose rather than two.
     const [open, setOpen] = useState(initiallyOpen);
@@ -178,16 +182,16 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
     // Collapsing or closing the panel removes the search box: it lets go of the keyboard first (the ref is gone by a plain effect).
     useLayoutEffect(() => () => search.current?.blur(), []);
     // A saved choice the game no longer lists still shows, so the button never reads blank.
-    const shown = options.some(option => option.name === value) ? options : [{ name: value, label: value }, ...options];
+    const shown = options.some(option => option.name === value) || placeholder !== undefined ? options : [{ name: value, label: value }, ...options];
     const chosen = shown.find(option => option.name === value);
-    const current = chosen?.label ?? value;
+    const current = chosen?.label ?? placeholder ?? value;
     // A long list (zones from other mods, every service building) gets a search box at its top.
     const searchable = vanilla.TextInput !== undefined && shown.length > SEARCH_FROM;
     const needle = query.trim().toLowerCase();
     const listed = needle ? shown.filter(option => option.label.toLowerCase().includes(needle)) : shown;
     // An inline list instead of a popup: the panel scrolls, and a popup would be clipped by it.
     return <>
-        <SettingTip label={label}><div className={styles.row}>
+        <SettingTip label={label ?? tipTitle} text={tip}><div className={styles.row}>
             {label ? <div className={styles.label}>{label}</div> : null}
             <Button className={styles.picker} disabled={disabled} selected={open} onSelect={() => open ? close() : setOpen(true)}>
                 {chosen?.icon ? <img className={bigIcons ? styles.layoutIconSmall : styles.optionIcon} src={chosen.icon} /> : null}
@@ -201,16 +205,24 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
             {searchable && vanilla.TextInput ? <div className={styles.searchRow}><vanilla.TextInput ref={search} className={styles.search}
                 value={query} placeholder="Search" onChange={event => setQuery(event.target.value)} /></div> : null}
             <Scroll className={styles.listScroll} innerClassName={styles.listInner} nested>
-                {listed.map((option, index) => <React.Fragment key={option.name}>
-                    {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}
-                    <Button className={classes(styles.listItem, bigIcons && styles.listItemTall)} selected={option.name === value}
-                        onSelect={() => { close(); if (option.name !== value) onPick(option.name); }}>
+                {listed.map((option, index) => {
+                    const item = <Button className={classes(styles.listItem, onRemove && styles.listRowItem, bigIcons && styles.listItemTall)}
+                        selected={option.name === value} onSelect={() => { close(); if (option.name !== value) onPick(option.name); }}>
                         {option.icon ? bigIcons
                             ? <div className={styles.layoutTile}><img className={styles.layoutIcon} src={option.icon} /></div>
                             : <img className={styles.optionIcon} src={option.icon} /> : null}
                         <div>{option.label}</div>
-                    </Button>
-                </React.Fragment>)}
+                    </Button>;
+                    return <React.Fragment key={option.name}>
+                        {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}
+                        {onRemove ? <div className={styles.listRow}>
+                            {item}
+                            <Button className={styles.remove} label={`Delete ${option.label}`} onSelect={() => onRemove(option.name)}>
+                                <img className={styles.closeIcon} src={closeIcon} />
+                            </Button>
+                        </div> : item}
+                    </React.Fragment>;
+                })}
                 {listed.length === 0 ? <div className={styles.noMatch}>Nothing matches "{query.trim()}"</div> : null}
             </Scroll>
         </div> : null}
@@ -236,7 +248,8 @@ function Mix({ mix, zones, services, serviceOptions, disabled }: {
             const options = serviceOptions.filter(option => option.name === entry.name || !services.some(other => other.name === option.name))
                 .map(option => ({ name: option.name, label: option.group ? `${option.label} (${option.group})` : option.label, icon: option.icon }));
             return <div key={entry.name} className={styles.mixEntry}>
-                <Picker options={options} value={entry.name} disabled={disabled} initiallyOpen={entry.name === justAdded}
+                <Picker options={options} value={entry.name} disabled={disabled} initiallyOpen={entry.name === justAdded} tipTitle={label}
+                    tip="A service building on its own lot beside the streets, facing the road. How many sets the count."
                     onPick={name => { setJustAdded(null); replace({ name }); }}>
                     <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled}
                         onSelect={() => sendServices(services.filter((_, at) => at !== index))}>
@@ -283,7 +296,8 @@ function ZoneMix({ mix, zones, disabled, justAdded }: { mix: ZoneShare[]; zones:
             const label = labelOf(entry.zone) + (missing ? " (not installed)" : "");
             const lastKnown = !mix.some((other, at) => at !== index && known(other.zone));
             return <div key={entry.zone} className={styles.mixEntry}>
-                <Picker options={zones.filter(zone => zone.name === entry.zone || !mix.some(other => other.zone === zone.name))}
+                <Picker tipTitle={label} tip="Its share sets how many lots get this zone; Mix mode sets where they go."
+                    options={zones.filter(zone => zone.name === entry.zone || !mix.some(other => other.zone === zone.name))}
                     value={entry.zone} disabled={disabled} initiallyOpen={entry.zone === justAdded} onPick={zone => replace({ zone })}>
                     {/* Removing the last zone leaves no zoning; removing the last installed one beside missing ones is refused. */}
                     <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled || (mix.length > 1 && lastKnown)}
@@ -300,6 +314,46 @@ function ZoneMix({ mix, zones, disabled, justAdded }: { mix: ZoneShare[]; zones:
             </div>;
         })}
     </>;
+}
+
+/** Zones for corner lots and lots on a main street; "From the mix" leaves them to the zone mix. */
+function ZoningSection({ settings, zones, disabled }: { settings: Settings; zones: Option[]; disabled: boolean }) {
+    const options = [{ name: "", label: "From the mix" }, ...zones];
+    return <Section title="Zoning">
+        <Picker label="Corner lots" options={options} value={settings.cornerZone} disabled={disabled} onPick={zone => act("setCornerZone", zone)} />
+        <Picker label="Main street lots" options={options} value={settings.mainStreetZone} disabled={disabled}
+            onPick={zone => act("setMainStreetZone", zone)} />
+    </Section>;
+}
+
+/**
+ * Saved sets of settings: pick one to load it, or name the current settings and save them; the cross by a listed preset
+ * deletes it. Without the game's text box (nothing to type in), Save takes the next free "Preset N".
+ */
+function PresetsSection({ presets, disabled }: { presets: string[]; disabled: boolean }) {
+    const [name, setName] = useState("");
+    const box = useRef<HTMLInputElement>(null);
+    // Collapsing or closing the panel removes the box: it lets go of the keyboard first, as the picker's search box does.
+    useLayoutEffect(() => () => box.current?.blur(), []);
+    const chosen = name.trim() || nextPresetName(presets);
+    const replaces = presets.some(preset => preset.toLowerCase() === chosen.toLowerCase());
+    const full = presets.length >= MOST_PRESETS && !replaces;
+    const TextInput = vanilla.TextInput;
+    return <Section title="Presets">
+        {presets.length > 0 ? <Picker label="Preset" options={presets.map(preset => ({ name: preset, label: preset }))} value=""
+            placeholder="Load a preset" disabled={disabled} onPick={preset => act("loadPreset", preset)}
+            onRemove={preset => act("deletePreset", preset)} /> : null}
+        <Row label="Save as">
+            {TextInput ? <TextInput ref={box} className={styles.presetName} value={name} placeholder={nextPresetName(presets)}
+                onChange={event => setName(event.target.value.slice(0, LONGEST_PRESET_NAME))} /> : null}
+            <Button className={classes(styles.statusButton, styles.presetSave)} disabled={disabled || full} onSelect={() => {
+                box.current?.blur();
+                act("savePreset", chosen);
+                setName("");
+            }}>{replaces ? "Replace" : "Save"}</Button>
+        </Row>
+        {full ? <div className={styles.layoutTip}>{`${MOST_PRESETS} presets at most. Delete one to save another.`}</div> : null}
+    </Section>;
 }
 
 // The game's font has no superscript digits: the 2 of km2 and the 3 of m3 are drawn smaller and raised instead.
@@ -334,10 +388,10 @@ function Steps({ state }: { state: ToolState }) {
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-    return <div className={styles.stat}>
+    return <SettingTip label={label} text={STAT_TIPS[label]}><div className={styles.stat}>
         <div className={styles.statLabel}>{label}</div>
         <Measure className={styles.statValue} text={value} />
-    </div>;
+    </div></SettingTip>;
 }
 
 const LAYOUTS: Option[] = [
@@ -385,6 +439,7 @@ const LAYOUTS: Option[] = [
 const JUNCTIONS: [JunctionPattern, string][] = [["Crossroads", "Crossroads"], ["Staggered", "Staggered"], ["TrafficOptimised", "Traffic"]];
 const MIX_PATTERNS: [MixPattern, string][] = [["Random", "Random"], ["Clumps", "Clumps"], ["Even", "Even"]];
 const SPACINGS: [string, string][] = [["-1", "Auto"], ["0", "0"], ["1", "1"], ["2", "2"]];
+const STREET_PLANTINGS: [StreetPlanting, string][] = [["None", "None"], ["Grass", "Grass"], ["Trees", "Trees"]];
 
 const cells = (value: number) => `${Math.round(value)} ${Math.round(value) === 1 ? "cell" : "cells"}`;
 const percent = (value: number) => `${Math.round(value)}%`;
@@ -458,16 +513,18 @@ function NeighbourhoodPanel() {
     // The tool clears it on Esc, on a new plan and when it builds.
     const confirming = state.stage === "Planned" && state.confirming;
     const building = state.stage === "Building";
-    const disabled = building || confirming;
+    // The tool's too: it clears it on Esc, when the removal starts and when there is nothing left to remove.
+    const confirmingRemove = state.confirmingRemove && state.canRemoveLast && !building;
+    const disabled = building || confirming || confirmingRemove;
     const hasPlan = (state.stage === "Planned" || state.stage === "Built" || state.stage === "Failed" || building)
         && (stats.lots > 0 || stats.roadKilometres > 0);
     // The tool also lists its summary among the messages; showing it twice reads as noise.
     const messages = state.messages.filter(message => message !== state.summary);
     const zoneLabel = (name: string) => state.zones.find(zone => zone.name === name)?.label ?? name;
     const serviceLabel = (name: string) => state.services.find(service => service.name === name)?.label ?? name;
-    // Existing streets: no roads, ground or trees, so only the zoning settings show.
+    // Existing streets: no roads, so only the zoning, lot and greenery settings show.
     const existing = settings.existingStreets;
-    const buildLabel = existing ? (building ? "Zoning..." : state.stage === "Built" ? "Zoned" : "Zone")
+    const buildLabel = state.removing ? "Removing..." : existing ? (building ? "Zoning..." : state.stage === "Built" ? "Zoned" : "Zone")
         : building ? "Building..." : state.stage === "Built" ? "Built" : "Build";
 
     return <div className={classes(styles.dock, place && styles.dockMoved)}>
@@ -514,6 +571,11 @@ function NeighbourhoodPanel() {
                                 <div>{state.areaClosed ? "Drag corners to reshape. Right-click to remove." : "Click the ground to add corners. Click the first one to finish."}</div>
                                 <div>Ctrl+Z to undo · Esc to go back</div>
                             </div> : null}
+                            {state.canRemoveLast && !building ? <SettingTip label="Remove"><div className={styles.statusButtons}>
+                                <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("setConfirmingRemove", true)}>
+                                    <img className={styles.buttonIcon} src={trashIcon} /><div>Remove last build</div>
+                                </Button>
+                            </div></SettingTip> : null}
                             {state.corners > 0 ? <div className={styles.statusButtons}>
                                 {state.stage === "Drawing" && state.corners >= 3 && !state.areaClosed
                                     ? <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("closeArea")}>Close area</Button> : null}
@@ -529,7 +591,7 @@ function NeighbourhoodPanel() {
                                     onChange={mode => act("setExistingStreets", mode === "existing")} />
                             </Row>
                             {existing ? <div className={styles.layoutTip}>Zones the empty cells along streets already in the area. No new
-                                roads and no ground changes; cells already zoned stay as they are.</div> : null}
+                                roads; cells already zoned stay as they are.</div> : null}
                         </Section>
 
                         {existing ? null : <Section title="Layout">
@@ -544,9 +606,8 @@ function NeighbourhoodPanel() {
                         </Section>}
 
                         <Section title="What to build">
-                            {/* Service buildings need new streets; the mix keeps them for Build new. */}
-                            <Mix mix={settings.zoneMix} zones={state.zones} services={existing ? [] : settings.serviceMix}
-                                serviceOptions={existing ? [] : state.services} disabled={disabled} />
+                            <Mix mix={settings.zoneMix} zones={state.zones} services={settings.serviceMix}
+                                serviceOptions={state.services} disabled={disabled} />
                             {settings.zoneMix.length > 1 ? <Row label="Mix mode">
                                 <Segmented options={MIX_PATTERNS} value={settings.mixPattern} disabled={disabled}
                                     onChange={pattern => act("setMixPattern", pattern)} />
@@ -564,17 +625,52 @@ function NeighbourhoodPanel() {
                             <img className={classes(styles.chevron, moreOpen && styles.chevronOpen)} src={chevronIcon} />
                         </Button>
 
-                        {moreOpen && existing ? <Section title="Lots">
-                            <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
-                                format={cells} trigger="setLotWidth" disabled={disabled} />
-                            <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
-                                format={cells} trigger="setLotDepth" disabled={disabled} />
+                        {moreOpen ? <PresetsSection presets={state.presets} disabled={disabled} /> : null}
+
+                        {existing ? <Section title="Greenery">
+                            <ToggleRow label="Greenery" value={settings.trees} trigger="setTrees" disabled={disabled} />
                         </Section> : null}
+
+                        {moreOpen && existing ? <>
+                            <Section title="Streets">
+                                <Row label="Street trees">
+                                    <Segmented options={STREET_PLANTINGS} value={settings.streetTrees} disabled={disabled}
+                                        onChange={planting => act("setStreetTrees", planting)} />
+                                </Row>
+                            </Section>
+
+                            <Section title="Lots">
+                                <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
+                                    format={cells} trigger="setLotWidth" disabled={disabled} />
+                                <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
+                                    format={cells} trigger="setLotDepth" disabled={disabled} />
+                                <Row label="Space between lots">
+                                    <Segmented options={SPACINGS} value={String(settings.lotSpacing)} disabled={disabled}
+                                        onChange={spacing => act("setLotSpacing", Number(spacing))} />
+                                </Row>
+                                <ToggleRow label="Level lots" value={settings.levelExistingLots} trigger="setLevelExistingLots" disabled={disabled} />
+                            </Section>
+
+                            <ZoningSection settings={settings} zones={state.zones} disabled={disabled} />
+
+                            <Section title="Landscape">
+                                <ToggleRow label="Pocket parks" value={settings.pocketParks} trigger="setPocketParks" disabled={disabled} />
+                                {settings.trees ? <NumberRow label="Tree density" value={settings.treeDensityPercent} minimum={10} maximum={100}
+                                    step={5} format={percent} trigger="setTreeDensity" disabled={disabled} /> : null}
+                            </Section>
+                        </> : null}
 
                         {moreOpen && !existing ? <>
                             <Section title="Roads">
                                 <Picker label="Road" options={state.roads} value={settings.road} disabled={disabled} onPick={road => act("setRoad", road)} />
+                                <Picker label="Main road" options={[{ name: "", label: "Same as streets" }, ...state.roads]} value={settings.mainRoad}
+                                    disabled={disabled} onPick={road => act("setMainRoad", road)} />
+                                <Row label="Street trees">
+                                    <Segmented options={STREET_PLANTINGS} value={settings.streetTrees} disabled={disabled}
+                                        onChange={planting => act("setStreetTrees", planting)} />
+                                </Row>
                                 <ToggleRow label="Crosswalks" value={settings.crosswalks} trigger="setCrosswalks" disabled={disabled} />
+                                <ToggleRow label="Footpaths" value={settings.footpaths} trigger="setFootpaths" disabled={disabled} />
                                 <NumberRow label="Block depth" value={settings.blockDepth} minimum={60} maximum={200} step={5}
                                     format={metres} trigger="setBlockDepth" disabled={disabled} />
                                 <NumberRow label="Max road grade" value={settings.maxRoadGradePercent} minimum={4} maximum={12} step={1}
@@ -594,6 +690,8 @@ function NeighbourhoodPanel() {
                                 </Row>
                             </Section>
 
+                            <ZoningSection settings={settings} zones={state.zones} disabled={disabled} />
+
                             <Section title="Grading">
                                 <ToggleRow label="Level the lots" value={settings.levelLots} trigger="setLevelLots" disabled={disabled} />
                                 <NumberRow label="Most earth" value={settings.earthworkLimit} minimum={1} maximum={settings.steepGround ? 12 : 8} step={0.5}
@@ -604,6 +702,7 @@ function NeighbourhoodPanel() {
 
                             <Section title="Landscape">
                                 <ToggleRow label="Retaining walls" value={settings.retainingWalls} trigger="setRetainingWalls" disabled={disabled} />
+                                <ToggleRow label="Pocket parks" value={settings.pocketParks} trigger="setPocketParks" disabled={disabled} />
                                 {settings.trees ? <NumberRow label="Tree density" value={settings.treeDensityPercent} minimum={10} maximum={100}
                                     step={5} format={percent} trigger="setTreeDensity" disabled={disabled} /> : null}
                                 <Row label="Seed"><div className={styles.seedValue}>{settings.seed}</div></Row>
@@ -614,6 +713,8 @@ function NeighbourhoodPanel() {
                             {hasPlan && existing ? <div className={styles.card}>
                                 <Stat label="Lots" value={thousands(stats.lots)} />
                                 <Stat label="Cells to zone" value={thousands(stats.zonedCells)} />
+                                {settings.levelExistingLots ? <Stat label="Earth moved" value={`${thousands(stats.earthCubicMetres)} m3`} /> : null}
+                                {settings.trees ? <Stat label="Greenery" value={thousands(stats.trees)} /> : null}
                             </div> : null}
                             {hasPlan && !existing ? <div className={styles.card}>
                                 <Stat label="Roads" value={`${stats.roadKilometres.toFixed(1)} km`} />
@@ -623,7 +724,7 @@ function NeighbourhoodPanel() {
                                 <Stat label="Steepest road" value={`${stats.steepestRoadPercent.toFixed(1)}%`} />
                                 <Stat label="Forest" value={percent(stats.wildPercent)} />
                                 <Stat label="Connected" value={stats.connected ? "Yes" : "No - built on its own"} />
-                                <Stat label="Trees" value={thousands(stats.trees)} />
+                                <Stat label="Greenery" value={thousands(stats.trees)} />
                             </div> : null}
                             {hasPlan ? state.zoneCounts.map(count => <div key={count.zone} className={styles.zoneCount}>
                                 <div className={styles.zoneDot} style={{ backgroundColor: zoneColour(count.zone) }} />
@@ -673,12 +774,27 @@ function NeighbourhoodPanel() {
                         <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="stepped-streets-confirm">
                             <div className={styles.dialogTitle}>{existing ? "Zone these streets?" : "Build this neighbourhood?"}</div>
                             <div id="stepped-streets-confirm" className={styles.dialogText}>
-                                {existing ? "Only empty cells are zoned. You can repaint any of them with the game's zoning tools."
+                                {existing ? settings.levelExistingLots ? "The lots are levelled before zoning, and ground changes are permanent. Zone?"
+                                    : "Only empty cells are zoned. You can repaint any of them with the game's zoning tools."
                                     : "Ground changes are permanent, like the game's terrain tools. Build?"}</div>
                             <div className={styles.dialogButtons}>
                                 <Button className={styles.secondary} onSelect={() => act("setConfirming", false)}>Cancel</Button>
                                 <Button className={styles.primary} onSelect={() => act("build")}>
                                     <div>{existing ? "Zone" : "Build"}</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
+                            </div>
+                        </div>
+                    </div> : null}
+
+                    {confirmingRemove ? <div className={styles.backdrop}>
+                        <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="stepped-streets-remove">
+                            <div className={styles.dialogTitle}>Remove the last build?</div>
+                            <div id="stepped-streets-remove" className={styles.dialogText}>
+                                Remove the roads, zoning, greenery and buildings this build placed? The ground changes stay.</div>
+                            {state.removeLastSummary ? <div className={styles.dialogDetail}>{`That is ${state.removeLastSummary}.`}</div> : null}
+                            <div className={styles.dialogButtons}>
+                                <Button className={styles.secondary} onSelect={() => act("setConfirmingRemove", false)}>Cancel</Button>
+                                <Button className={styles.primary} onSelect={() => act("removeLast")}>
+                                    <div>Remove</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
                             </div>
                         </div>
                     </div> : null}

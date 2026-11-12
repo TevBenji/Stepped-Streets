@@ -15,7 +15,8 @@ const DEFAULT_SETTINGS = {
     style: "ContourSuburb", road: "Small Road", blockDepth: 90, maxRoadGradePercent: 8, steepestBuildablePercent: 15,
     steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 4,
     shapeGround: true, existingStreets: false, junctions: "Staggered",
-    levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, crosswalks: true, trees: false,
+    levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, crosswalks: true, mainRoad: "", streetTrees: "None", footpaths: false, pocketParks: false,
+    levelExistingLots: false, cornerZone: "", mainStreetZone: "", trees: false,
     treeDensityPercent: 50, seed: 1, panelCollapsed: false, panelLeft: -1, panelTop: -1,
 };
 const EMPTY_STATS = {
@@ -30,6 +31,7 @@ test("missing, broken or non-object state keeps the tool closed with the default
         assert.equal(state.corners, 0);
         assert.equal(state.areaClosed, false);
         assert.equal(state.confirming, false);
+        assert.equal(state.confirmingRemove, false);
         assert.equal(state.areaSquareMetres, 0);
         assert.equal(state.summary, "");
         assert.equal(state.progress, 0);
@@ -144,7 +146,8 @@ test("enums are validated, wrong types and non-finite numbers fall back to defau
         stage: "Picking", corners: "5", areaClosed: "true", areaSquareMetres: NaN, progress: Infinity, summary: 5,
         messages: [null, "Kept", {}], stats: { lots: "86", connected: 1, wildPercent: NaN },
         settings: { style: "Grid", road: 7, mixPattern: "random", blockDepth: "120", levelLots: "false", trees: 0,
-            retainingWalls: 1, crosswalks: "false", seed: Infinity, earthworkLimit: -Infinity },
+            retainingWalls: 1, crosswalks: "false", seed: Infinity, earthworkLimit: -Infinity, mainRoad: 5, streetTrees: "Bushes",
+            footpaths: "yes", pocketParks: 1, levelExistingLots: null, cornerZone: [], mainStreetZone: {} },
     });
     assert.equal(state.stage, "Closed");
     assert.equal(state.corners, 0);
@@ -159,12 +162,18 @@ test("enums are validated, wrong types and non-finite numbers fall back to defau
     assert.deepEqual(state.settings, DEFAULT_SETTINGS);
     assert.equal(readState({ settings: { mixPattern: "Random", style: "TerracedBlocks", trees: false } }).settings.mixPattern, "Random");
     assert.equal(readState({ settings: { crosswalks: false } }).settings.crosswalks, false);
+    const chosen = readState({ settings: { mainRoad: "Medium Road", streetTrees: "Trees", footpaths: true, pocketParks: true,
+        levelExistingLots: true, cornerZone: "Commercial Low", mainStreetZone: "Residential Medium" } }).settings;
+    assert.deepEqual([chosen.mainRoad, chosen.streetTrees, chosen.footpaths, chosen.pocketParks, chosen.levelExistingLots, chosen.cornerZone,
+        chosen.mainStreetZone], ["Medium Road", "Trees", true, true, true, "Commercial Low", "Residential Medium"]);
     assert.equal(readState({ settings: { steepGround: true } }).settings.steepGround, true);
     assert.equal(readState({ settings: { style: "TerracedBlocks" } }).settings.style, "TerracedBlocks");
     assert.equal(readState({ settings: { trees: false } }).settings.trees, false);
     assert.equal(readState({ stats: { connected: true } }).stats.connected, true);
     assert.equal(readState({ confirming: true }).confirming, true);
     assert.equal(readState({ confirming: "true" }).confirming, false);
+    assert.equal(readState({ confirmingRemove: true }).confirmingRemove, true);
+    for (const value of ["true", 1, null]) assert.equal(readState({ confirmingRemove: value }).confirmingRemove, false);
 });
 
 test("zone mix keeps valid rows, drops duplicates and falls back to the default", async () => {
@@ -330,4 +339,33 @@ test("thousands separators for counts", async () => {
     assert.equal(thousands(1240), "1,240");
     assert.equal(thousands(38000.4), "38,000");
     assert.equal(thousands(1234567), "1,234,567");
+});
+
+test("presets, Remove and the removal read safely", async () => {
+    const { readState, statusLine, nextPresetName } = await stateModule();
+    const empty = readState(null);
+    assert.deepEqual(empty.presets, []);
+    assert.equal(empty.canRemoveLast, false);
+    assert.equal(empty.removeLastSummary, "");
+    assert.equal(empty.removing, false);
+
+    // Names are trimmed text of 1-40 characters; a name repeated in another case is the same preset.
+    const forty = "x".repeat(40);
+    const state = readState({
+        stage: "Building", presets: ["  Hill town ", "hill TOWN", "", "   ", 7, null, forty + "x", forty, "Grid"],
+        canRemoveLast: true, removeLastSummary: "34 road pieces and the zoning of 210 cells", removing: true,
+    });
+    assert.deepEqual(state.presets, ["Hill town", forty, "Grid"]);
+    assert.equal(state.canRemoveLast, true);
+    assert.equal(state.removeLastSummary, "34 road pieces and the zoning of 210 cells");
+    assert.equal(statusLine(state), "Removing...");
+    assert.equal(statusLine(readState({ stage: "Building", removing: "yes" })), "Building...");
+    for (const value of ["true", 1, {}, null]) assert.equal(readState({ canRemoveLast: value }).canRemoveLast, false);
+    assert.equal(readState({ removeLastSummary: 5 }).removeLastSummary, "");
+    assert.deepEqual(readState({ presets: "Hill town" }).presets, []);
+    assert.equal(readState({ presets: Array.from({ length: 30 }, (_, index) => `P${index}`) }).presets.length, 20);
+
+    assert.equal(nextPresetName([]), "Preset 1");
+    assert.equal(nextPresetName(["Preset 2", "A"]), "Preset 3");
+    assert.equal(nextPresetName(["preset 2", "Preset 3"]), "Preset 4");
 });

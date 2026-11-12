@@ -20,16 +20,17 @@ export function useToolState() {
     return useMemo(() => readState(raw), [raw]);
 }
 
-export type Action = "toggleTool" | "close" | "clearArea" | "closeArea" | "undo" | "build" | "reroll";
-export type TextTrigger = "setStyle" | "setJunctions" | "setRoad" | "setMixPattern" | "setZoneMix" | "setServiceMix" | "openLink";
+export type Action = "toggleTool" | "close" | "clearArea" | "closeArea" | "undo" | "build" | "reroll" | "removeLast";
+export type TextTrigger = "setStyle" | "setJunctions" | "setRoad" | "setMixPattern" | "setZoneMix" | "setServiceMix" | "openLink"
+    | "setMainRoad" | "setStreetTrees" | "setCornerZone" | "setMainStreetZone" | "savePreset" | "loadPreset" | "deletePreset";
 export type NumberTrigger = "setBlockDepth" | "setMaxRoadGrade" | "setSteepestBuildable" | "setLotWidth" | "setLotDepth"
     | "setEarthworkLimit" | "setBankGrade" | "setLotSpacing" | "setTreeDensity" | "setSeed";
 export type ToggleTrigger = "setLevelLots" | "setRetainingWalls" | "setTrees" | "setSteepGround" | "setShapeGround" | "setExistingStreets"
-    | "setCrosswalks";
+    | "setCrosswalks" | "setFootpaths" | "setPocketParks" | "setLevelExistingLots";
 export function act(name: Action): void;
 export function act(name: TextTrigger, value: string): void;
 export function act(name: NumberTrigger, value: number): void;
-export function act(name: ToggleTrigger | "setConfirming" | "setPanelCollapsed", value: boolean): void;
+export function act(name: ToggleTrigger | "setConfirming" | "setConfirmingRemove" | "setPanelCollapsed", value: boolean): void;
 export function act(name: "setPanelPosition", left: number, top: number): void;
 export function act(name: string, ...values: (string | number | boolean)[]): void {
     try { trigger(GROUP, name, ...values); }

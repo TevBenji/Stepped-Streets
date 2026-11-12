@@ -20,6 +20,7 @@ export const isExperimental = (style: NeighbourhoodStyle) => !TRIED_STYLES.inclu
 export const usesJunctions = (style: NeighbourhoodStyle) => JUNCTION_STYLES.includes(style);
 export type JunctionPattern = "Crossroads" | "Staggered" | "TrafficOptimised";
 export type MixPattern = "Random" | "Clumps" | "Even";
+export type StreetPlanting = "None" | "Grass" | "Trees";
 
 /** A catalogue entry; icon is the game's own menu icon for it, when the game has one; group heads its part of a list. */
 export interface Option { name: string; label: string; icon?: string; group?: string }
@@ -57,6 +58,17 @@ export interface Settings {
     retainingWalls: boolean;
     /** Painted crosswalks where the new streets meet. Saved without re-planning. */
     crosswalks: boolean;
+    /** The road for main streets and connectors; empty: the same road for every street. */
+    mainRoad: string;
+    /** The game's grass or tree upgrade on the streets. Saved without re-planning. */
+    streetTrees: StreetPlanting;
+    footpaths: boolean;
+    pocketParks: boolean;
+    /** Use existing: grade the lots into level pads. */
+    levelExistingLots: boolean;
+    /** Zones for corner lots and lots on a main street; empty: from the mix. */
+    cornerZone: string;
+    mainStreetZone: string;
     trees: boolean;
     treeDensityPercent: number;
     seed: number;
@@ -87,6 +99,8 @@ export interface ToolState {
     areaClosed: boolean;
     /** The "Build this neighbourhood?" dialog is open; the tool owns it so Esc on the map can close it. */
     confirming: boolean;
+    /** The "Remove the last build?" dialog is open; the tool owns it like the Build dialog. */
+    confirmingRemove: boolean;
     areaSquareMetres: number;
     summary: string;
     messages: string[];
@@ -101,10 +115,21 @@ export interface ToolState {
     serviceCounts: ServiceCount[];
     /** The mod has a Discord link, so the panel shows its Discord buttons. */
     discord: boolean;
+    /** The names of the saved presets, in their saved order. */
+    presets: string[];
+    /** The last build can still be removed (this game session, no build since). */
+    canRemoveLast: boolean;
+    /** What removing it takes away, for the dialog. */
+    removeLastSummary: string;
+    /** The Building stage is removing the last build. */
+    removing: boolean;
 }
 
 // Counters and areas have no natural ceiling; this only keeps absurd values out of the layout.
 const LARGEST = 1e12;
+/** The tool keeps 20 presets of names up to 40 characters, trimmed. */
+export const MOST_PRESETS = 20;
+export const LONGEST_PRESET_NAME = 40;
 const DEFAULT_MIX: ZoneShare[] = [{ zone: "Residential Low", share: 100 }];
 
 const object = (value: unknown): Record<string, unknown> =>
@@ -165,6 +190,7 @@ export function readState(raw: unknown): ToolState {
         corners: whole(state.corners, 0, 0, LARGEST),
         areaClosed: flag(state.areaClosed, false),
         confirming: flag(state.confirming, false),
+        confirmingRemove: flag(state.confirmingRemove, false),
         areaSquareMetres: number(state.areaSquareMetres, 0, 0, LARGEST),
         summary: text(state.summary),
         messages: Array.isArray(state.messages) ? state.messages.filter((value): value is string => typeof value === "string") : [],
@@ -204,6 +230,13 @@ export function readState(raw: unknown): ToolState {
             lotSpacing: whole(settings.lotSpacing, -1, -1, 2),
             retainingWalls: flag(settings.retainingWalls, false),
             crosswalks: flag(settings.crosswalks, true),
+            mainRoad: text(settings.mainRoad),
+            streetTrees: choice(settings.streetTrees, ["None", "Grass", "Trees"], "None"),
+            footpaths: flag(settings.footpaths, false),
+            pocketParks: flag(settings.pocketParks, false),
+            levelExistingLots: flag(settings.levelExistingLots, false),
+            cornerZone: text(settings.cornerZone),
+            mainStreetZone: text(settings.mainStreetZone),
             trees: flag(settings.trees, false),
             treeDensityPercent: number(settings.treeDensityPercent, 50, 10, 100),
             seed: whole(settings.seed, 1, 1, 99999),
@@ -216,7 +249,31 @@ export function readState(raw: unknown): ToolState {
         services: rows(state.services, readService, service => service.name),
         serviceCounts: rows(state.serviceCounts, readServiceCount, service => service.name),
         discord: flag(state.discord, false),
+        presets: presetNames(state.presets),
+        canRemoveLast: flag(state.canRemoveLast, false),
+        removeLastSummary: text(state.removeLastSummary),
+        removing: flag(state.removing, false),
     };
+}
+
+/** Names that are text, trimmed, 1-40 characters, the first of any repeated in another case, at most 20. */
+function presetNames(value: unknown): string[] {
+    const names: string[] = [];
+    if (!Array.isArray(value)) return names;
+    for (const entry of value) {
+        const name = typeof entry === "string" ? entry.trim() : "";
+        if (name.length === 0 || name.length > LONGEST_PRESET_NAME || names.some(kept => kept.toLowerCase() === name.toLowerCase())) continue;
+        if (names.length < MOST_PRESETS) names.push(name);
+    }
+    return names;
+}
+
+/** The first "Preset N" not taken yet, for a preset saved without a name typed. */
+export function nextPresetName(presets: string[]): string {
+    for (let number = presets.length + 1; ; number++) {
+        const name = `Preset ${number}`;
+        if (!presets.some(preset => preset.toLowerCase() === name.toLowerCase())) return name;
+    }
 }
 
 /** One side of a dragged panel's place as a fraction of the screen, stopped where the whole panel still fits. */
@@ -241,7 +298,7 @@ export function statusLine(state: ToolState): string {
             return state.areaClosed ? state.summary || "Area closed" : "Click the first corner, or press Close area, to finish.";
         case "Planning": return "Planning...";
         case "Planned": return existing ? "Ready to zone" : "Neighbourhood planned";
-        case "Building": return existing ? "Zoning..." : "Building...";
+        case "Building": return state.removing ? "Removing..." : existing ? "Zoning..." : "Building...";
         case "Built": return existing ? "Zoned" : "Built";
         case "Failed": return state.summary || "Failed";
         default: return "";

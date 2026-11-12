@@ -98,20 +98,20 @@ namespace SteppedStreets.Core.Neighbourhood
             void Settle()
             {
                 connected = RoadNetwork.Prune(streets, out leftOut);
-                RoadNetwork.Assemble(streets, plan, owners);
+                RoadNetwork.Assemble(streets, plan, owners, request);
                 for (int round = 0; round < 4; round++)
                 {
                     var bad = RoadNetwork.Violations(plan, owners, streets, request, radius, LinkRadius(request), notes);
                     if (bad.Count == 0) break;
                     foreach (int street in bad) streets[street].Broken = true;
                     connected = RoadNetwork.Prune(streets, out leftOut);
-                    RoadNetwork.Assemble(streets, plan, owners);
+                    RoadNetwork.Assemble(streets, plan, owners, request);
                 }
             }
             Settle();
             // A layout that met the city's road straight on can still lose every one of those joins to the rules; then it
             // gets the winding connection the hillside layouts use, rather than standing apart beside the road.
-            if (!connected && straight && (request.ExistingRoads?.Length ?? 0) > 0 && plan.Roads.Count > 0)
+            if (!connected && straight && request.AnyJoinable && plan.Roads.Count > 0)
             {
                 Connect(streets, new RoadLinks(survey, request, streets, LinkRadius(request)),
                     through.Count > 0 ? street => through.Contains(street) : (Func<int, bool>)null, cancellation);
@@ -144,8 +144,13 @@ namespace SteppedStreets.Core.Neighbourhood
                 foreach (var road in roads.Roads) roads.RoadLength += road.Length;
                 roadsReady(roads);
             }
-            var lots = LotLayout.Plan(plan, owners, survey, request, plan.Messages, cancellation);
+            // Before the lots, which keep off them.
+            plan.Paths = Footpaths.Plan(plan, survey, request, cancellation);
+            var parks = new List<PlannedBuilding>();
+            var lots = LotLayout.Plan(plan, owners, survey, request, plan.Messages, cancellation, parks);
             plan.Buildings = ServiceSites.Place(plan, lots, survey, request, plan.Messages, cancellation);
+            ServiceSites.AddParks(plan.Buildings, parks);
+            PositionZones.ForNewStreets(lots, plan, request);
             Stage("lots");
             // The buildings' pads are graded like the lots' and keep the trees off.
             var buildingPads = new List<PlannedLot>();
@@ -154,6 +159,9 @@ namespace SteppedStreets.Core.Neighbourhood
             pads.AddRange(buildingPads);
             // Shape the ground off: nothing is graded, and the game lays its roads on the ground as it is.
             plan.Ground = request.ShapeGround ? GroundField.Build(request, plan, pads, cancellation) : null;
+            // A pocket park the banks reached isn't level: like a lot lost to the banks it is left out, and its spot stays grass.
+            if (plan.Ground != null && request.LevelLots)
+                plan.Buildings.RemoveAll(building => parks.Contains(building) && !Level(building.Pad, plan.Ground));
             Stage("ground");
             int lostToBanks = 0;
             foreach (var lot in lots)
@@ -179,24 +187,85 @@ namespace SteppedStreets.Core.Neighbourhood
         }
 
         /// <summary>
-        /// Existing streets: the empty cells along the streets already in the area, zoned from the mix. No roads, no ground, no
-        /// trees, so there is no survey either; cells already zoned stay as the player painted them.
+        /// Existing streets: the empty cells along the streets already in the area, zoned from the mix, with the service
+        /// buildings and pocket parks asked for on runs of free cells. No roads; cells already zoned stay as the player painted
+        /// them. The ground is surveyed only for greenery and levelled lots, the two that need it (Auto spacing reads it then).
         /// </summary>
         private static NeighbourhoodPlan ZoneExisting(NeighbourhoodRequest request, NeighbourhoodPlan plan, Stopwatch clock, CancellationToken cancellation)
         {
-            foreach (var lot in ExistingStreetLots.Plan(request, cancellation))
+            var survey = request.Trees || request.LevelExistingLots ? new SiteSurvey(request, cancellation) : null;
+            var lots = ExistingStreetLots.Plan(request, plan.Buildings, plan.Messages, cancellation);
+            var taken = ExistingStreetLots.TakenCells(request);
+            if (request.LevelExistingLots) plan.Ground = LevelExisting(request, plan, lots, taken, cancellation);
+            foreach (var lot in lots)
             {
                 lot.LevelCells = AllCells(lot.Pad);
                 plan.Lots.Add(lot);
                 if (lot.Zone.Length > 0) plan.ZonedCells += lot.LevelCells.Count;
             }
-            if (plan.Lots.Count == 0) plan.Messages.Add("No empty zone cells along streets in this area. Draw it over streets whose zoning is still empty.");
-            else if (plan.ZonedCells == 0) plan.Messages.Add("The zone mix is empty, so there is nothing to zone. Add a zone.");
-            if ((request.Services?.Length ?? 0) > 0) plan.Messages.Add("Service buildings are only placed with new streets.");
+            if (request.Trees)
+            {
+                // Lots and buildings alike keep the greenery off.
+                var occupied = new List<PlannedLot>(plan.Lots);
+                foreach (var building in plan.Buildings) occupied.Add(new PlannedLot { Pad = building.Pad, Road = building.Road });
+                plan.Trees = Landscaping.Trees(plan, occupied, survey, request, cancellation, taken);
+            }
+            if (plan.Lots.Count == 0 && plan.Buildings.Count == 0)
+                plan.Messages.Add("No empty zone cells along streets in this area. Draw it over streets whose zoning is still empty.");
+            // With greenery, buildings or levelling still to build, an empty mix only leaves the lots unzoned.
+            else if (plan.Lots.Count > 0 && plan.ZonedCells == 0)
+                plan.Messages.Add(plan.Buildable ? "The zone mix is empty, so the lots stay unzoned. Add a zone to zone them."
+                    : "The zone mix is empty, so there is nothing to zone. Add a zone.");
             Finish(plan, clock, request);
+            var summary = new List<string>();
             if (plan.ZonedCells > 0)
-                plan.SummaryLine = string.Format(CultureInfo.InvariantCulture, "{0} lots, {1} cells to zone along existing streets", plan.Lots.Count, plan.ZonedCells);
+                summary.Add(string.Format(CultureInfo.InvariantCulture, "{0} lots, {1} cells to zone along existing streets", plan.Lots.Count, plan.ZonedCells));
+            if (plan.ZonedCells == 0 && plan.Buildings.Count > 0) summary.Add(string.Format(CultureInfo.InvariantCulture, "{0} buildings along existing streets", plan.Buildings.Count));
+            if (plan.ZonedCells == 0 && plan.Buildings.Count == 0 && plan.Trees.Count > 0)
+                summary.Add(string.Format(CultureInfo.InvariantCulture, "{0} pieces of greenery along existing streets", plan.Trees.Count));
+            if (plan.Ground != null) summary.Add(string.Format(CultureInfo.InvariantCulture, "{0:N0} m³ of earth moved", plan.CutVolume + plan.FillVolume));
+            if (plan.Buildable) plan.SummaryLine = string.Join(", ", summary);
             return plan;
+        }
+
+        /// <summary>
+        /// Existing streets with level lots: every lot and building on a pad near its street's height (up to the pad lift
+        /// towards its own ground, as on new streets), graded with banks by the same ground field. The existing roads,
+        /// buildings, water and the cells already zoned keep their ground. A lot over the earthwork limit is zoned as it is.
+        /// </summary>
+        private static GroundField LevelExisting(NeighbourhoodRequest request, NeighbourhoodPlan plan, List<PlannedLot> lots,
+            Func<float2, bool> taken, CancellationToken cancellation)
+        {
+            var pads = new List<PlannedLot>();
+            int unlevelled = 0;
+            foreach (var lot in lots)
+            {
+                // A lot one row deep is too shallow for a pad of its own: it stays as it is.
+                if (lot.Pad.DepthCells < StepPlanner.MinimumRows) continue;
+                var settled = LotLayout.Settle(lot.Pad, request);
+                if (settled == null) { unlevelled++; continue; }
+                lot.Pad = settled;
+                pads.Add(lot);
+            }
+            foreach (var building in plan.Buildings)
+            {
+                var settled = LotLayout.Settle(building.Pad, request);
+                // A building's lot keeps its size.
+                if (settled == null || settled.DepthCells != building.Pad.DepthCells) { unlevelled++; continue; }
+                building.Pad = settled;
+                building.Position.y = settled.Height;
+                pads.Add(new PlannedLot { Pad = settled, Road = building.Road });
+            }
+            if (unlevelled > 0)
+                plan.Messages.Add(string.Format(CultureInfo.InvariantCulture, unlevelled == 1
+                    ? "1 lot is left as it is: levelling it needs more than {0:0.#} m of earthwork."
+                    : "{1} lots are left as they are: levelling them needs more than {0:0.#} m of earthwork.", request.EarthworkLimit, unlevelled));
+            if (pads.Count == 0) return null;
+            var grading = request.Copy();
+            grading.LevelLots = true;
+            var blocked = request.Blocked;
+            if (taken != null) grading.Blocked = point => (blocked != null && blocked(point)) || taken(point);
+            return GroundField.Build(grading, plan, pads, cancellation);
         }
 
         private static List<Street> Lane(SiteSurvey survey, NeighbourhoodRequest request, float radius, CancellationToken cancellation)
@@ -346,8 +415,8 @@ namespace SteppedStreets.Core.Neighbourhood
         private static float EntryHeight(SiteSurvey survey, NeighbourhoodRequest request)
         {
             float best = float.MaxValue, height = float.NaN;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                foreach (var point in road?.Points ?? new float3[0])
+            foreach (var road in request.JoinableRoads)
+                foreach (var point in road.Points ?? new float3[0])
                 {
                     float distance = Poly.Contains(survey.Boundary, point.xz) ? 0f : Poly.DistanceToBoundary(survey.Boundary, point.xz);
                     if (distance >= best) continue;
@@ -364,6 +433,14 @@ namespace SteppedStreets.Core.Neighbourhood
             return heights.Count == 0 ? 0f : heights[heights.Count / 2];
         }
 
+        private static bool Level(Pad pad, GroundField ground)
+        {
+            for (int column = 0; column < pad.WidthCells; column++)
+                for (int row = 0; row < pad.DepthCells; row++)
+                    if (math.abs(ground.HeightAt(pad.PointAt(column + 0.5f, row + 0.5f)) - pad.Height) > 0.3f) return false;
+            return true;
+        }
+
         private static List<int2> AllCells(Pad pad)
         {
             var cells = new List<int2>();
@@ -378,6 +455,7 @@ namespace SteppedStreets.Core.Neighbourhood
             if (request.Boundary == null || request.Boundary.Length < 3) throw new ArgumentException("The area needs at least three corners.", nameof(request));
             if (request.GroundHeight == null) throw new ArgumentException("The request needs a ground height sampler.", nameof(request));
             request.RoadHalfWidth = math.clamp(Finite(request.RoadHalfWidth, 6f), 2f, 20f);
+            request.MainRoadHalfWidth = Finite(request.MainRoadHalfWidth, 0f) > 0f ? math.clamp(request.MainRoadHalfWidth, 2f, 20f) : 0f;
             request.BlockDepth = math.clamp(Finite(request.BlockDepth, 90f), 50f, 250f);
             request.MaxRoadGrade = math.clamp(Finite(request.MaxRoadGrade, 0.08f), 0.03f, 0.12f);
             request.SteepestBuildable = math.clamp(Finite(request.SteepestBuildable, 0.15f), 0.05f, request.SteepGround ? 0.6f : 0.4f);
@@ -392,6 +470,12 @@ namespace SteppedStreets.Core.Neighbourhood
                 service.WidthCells = math.clamp(service.WidthCells, 1, 20);
                 service.DepthCells = math.clamp(service.DepthCells, 1, 20);
                 service.Count = math.clamp(service.Count, 0, ServiceRequest.MostEach);
+            }
+            foreach (var park in request.Parks ?? new ServiceRequest[0])
+            {
+                if (park == null) continue;
+                park.WidthCells = math.clamp(park.WidthCells, 1, 20);
+                park.DepthCells = math.clamp(park.DepthCells, 1, 20);
             }
             request.EarthworkLimit = math.clamp(Finite(request.EarthworkLimit, 4f), 0.5f, 12f);
             request.BankGrade = math.clamp(Finite(request.BankGrade, 0.4f), 0.15f, 0.5f);
@@ -419,6 +503,10 @@ namespace SteppedStreets.Core.Neighbourhood
                 foreach (var share in request.Mix ?? new ZoneShare[0])
                     if (share != null && counts.TryGetValue(share.Zone ?? "", out int count) && !plan.ZoneCounts.Exists(entry => entry.Key == share.Zone))
                         plan.ZoneCounts.Add(new KeyValuePair<string, int>(share.Zone, count));
+                // The corner and main-street zones follow the mix's, when it doesn't have them.
+                foreach (string zone in new[] { request.CornerZone, request.MainStreetZone })
+                    if (!string.IsNullOrEmpty(zone) && counts.TryGetValue(zone, out int count) && !plan.ZoneCounts.Exists(entry => entry.Key == zone))
+                        plan.ZoneCounts.Add(new KeyValuePair<string, int>(zone, count));
                 if (!plan.Connected && plan.Roads.Count > 0)
                     plan.Messages.Insert(0, "Not connected: no existing road within reach. The new streets are built on their own.");
                 if (plan.WildShare >= 0.05f)

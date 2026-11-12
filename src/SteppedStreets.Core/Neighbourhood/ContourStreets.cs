@@ -322,7 +322,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Lowers the distance-to-street field around new street points.</summary>
         /// <summary>Each node's distance to the nearest of these points within reach; with heights, also that point's height.</summary>
-        internal static void Stamp(SiteSurvey survey, List<float2> points, float reach, float[] nearest, float[] pointHeights = null, float[] nearestHeight = null)
+        /// <param name="wider">How much wider than the street road this street is, taken off every distance it stamps.</param>
+        internal static void Stamp(SiteSurvey survey, List<float2> points, float reach, float[] nearest, float[] pointHeights = null, float[] nearestHeight = null,
+            float wider = 0f)
         {
             int cells = (int)math.ceil(reach / survey.Cell);
             // Every other point: the points are 4 m apart, so a node's distance is off by at most 4 m, well inside the margins.
@@ -335,7 +337,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     for (int column = math.max(0, centreColumn - cells); column <= math.min(survey.Columns - 1, centreColumn + cells); column++)
                     {
                         int index = row * survey.Columns + column;
-                        float distance = math.distance(survey.Position(index), position);
+                        float distance = math.distance(survey.Position(index), position) - wider;
                         if (distance >= nearest[index]) continue;
                         nearest[index] = distance;
                         if (nearestHeight != null) nearestHeight[index] = pointHeights[point];

@@ -124,7 +124,7 @@ namespace SteppedStreets.Core.Neighbourhood
             var roads = request.ExistingRoads ?? new ExistingRoad[0];
             foreach (var road in roads)
             {
-                if (road?.Points == null || road.Points.Length < 2) continue;
+                if (road?.Points == null || road.Points.Length < 2 || !road.Joinable) continue;
                 for (int point = 0; point < road.Points.Length; point++)
                 {
                     float2 position = road.Points[point].xz;

@@ -4,10 +4,11 @@
 // Upgraded composition flags on the definition). Object definitions follow ParkingLotTool's
 // "field by field like ObjectToolBaseSystem" ObjectDefinition. Credits: tomkpunkt, Ti4goc,
 // KruemelGames (GPL-3.0).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: trees (prefabs chosen by name from the game's trees) and service buildings only, live ground heights, batches of 1500 definitions per frame and the standalone build-tool cadence; no nets, scaling, grouping or audit machinery.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: trees, bushes, flowers and rocks (prefabs chosen by name from the game's) and service buildings only, live ground heights, batches of 1500 definitions per frame and the standalone build-tool cadence; no nets, scaling, grouping or audit machinery.
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Game;
 using Game.Common;
 using Game.Prefabs;
@@ -58,6 +59,8 @@ namespace SteppedStreets.Build
         private List<Placement> _objects;
         private string _what = "trees";
         private List<Entity> _conifers, _broadleaves;
+        // Bushes, flowers, rocks and boulders, by the plan's kind.
+        private Dictionary<TreeKind, List<Entity>> _palette;
         private int _cursor, _activationFrame, _emittedFrame = -1, _applyFrame = -1, _placed;
         private Action<ObjectBuildReport> _whenDone;
         private readonly List<string> _missing = new List<string>();
@@ -80,10 +83,13 @@ namespace SteppedStreets.Build
             {
                 if (trees == null || trees.Count == 0) { Finish("no trees planned"); return; }
                 FindPrefabs();
-                if (_conifers.Count == 0 && _broadleaves.Count == 0) { Finish("no tree prefabs found"); return; }
+                int unmatched = 0;
                 foreach (var tree in trees)
                 {
-                    var choices = tree.Kind == TreeKind.Conifer ? _conifers : _broadleaves;
+                    var choices = tree.Kind == TreeKind.Conifer ? _conifers : tree.Kind == TreeKind.Broadleaf ? _broadleaves
+                        : _palette.TryGetValue(tree.Kind, out var kind) ? kind : null;
+                    // A kind the game has no prefab for is left out rather than stood in by another.
+                    if (choices == null || choices.Count == 0) { unmatched++; continue; }
                     _objects.Add(new Placement
                     {
                         Prefab = choices[(int)(tree.Variation % (uint)choices.Count)],
@@ -93,6 +99,8 @@ namespace SteppedStreets.Build
                         Age = Ages[(tree.Variation >> 4) % (uint)Ages.Length],
                     });
                 }
+                if (unmatched > 0) Mod.Logger.Warn($"Stepped Streets trees: {unmatched} planned plants had no prefab of their kind and were left out.");
+                if (_objects.Count == 0) { Finish("no prefabs found for the planned trees and plants"); return; }
                 Activate();
             }
             catch (Exception exception)
@@ -156,7 +164,7 @@ namespace SteppedStreets.Build
                 foreach (var (name, prefab) in named)
                 {
                     string lower = name.ToLowerInvariant();
-                    if (lower.Contains("dead") || lower.Contains("stump") || lower.Contains("bush") || lower.Contains("hedge")) continue;
+                    if (lower.Contains("dead") || lower.Contains("stump") || lower.Contains("bush") || lower.Contains("hedge") || lower.Contains("placeholder")) continue;
                     if (Array.Exists(Conifers, word => lower.Contains(word))) _conifers.Add(prefab);
                     else if (Array.Exists(Broadleaves, word => lower.Contains(word))) _broadleaves.Add(prefab);
                     else other.Add((name, prefab));
@@ -165,7 +173,48 @@ namespace SteppedStreets.Build
             if (_conifers.Count == 0) foreach (var (_, prefab) in other) _conifers.Add(prefab);
             if (_broadleaves.Count == 0) _broadleaves.AddRange(_conifers);
             if (_conifers.Count == 0) _conifers.AddRange(_broadleaves);
-            Mod.Logger.Info($"Stepped Streets trees: {_conifers.Count} conifer and {_broadleaves.Count} broadleaf prefabs.");
+
+            // Plants (some bushes are trees to the game) and rocks, which are plain placeable objects. Placeholders stand for a
+            // random pick the game makes itself, so they are left out with the buildings.
+            _palette = new Dictionary<TreeKind, List<Entity>>();
+            using (var query = EntityManager.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[] { ComponentType.ReadOnly<PrefabData>(), ComponentType.ReadOnly<ObjectGeometryData>() },
+                Any = new[] { ComponentType.ReadOnly<PlantData>(), ComponentType.ReadOnly<PlaceableObjectData>() },
+                None = new[] { ComponentType.ReadOnly<BuildingData>(), ComponentType.ReadOnly<PlaceholderObjectData>() },
+            }))
+            using (var entities = query.ToEntityArray(Allocator.Temp))
+            {
+                var named = new List<(string Name, Entity Prefab)>();
+                foreach (var entity in entities)
+                    if (_prefabs.TryGetPrefab<PrefabBase>(EntityManager.GetComponentData<PrefabData>(entity), out var prefab) && prefab != null)
+                        named.Add((prefab.name ?? "", entity));
+                named.Sort((first, second) => string.CompareOrdinal(first.Name, second.Name));
+                foreach (var (name, prefab) in named)
+                {
+                    var kind = PaletteKind(name);
+                    if (kind == null) continue;
+                    if (!_palette.TryGetValue(kind.Value, out var list)) _palette[kind.Value] = list = new List<Entity>();
+                    list.Add(prefab);
+                }
+            }
+            Mod.Logger.Info($"Stepped Streets trees: {_conifers.Count} conifer and {_broadleaves.Count} broadleaf prefabs; "
+                + string.Join(", ", _palette.Select(entry => $"{entry.Value.Count} {entry.Key}")) + ".");
+        }
+
+        /// <summary>
+        /// The garden kinds by the game's own names (2.12.0 game facts): bushes, flowers, small rocks and boulders. Pots, garden
+        /// beds, hedge pieces and stone piles are building props, so no prefix here takes them.
+        /// </summary>
+        private static TreeKind? PaletteKind(string name)
+        {
+            bool Starts(string prefix) => name.StartsWith(prefix, StringComparison.Ordinal);
+            if (Starts("GreenBush") || Starts("BushWildRandom") || Starts("BushCityRandom")) return TreeKind.Bush;
+            // FlowerBushWild0 leaves out the dead, young and old variants.
+            if (Starts("FlowerBushWild0") || Starts("FlowerBushCity") || Starts("Flowerbed")) return TreeKind.Flower;
+            if (Starts("Boulder0")) return TreeKind.Boulder;
+            if (name.Length == 6 && Starts("Rock") && int.TryParse(name.Substring(4), out int number) && number >= 1 && number <= 13) return TreeKind.Rock;
+            return null;
         }
 
         [Preserve]

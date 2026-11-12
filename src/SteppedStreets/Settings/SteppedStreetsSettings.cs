@@ -48,6 +48,15 @@ namespace SteppedStreets.Settings
         [SettingsUISection(Section, Group)]
         public string RoadName { get; set; }
 
+        /// <summary>The road for main streets and connectors; empty uses the street road for every street.</summary>
+        [SettingsUITextInput]
+        [SettingsUISection(Section, Group)]
+        public string MainRoadName { get; set; }
+
+        /// <summary>Paths for people on foot through long blocks, from street to street.</summary>
+        [SettingsUISection(Section, Group)]
+        public bool Footpaths { get; set; }
+
         [SettingsUISlider(min = 60, max = 200, step = 5, scalarMultiplier = 1)]
         [SettingsUISection(Section, Group)]
         public int BlockDepth { get; set; }
@@ -136,6 +145,24 @@ namespace SteppedStreets.Settings
         [SettingsUISection(Section, Group)]
         public bool Trees { get; set; }
 
+        /// <summary>Frontage too short for a lot becomes a small park instead of grass.</summary>
+        [SettingsUISection(Section, Group)]
+        public bool PocketParks { get; set; }
+
+        /// <summary>Use existing streets: grade each lot into a level pad. Off by default: it changes the ground of existing streets.</summary>
+        [SettingsUISection(Section, Group)]
+        public bool LevelExistingLots { get; set; }
+
+        /// <summary>The zone for corner lots; empty takes the mix.</summary>
+        [SettingsUITextInput]
+        [SettingsUISection(Section, Group)]
+        public string CornerZone { get; set; }
+
+        /// <summary>The zone for lots on a main street; empty takes the mix.</summary>
+        [SettingsUITextInput]
+        [SettingsUISection(Section, Group)]
+        public string MainStreetZone { get; set; }
+
         [SettingsUISlider(min = 10, max = 100, step = 5, scalarMultiplier = 1, unit = Game.UI.Unit.kPercentage)]
         [SettingsUISection(Section, Group)]
         public int TreeDensityPercent { get; set; }
@@ -152,6 +179,13 @@ namespace SteppedStreets.Settings
         [SettingsUIHidden]
         public bool Crosswalks { get; set; }
 
+        /// <summary>
+        /// The game's grass or tree upgrade on the streets this mod builds or zones. Read when the roads are built, so it is set
+        /// from the panel without re-planning and hidden here like Crosswalks.
+        /// </summary>
+        [SettingsUIHidden]
+        public StreetPlanting StreetTrees { get; set; }
+
         /// <summary>The panel is folded down to its header. Saved here, set from the panel, so not on the Options page.</summary>
         [SettingsUIHidden]
         public bool PanelCollapsed { get; set; }
@@ -162,6 +196,13 @@ namespace SteppedStreets.Settings
 
         [SettingsUIHidden]
         public float PanelTop { get; set; }
+
+        /// <summary>
+        /// The player's named presets, as the panel saves them (Core PresetList). Set from the panel, so not on the Options page,
+        /// and not in SetDefaults, so resetting the settings keeps them.
+        /// </summary>
+        [SettingsUIHidden]
+        public string Presets { get; set; } = "[]";
 
         [SettingsUIKeyboardBinding(BindingKeyboard.S, StepStreetAction, ctrl: true, shift: true)]
         [SettingsUISection(Section, Group)]
@@ -196,6 +237,13 @@ namespace SteppedStreets.Settings
             Trees = false;
             TreeDensityPercent = 50;
             Seed = 1;
+            MainRoadName = "";
+            Footpaths = false;
+            PocketParks = false;
+            LevelExistingLots = false;
+            CornerZone = "";
+            MainStreetZone = "";
+            StreetTrees = StreetPlanting.None;
             Crosswalks = true;
             PanelCollapsed = false;
             PanelLeft = -1f;
@@ -279,7 +327,7 @@ namespace SteppedStreets.Settings
                 labels[GetOptionDescLocaleID(property)] = description;
             }
 
-            Label(nameof(UseExistingStreets), "Use existing streets", "Zone the empty cells along streets already in the area with your zone mix, instead of building new streets. No new roads and no ground changes; cells already zoned stay as they are.");
+            Label(nameof(UseExistingStreets), "Use existing streets", "Zone the empty cells along streets already in the area with your zone mix, instead of building new streets. No new roads; cells already zoned stay as they are.");
             Label(nameof(Style), "Layout", "Hillside layouts follow the contours: contour suburb, terraced blocks or one winding mountain lane. Grid layouts suit flat or gentle ground.");
             Label(nameof(Junctions), "Junctions", "For grid layouts: crossroads, staggered T-junctions, or traffic-optimised, where one through road carries the traffic and is the only road that meets yours.");
             Label(nameof(ShapeGround), "Shape the ground", "Grade roads and lots into the hill. Off: no terrain changes at all; roads follow the ground as the game builds them and lots aren't levelled.");
@@ -300,11 +348,20 @@ namespace SteppedStreets.Settings
             Label(nameof(HighestStep), "Highest step (m)", "The tallest step between neighbouring lots along a climbing road.");
             Label(nameof(LotSpacing), "Space between lots", "-1 decides from the slope (Auto); otherwise 0, 1 or 2 empty cells.");
             Label(nameof(RetainingWalls), "Retaining walls", "The game's garden wall where the cut beside a road is tall enough.");
-            Label(nameof(Trees), "Trees", "Forest on steep ground, trees on banks and in gaps.");
+            Label(nameof(Trees), "Trees", "Forest on steep ground, trees on banks and in gaps. With Use existing: trees, bushes and rocks on the empty land in the area.");
             Label(nameof(TreeDensityPercent), "Tree density", "How many trees to plant.");
             Label(nameof(Seed), "Seed", "The same seed gives the same layout; Reroll picks another.");
+            Label(nameof(MainRoadName), "Main road type", "The road prefab for main streets and connectors, by name. Empty uses the road type for every street.");
+            Label(nameof(Footpaths), "Footpaths", "Paths for people on foot through long blocks, from street to street.");
+            Label(nameof(PocketParks), "Pocket parks", "Frontage too short for a lot becomes a small park.");
+            Label(nameof(LevelExistingLots), "Level lots on existing streets", "With Use existing: grade each lot into a level pad before zoning. Changes the ground.");
+            Label(nameof(CornerZone), "Corner lots", "The zone for lots on a corner, by name (for example Commercial Low). Empty takes the zone mix.");
+            Label(nameof(MainStreetZone), "Main street lots", "The zone for lots facing a main street, by name. Empty takes the zone mix.");
             Label(nameof(StepStreetBinding), "Open Stepped Streets", "Opens or closes the Stepped Streets tool.");
             return new MemorySource(labels);
         }
     }
+
+    /// <summary>The game's own planting upgrade for the streets: none, a grass strip, or trees.</summary>
+    public enum StreetPlanting { None, Grass, Trees }
 }

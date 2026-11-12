@@ -46,7 +46,8 @@ namespace SteppedStreets.Core.Neighbourhood
             this.request = request;
             this.streets = streets;
             this.minimumRadius = minimumRadius;
-            halfWidth = request.RoadHalfWidth;
+            // Every road this lays is a connector, so main: it keeps the main road's room.
+            halfWidth = RoadNetwork.MainHalfWidth(request);
             // The rule itself; the validation, measuring the same way, allows a degree more for rounding.
             junctionCosine = math.cos(math.radians(RoadNetwork.SharpestJunction(request)));
             roadDistance = new float[survey.Count];
@@ -56,15 +57,20 @@ namespace SteppedStreets.Core.Neighbourhood
             foreach (var street in streets) if (!street.Removed) Stamp(street);
         }
 
-        // Two corridors (road plus shoulders) side by side, and a metre between them.
-        private float Clearance => (halfWidth + 1.5f) * 2f + 1f;
+        // Two corridors (road plus shoulders) side by side, and a metre between them: this link's and a street's. A main
+        // street's stamped distances are already less how much wider it is. A link wider than the streets keeps a little more:
+        // the stamped distances are a few tenths out, and the rules then dropped wide links that cleared by less than that,
+        // and with them every street they joined.
+        private float Clearance => (halfWidth + 1.5f) + (request.RoadHalfWidth + 1.5f) + 1f + (halfWidth > request.RoadHalfWidth ? WideMargin : 0f);
+        private const float WideMargin = 1.5f;
         // A link leaving at 62° is this far along before it clears the street it left by the road clearance.
         private float Exempt => (Clearance + 2f) / 0.88f;
 
         // As far as the validation looks for a road too close (its clearance plus 20 m).
         // As far as the road check looks (RoadNetwork.ClearanceReach): a shorter reach here let through connections the check
         // then dropped, with no second try, leaving a neighbourhood unconnected beside a city road split into edges.
-        private void Stamp(Street street) => ContourStreets.Stamp(survey, street.Points, RoadNetwork.ClearanceReach(request), roadDistance, street.Heights, roadHeight);
+        private void Stamp(Street street) => ContourStreets.Stamp(survey, street.Points, RoadNetwork.ClearanceReach(request), roadDistance, street.Heights, roadHeight,
+            street.Main ? halfWidth - request.RoadHalfWidth : 0f);
 
         internal sealed class Candidate
         {
@@ -263,7 +269,9 @@ namespace SteppedStreets.Core.Neighbourhood
             var roads = request.ExistingRoads ?? new ExistingRoad[0];
             for (int road = 0; road < roads.Length; road++)
             {
-                var points = roads[road]?.Points;
+                // A highway is no place to join; the connection still keeps clear of it.
+                if (roads[road] == null || !roads[road].Joinable) continue;
+                var points = roads[road].Points;
                 if (points == null || points.Length < 2) continue;
                 // Places about every 12 m along the edge's clear middle, whatever its sampling, so a short edge still offers its
                 // middle: the samples alone could all miss a clear stretch of a few metres.
@@ -408,6 +416,7 @@ namespace SteppedStreets.Core.Neighbourhood
         {
             var link = new Street(kind, candidate.Points, candidate.Heights)
             {
+                Main = true,
                 Start = start,
                 End = new Attachment { Street = candidate.Target, Point = candidate.TargetPoint },
             };
@@ -622,7 +631,7 @@ namespace SteppedStreets.Core.Neighbourhood
             if (earthwork > request.EarthworkLimit) return null;
             // The validation's clearance, heights and all: room for a bank across the difference in height to the road beside.
             // Near its ends a road shares a node with the street it joins, which the validation lets off the same way.
-            float bank = RoadNetwork.BankBetweenRoads(request), nodeReach = RoadNetwork.SharedNodeReach(request);
+            float bank = RoadNetwork.BankBetweenRoads(request), nodeReach = RoadNetwork.SharedNodeReach(request) + (halfWidth - request.RoadHalfWidth);
             float fromStart = connection ? startExempt : math.max(startExempt, nodeReach), fromEnd = math.max(endExempt, nodeReach);
             for (int index = 1; index < path.Count - 1; index++)
             {

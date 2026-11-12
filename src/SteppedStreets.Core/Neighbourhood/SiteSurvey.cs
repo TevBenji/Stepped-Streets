@@ -55,10 +55,10 @@ namespace SteppedStreets.Core.Neighbourhood
             Boundary = request.Boundary;
             Poly.Bounds(Boundary, out BoundaryMinimum, out BoundaryMaximum);
             AreaSquareMetres = math.abs(SignedArea(Boundary));
-            // Reach as far as the nearest existing road (at most 400 m), so a connection to it can be planned.
+            // Reach as far as the nearest road a connection may join (at most 400 m), so one to it can be planned.
             float nearestRoad = float.MaxValue;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                foreach (var point in road?.Points ?? new float3[0])
+            foreach (var road in request.JoinableRoads)
+                foreach (var point in road.Points ?? new float3[0])
                     nearestRoad = math.min(nearestRoad, Poly.Contains(Boundary, point.xz) ? 0f : Poly.DistanceToBoundary(Boundary, point.xz));
             // No road in reach: only the banks need room past the area.
             float margin = nearestRoad == float.MaxValue ? MinimumMargin : math.clamp(nearestRoad + 48f, MinimumMargin, MaximumMargin);
@@ -117,6 +117,8 @@ namespace SteppedStreets.Core.Neighbourhood
             // Clearances from chamfer distance fields: a street keeps its whole corridor on buildable ground inside the area,
             // and keeps clear of buildings, water and existing roads by its half width plus a shoulder and a bank.
             float halfWidth = request.RoadHalfWidth;
+            // Any street may turn out to be main, so buildings and water are kept clear of the wider road.
+            float widest = math.max(halfWidth, request.MainRoadHalfWidth);
             var outside = new bool[count];
             for (int index = 0; index < count; index++) outside[index] = !Inside[index];
             cancellation.ThrowIfCancellationRequested();
@@ -127,7 +129,7 @@ namespace SteppedStreets.Core.Neighbourhood
             ConnectionRoom = new float[count];
             for (int index = 0; index < count; index++)
             {
-                float edges = math.min(toObstacle[index] - (halfWidth + 6f), toWild[index] - halfWidth);
+                float edges = math.min(toObstacle[index] - (widest + 6f), toWild[index] - halfWidth);
                 StreetRoom[index] = math.min(edges, toOutside[index] - (halfWidth + 4f));
                 ConnectionRoom[index] = math.min(edges, BorderDistance(index) - 24f);
             }

@@ -204,6 +204,7 @@ namespace SteppedStreets.Tool
                 // A drag cut short goes back, or the outline would no longer match its plan.
                 if (dragging >= 0) RestoreDrag();
                 State.Confirming = false;
+                State.ConfirmingRemove = false;
                 Cursor = null;
                 HoveredCorner = -1;
                 // Planning takes every core for a few seconds, so a plan still being worked out stops with the tool and
@@ -294,10 +295,11 @@ namespace SteppedStreets.Tool
             bool control = keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
             bool escape = (Pressed(cancelAction) && !rawRightDown && !rightHeld) || (keyboard != null && keyboard.escapeKey.wasPressedThisFrame);
 
-            // The Build dialog is open: Esc closes it and the map takes nothing, so the plan stays the one being asked about.
-            if (State.Confirming)
+            // The Build or Remove dialog is open: Esc closes it and the map takes nothing, so the plan or the area stays the one
+            // being asked about.
+            if (State.Confirming || State.ConfirmingRemove)
             {
-                if (escape) SetConfirming(false);
+                if (escape) { SetConfirming(false); SetConfirmingRemove(false); }
                 return;
             }
             if (escape)
@@ -498,7 +500,9 @@ namespace SteppedStreets.Tool
             var settings = Mod.Settings ?? throw new InvalidOperationException("Stepped Streets settings are unavailable.");
             var boundary = corners.ToArray();
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            var snapshot = SiteSnapshot.Capture(EntityManager, World, boundary, settings.UseExistingStreets);
+            // Existing streets read the ground only for what needs it: greenery and levelled lots.
+            var snapshot = SiteSnapshot.Capture(EntityManager, World, boundary, settings.UseExistingStreets,
+                !settings.UseExistingStreets || settings.Trees || settings.LevelExistingLots);
             var request = BuildRequest(boundary, snapshot, settings);
             double captureMilliseconds = clock.Elapsed.TotalMilliseconds;
             var cancel = new CancellationTokenSource();
@@ -516,7 +520,7 @@ namespace SteppedStreets.Tool
             }), cancel.Token);
             State.Stage = ToolStage.Planning;
             Touch();
-            Log(Invariant($"planning an area of {State.AreaSquareMetres / 10000f:0.0} ha with {boundary.Length} corners; snapshot {captureMilliseconds:0} ms, {snapshot.ExistingRoads.Length} existing road edges, {snapshot.BuildingCount} buildings{(request.ExistingStreets ? Invariant($", existing streets: {snapshot.ZoneCells.Length} free zone cells nearby") : "")}"));
+            Log(Invariant($"planning an area of {State.AreaSquareMetres / 10000f:0.0} ha with {boundary.Length} corners; snapshot {captureMilliseconds:0} ms, {snapshot.ExistingRoads.Length} existing road edges, {snapshot.BuildingCount} buildings{(request.ExistingStreets ? Invariant($", existing streets: {snapshot.ZoneCells.Count(cell => !cell.Taken)} free zone cells nearby") : "")}"));
         }
 
         private void AdoptFinishedPlan()
@@ -574,7 +578,7 @@ namespace SteppedStreets.Tool
             State.Stage = plan.Buildable ? ToolStage.Planned : ToolStage.Drawing;
             if (!IsActive && State.Stage != ToolStage.Building) State.Stage = ToolStage.Closed;
             Touch();
-            Log(Invariant($"plan in {plan.Milliseconds:0} ms ({plan.Timings}): {plan.Roads.Count} roads, {plan.RoadLength / 1000f:0.00} km, {plan.Lots.Count} lots, {plan.ZonedCells} cells, {plan.Trees.Count} trees, {plan.Walls.Count} wall pieces, connected {plan.Connected}; {plan.SummaryLine}"));
+            Log(Invariant($"plan in {plan.Milliseconds:0} ms ({plan.Timings}): {plan.Roads.Count} roads ({plan.Roads.Count(road => road.Main)} main), {plan.RoadLength / 1000f:0.00} km, {plan.Paths.Count} footpaths, {plan.Lots.Count} lots, {plan.ZonedCells} cells, {plan.Trees.Count} trees, {plan.Walls.Count} wall pieces, connected {plan.Connected}; {plan.SummaryLine}"));
             foreach (var message in plan.Messages) Log(message);
         }
 
@@ -582,11 +586,22 @@ namespace SteppedStreets.Tool
         // say which one rather than swap it silently.
         private void WarnIfRoadMissing()
         {
+            WarnIfMainRoadMissing();
             string saved = Mod.Settings?.RoadName;
             var road = RoadCatalog.Find(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), saved);
             if (road == null || string.Equals(road.Name, saved, StringComparison.OrdinalIgnoreCase)) return;
             string label = Panel.PanelSystem.Localised("Assets.NAME[" + road.Name + "]", road.Name);
             Message($"The chosen road isn't in the game now, so the plan uses {label}. Pick another under More settings.");
+        }
+
+        private void WarnIfMainRoadMissing()
+        {
+            string saved = Mod.Settings?.MainRoadName;
+            if (string.IsNullOrEmpty(saved)) return;
+            var road = RoadCatalog.Find(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), saved);
+            if (road == null || string.Equals(road.Name, saved, StringComparison.OrdinalIgnoreCase)) return;
+            string label = Panel.PanelSystem.Localised("Assets.NAME[" + road.Name + "]", road.Name);
+            Message($"The chosen main road isn't in the game now, so the plan uses {label}. Pick another under More settings.");
         }
 
         private NeighbourhoodRequest BuildRequest(float2[] boundary, SiteSnapshot snapshot, Settings.SteppedStreetsSettings settings)
@@ -625,6 +640,14 @@ namespace SteppedStreets.Tool
                 Trees = settings.Trees,
                 TreeDensity = settings.TreeDensityPercent / 100f,
                 Seed = (uint)math.max(1, settings.Seed),
+                MainRoadHalfWidth = string.IsNullOrEmpty(settings.MainRoadName) ? 0f
+                    : RoadCatalog.Find(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), settings.MainRoadName)?.HalfWidth ?? 0f,
+                Footpaths = settings.Footpaths,
+                PocketParks = settings.PocketParks,
+                Parks = settings.PocketParks ? ParkRequests() : new ServiceRequest[0],
+                LevelExistingLots = settings.LevelExistingLots,
+                CornerZone = settings.CornerZone ?? "",
+                MainStreetZone = settings.MainStreetZone ?? "",
             };
         }
 
@@ -665,6 +688,11 @@ namespace SteppedStreets.Tool
             }
             return services.ToArray();
         }
+
+        /// <summary>The small parks the game has unlocked, with their lot sizes, for pocket parks.</summary>
+        private ServiceRequest[] ParkRequests() =>
+            ServiceCatalog.Parks(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), null)
+                .Select(park => new ServiceRequest { Name = park.Name, WidthCells = park.WidthCells, DepthCells = park.DepthCells }).ToArray();
 
         private void RefreshStage()
         {

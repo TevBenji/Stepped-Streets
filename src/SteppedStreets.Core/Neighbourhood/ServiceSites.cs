@@ -29,15 +29,15 @@ namespace SteppedStreets.Core.Neighbourhood
             wanted.Sort((first, second) => first.WidthCells * first.DepthCells != second.WidthCells * second.DepthCells
                 ? (second.WidthCells * second.DepthCells).CompareTo(first.WidthCells * first.DepthCells) : string.CompareOrdinal(first.Name, second.Name));
 
-            float halfWidth = request.RoadHalfWidth;
-            var segments = new SpatialBuckets<(int Road, float2 Start, float2 End)>(32f);
+            var segments = new SpatialBuckets<(int Road, float2 Start, float2 End, float Wider)>(32f);
             for (int road = 0; road < plan.Roads.Count; road++)
             {
                 var points = plan.Roads[road].Points;
+                float halfWidth = plan.Roads[road].HalfWidth, wider = RoadNetwork.Wider(plan.Roads[road], request);
                 for (int point = 1; point < points.Length; point++)
                 {
                     float2 start = points[point - 1].xz, end = points[point].xz;
-                    segments.Add(math.min(start, end) - halfWidth - 4f, math.max(start, end) + halfWidth + 4f, (road, start, end));
+                    segments.Add(math.min(start, end) - halfWidth - 4f, math.max(start, end) + halfWidth + 4f, (road, start, end, wider));
                 }
             }
             var existing = LotLayout.ExistingRoads(request);
@@ -112,12 +112,15 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Lower is better; MaxValue when the site breaks a rule.</summary>
         private static float Score(float2[] quad, PlannedLot lot, NeighbourhoodPlan plan, List<PlannedBuilding> placed,
-            SpatialBuckets<(int Road, float2 Start, float2 End)> segments, SpatialBuckets<(float2 Start, float2 End, float Clearance)> existing,
+            SpatialBuckets<(int Road, float2 Start, float2 End, float Wider)> segments, SpatialBuckets<(float2 Start, float2 End, float Clearance)> existing,
             SiteSurvey survey, NeighbourhoodRequest request)
         {
             float halfWidth = request.RoadHalfWidth;
             foreach (var building in placed)
                 if (Overlap(quad, Quad(building.Pad), 6f)) return float.MaxValue;
+            // Off the footpaths' corridors, which the lots kept off too.
+            foreach (var path in plan.Paths)
+                if (Overlap(quad, new[] { path.Start.xz, path.End.xz, path.End.xz, path.Start.xz }, Footpaths.Clearance)) return float.MaxValue;
             // The house lot it replaces kept off the roads already there, but the building reaches further back. The whole
             // outline is tested, not the sample points below: a road could pass between those.
             foreach (var (start, end, clearance) in existing.Within((quad[0] + quad[2]) * 0.5f, math.distance(quad[0], quad[2]) * 0.5f))
@@ -153,13 +156,52 @@ namespace SteppedStreets.Core.Neighbourhood
             return earthwork - nearest * 0.01f;
         }
 
-        /// <summary>Distance to the road itself (<paramref name="own"/>) or to the nearest other road; MaxValue when none is near.</summary>
-        private static float RoadDistance(float2 point, int road, SpatialBuckets<(int Road, float2 Start, float2 End)> segments, bool own)
+        /// <summary>
+        /// Distance to the road itself (<paramref name="own"/>) or to the nearest other road, less how much wider than the street
+        /// road it is, so it compares with the street road's half width; MaxValue when none is near.
+        /// </summary>
+        private static float RoadDistance(float2 point, int road, SpatialBuckets<(int Road, float2 Start, float2 End, float Wider)> segments, bool own)
         {
             float best = float.MaxValue;
             foreach (var segment in segments.Near(point))
-                if ((segment.Road == road) == own) best = math.min(best, Geometry.DistanceToSegment(point, segment.Start, segment.End));
+                if ((segment.Road == road) == own) best = math.min(best, Geometry.DistanceToSegment(point, segment.Start, segment.End) - segment.Wider);
             return best;
+        }
+
+        /// <summary>Pocket parks keep this far apart, so short frontage here and there becomes a park, not every piece of it.</summary>
+        internal const float ParkSpacing = 200f;
+
+        /// <summary>
+        /// The request's parks that fit frontage <paramref name="width"/> cells wide and <paramref name="depth"/> deep, biggest
+        /// first; parks of one size in an order seeded by <paramref name="salt"/>, so neighbouring parks vary.
+        /// </summary>
+        internal static List<ServiceRequest> ParksThatFit(NeighbourhoodRequest request, int width, int depth, uint salt)
+        {
+            var fits = new List<(ServiceRequest Park, float Order)>();
+            var parks = request.Parks ?? new ServiceRequest[0];
+            for (int index = 0; index < parks.Length; index++)
+            {
+                var park = parks[index];
+                if (park == null || string.IsNullOrEmpty(park.Name) || park.WidthCells > width || park.DepthCells > depth) continue;
+                fits.Add((park, -park.WidthCells * park.DepthCells + Geometry.Hash01(salt, index, 0) * 0.5f));
+            }
+            fits.Sort((first, second) => first.Order.CompareTo(second.Order));
+            return fits.ConvertAll(fit => fit.Park);
+        }
+
+        internal static bool FarFromParks(List<PlannedBuilding> parks, float2 centre) =>
+            parks.TrueForAll(park => math.distancesq(park.Position.xz, centre) >= ParkSpacing * ParkSpacing);
+
+        /// <summary>Adds the pocket parks clear of every service building: those were placed over the lots, the parks beside them.</summary>
+        internal static void AddParks(List<PlannedBuilding> buildings, List<PlannedBuilding> parks)
+        {
+            int services = buildings.Count;
+            foreach (var park in parks)
+            {
+                bool clear = true;
+                for (int index = 0; index < services && clear; index++) clear = !Overlap(Quad(park.Pad), Quad(buildings[index].Pad), 0.5f);
+                if (clear) buildings.Add(park);
+            }
         }
 
         /// <summary>
