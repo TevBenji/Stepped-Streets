@@ -83,6 +83,10 @@ namespace SteppedStreets
             {
                 Logger.Error(exception, "Stepped Streets: the panel bindings failed to register");
             }
+#if SS_DEV
+            try { Dev.DevHarness.StartIfAsked(); }
+            catch (Exception exception) { Logger.Error(exception, "Stepped Streets: the dev harness failed to start"); }
+#endif
         }
 
         public void OnDispose()

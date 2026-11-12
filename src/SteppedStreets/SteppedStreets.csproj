@@ -14,6 +14,20 @@
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
+  <!-- The owner's local test runner: its own build configuration, so it can never reach bin\Release. Its folder isn't in the public repo. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Dev'">
+    <DefineConstants>$(DefineConstants);SS_DEV</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(Configuration)' != 'Dev'">
+    <Compile Remove="Dev\**" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Dev'">
+    <DevReference Include="UnityEngine.ScreenCaptureModule;UnityEngine.ImageConversionModule;Colossal.AssetPipeline" />
+    <Reference Include="@(DevReference)">
+      <HintPath>$(ManagedPath)\%(Identity).dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib">
       <HintPath>$(ManagedPath)\mscorlib.dll</HintPath>
