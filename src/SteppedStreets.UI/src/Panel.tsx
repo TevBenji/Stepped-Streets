@@ -8,7 +8,7 @@ import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./li
 import { ErrorBoundary } from "./lib/errorBoundary";
 import { LAYOUT_TIPS, SettingTip } from "./lib/tips";
 import {
-    formatArea, isExperimental, JunctionPattern, MixPattern, Option, panelFraction, PanelPlace, ServiceCount, ServiceOption, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
+    formatArea, isExperimental, JunctionPattern, MixPattern, Option, panelFraction, PanelPlace, ServiceCount, ServiceOption, Settings, StreetPlanting, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
 } from "./lib/state";
 import { vanilla } from "./lib/vanilla";
 import { LAYOUT_ICONS } from "./lib/layoutIcons";
@@ -302,6 +302,16 @@ function ZoneMix({ mix, zones, disabled, justAdded }: { mix: ZoneShare[]; zones:
     </>;
 }
 
+/** Zones for corner lots and lots on a main street; "From the mix" leaves them to the zone mix. */
+function ZoningSection({ settings, zones, disabled }: { settings: Settings; zones: Option[]; disabled: boolean }) {
+    const options = [{ name: "", label: "From the mix" }, ...zones];
+    return <Section title="Zoning">
+        <Picker label="Corner lots" options={options} value={settings.cornerZone} disabled={disabled} onPick={zone => act("setCornerZone", zone)} />
+        <Picker label="Main street lots" options={options} value={settings.mainStreetZone} disabled={disabled}
+            onPick={zone => act("setMainStreetZone", zone)} />
+    </Section>;
+}
+
 // The game's font has no superscript digits: the 2 of km2 and the 3 of m3 are drawn smaller and raised instead.
 function Measure({ text, className }: { text: string; className?: string }) {
     const power = /^(.*[a-z])([23])$/.exec(text);
@@ -385,6 +395,7 @@ const LAYOUTS: Option[] = [
 const JUNCTIONS: [JunctionPattern, string][] = [["Crossroads", "Crossroads"], ["Staggered", "Staggered"], ["TrafficOptimised", "Traffic"]];
 const MIX_PATTERNS: [MixPattern, string][] = [["Random", "Random"], ["Clumps", "Clumps"], ["Even", "Even"]];
 const SPACINGS: [string, string][] = [["-1", "Auto"], ["0", "0"], ["1", "1"], ["2", "2"]];
+const STREET_PLANTINGS: [StreetPlanting, string][] = [["None", "None"], ["Grass", "Grass"], ["Trees", "Trees"]];
 
 const cells = (value: number) => `${Math.round(value)} ${Math.round(value) === 1 ? "cell" : "cells"}`;
 const percent = (value: number) => `${Math.round(value)}%`;
@@ -529,7 +540,7 @@ function NeighbourhoodPanel() {
                                     onChange={mode => act("setExistingStreets", mode === "existing")} />
                             </Row>
                             {existing ? <div className={styles.layoutTip}>Zones the empty cells along streets already in the area. No new
-                                roads and no ground changes; cells already zoned stay as they are.</div> : null}
+                                roads; cells already zoned stay as they are.</div> : null}
                         </Section>
 
                         {existing ? null : <Section title="Layout">
@@ -544,9 +555,8 @@ function NeighbourhoodPanel() {
                         </Section>}
 
                         <Section title="What to build">
-                            {/* Service buildings need new streets; the mix keeps them for Build new. */}
-                            <Mix mix={settings.zoneMix} zones={state.zones} services={existing ? [] : settings.serviceMix}
-                                serviceOptions={existing ? [] : state.services} disabled={disabled} />
+                            <Mix mix={settings.zoneMix} zones={state.zones} services={settings.serviceMix}
+                                serviceOptions={state.services} disabled={disabled} />
                             {settings.zoneMix.length > 1 ? <Row label="Mix mode">
                                 <Segmented options={MIX_PATTERNS} value={settings.mixPattern} disabled={disabled}
                                     onChange={pattern => act("setMixPattern", pattern)} />
@@ -564,17 +574,51 @@ function NeighbourhoodPanel() {
                             <img className={classes(styles.chevron, moreOpen && styles.chevronOpen)} src={chevronIcon} />
                         </Button>
 
-                        {moreOpen && existing ? <Section title="Lots">
-                            <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
-                                format={cells} trigger="setLotWidth" disabled={disabled} />
-                            <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
-                                format={cells} trigger="setLotDepth" disabled={disabled} />
+                        {existing ? <Section title="Greenery">
+                            <ToggleRow label="Greenery" value={settings.trees} trigger="setTrees" disabled={disabled} />
                         </Section> : null}
+
+                        {moreOpen && existing ? <>
+                            <Section title="Streets">
+                                <Row label="Street trees">
+                                    <Segmented options={STREET_PLANTINGS} value={settings.streetTrees} disabled={disabled}
+                                        onChange={planting => act("setStreetTrees", planting)} />
+                                </Row>
+                                <ToggleRow label="Footpaths" value={settings.footpaths} trigger="setFootpaths" disabled={disabled} />
+                            </Section>
+
+                            <Section title="Lots">
+                                <NumberRow label="Lot width" value={settings.lotWidthCells} minimum={2} maximum={6} step={1}
+                                    format={cells} trigger="setLotWidth" disabled={disabled} />
+                                <NumberRow label="Lot depth" value={settings.lotDepthCells} minimum={2} maximum={6} step={1}
+                                    format={cells} trigger="setLotDepth" disabled={disabled} />
+                                <Row label="Space between lots">
+                                    <Segmented options={SPACINGS} value={String(settings.lotSpacing)} disabled={disabled}
+                                        onChange={spacing => act("setLotSpacing", Number(spacing))} />
+                                </Row>
+                                <ToggleRow label="Level lots" value={settings.levelExistingLots} trigger="setLevelExistingLots" disabled={disabled} />
+                            </Section>
+
+                            <ZoningSection settings={settings} zones={state.zones} disabled={disabled} />
+
+                            <Section title="Landscape">
+                                <ToggleRow label="Pocket parks" value={settings.pocketParks} trigger="setPocketParks" disabled={disabled} />
+                                {settings.trees ? <NumberRow label="Tree density" value={settings.treeDensityPercent} minimum={10} maximum={100}
+                                    step={5} format={percent} trigger="setTreeDensity" disabled={disabled} /> : null}
+                            </Section>
+                        </> : null}
 
                         {moreOpen && !existing ? <>
                             <Section title="Roads">
                                 <Picker label="Road" options={state.roads} value={settings.road} disabled={disabled} onPick={road => act("setRoad", road)} />
+                                <Picker label="Main road" options={[{ name: "", label: "Same as streets" }, ...state.roads]} value={settings.mainRoad}
+                                    disabled={disabled} onPick={road => act("setMainRoad", road)} />
+                                <Row label="Street trees">
+                                    <Segmented options={STREET_PLANTINGS} value={settings.streetTrees} disabled={disabled}
+                                        onChange={planting => act("setStreetTrees", planting)} />
+                                </Row>
                                 <ToggleRow label="Crosswalks" value={settings.crosswalks} trigger="setCrosswalks" disabled={disabled} />
+                                <ToggleRow label="Footpaths" value={settings.footpaths} trigger="setFootpaths" disabled={disabled} />
                                 <NumberRow label="Block depth" value={settings.blockDepth} minimum={60} maximum={200} step={5}
                                     format={metres} trigger="setBlockDepth" disabled={disabled} />
                                 <NumberRow label="Max road grade" value={settings.maxRoadGradePercent} minimum={4} maximum={12} step={1}
@@ -594,6 +638,8 @@ function NeighbourhoodPanel() {
                                 </Row>
                             </Section>
 
+                            <ZoningSection settings={settings} zones={state.zones} disabled={disabled} />
+
                             <Section title="Grading">
                                 <ToggleRow label="Level the lots" value={settings.levelLots} trigger="setLevelLots" disabled={disabled} />
                                 <NumberRow label="Most earth" value={settings.earthworkLimit} minimum={1} maximum={settings.steepGround ? 12 : 8} step={0.5}
@@ -604,6 +650,7 @@ function NeighbourhoodPanel() {
 
                             <Section title="Landscape">
                                 <ToggleRow label="Retaining walls" value={settings.retainingWalls} trigger="setRetainingWalls" disabled={disabled} />
+                                <ToggleRow label="Pocket parks" value={settings.pocketParks} trigger="setPocketParks" disabled={disabled} />
                                 {settings.trees ? <NumberRow label="Tree density" value={settings.treeDensityPercent} minimum={10} maximum={100}
                                     step={5} format={percent} trigger="setTreeDensity" disabled={disabled} /> : null}
                                 <Row label="Seed"><div className={styles.seedValue}>{settings.seed}</div></Row>
@@ -673,7 +720,8 @@ function NeighbourhoodPanel() {
                         <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="stepped-streets-confirm">
                             <div className={styles.dialogTitle}>{existing ? "Zone these streets?" : "Build this neighbourhood?"}</div>
                             <div id="stepped-streets-confirm" className={styles.dialogText}>
-                                {existing ? "Only empty cells are zoned. You can repaint any of them with the game's zoning tools."
+                                {existing ? settings.levelExistingLots ? "The lots are levelled before zoning, and ground changes are permanent. Zone?"
+                                    : "Only empty cells are zoned. You can repaint any of them with the game's zoning tools."
                                     : "Ground changes are permanent, like the game's terrain tools. Build?"}</div>
                             <div className={styles.dialogButtons}>
                                 <Button className={styles.secondary} onSelect={() => act("setConfirming", false)}>Cancel</Button>

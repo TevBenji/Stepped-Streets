@@ -32,7 +32,7 @@ and read defensively by `src/lib/state.ts` (`readState` never throws and clamps 
 open; the tool clears it on Esc, a new plan and the build), `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
 `connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
-`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `crosswalks`, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), and the catalogues `zones` and
+`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `crosswalks`, `streetTrees`, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), and the catalogues `zones` and
 `roads` (`name`/`label`, read again each time the tool opens, so Road Builder roads made since appear) and `services`
 (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
 the game's own menu icon path (ImageSystem.GetIconOrGroupIcon); it is left out when the game has none. While Planning and Building, `summary` is the current step; once Built,
@@ -48,6 +48,9 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setStyle` | string | ContourSuburb / TerracedBlocks / MountainLane / SquareGrid / RectangularGrid / IrregularGrid / SkewedGrid / FragmentedGrid / DiagonalGrid / CurvedGrid / WarpedGrid / RadialGrid / Star / Rings / Spiderweb / Fan / Spine / Ladder / Comb / Fishbone / Tree / CulDeSacs / Loops / LoopsAndLollipops / Lollipops / TriangularMesh / Hexagonal / HexagonalSpokes / Ridge / Valley / Coastal / Winding / OrganicMesh / Hybrid / Polycentric / Superblock / Radburn / FusedGrid / FilteredGrid / BarcelonaSuperblock |
 | `setJunctions` | string | Crossroads / Staggered / TrafficOptimised (grid layouts) |
 | `setRoad` | string | A road `name` from the catalogue |
+| `setMainRoad` | string | A road `name` for main streets and connectors; empty: the same road for every street |
+| `setCornerZone`, `setMainStreetZone` | string | A zone `name` for corner lots / lots on a main street; empty: from the mix |
+| `setStreetTrees` | string | None / Grass / Trees: the game's planting upgrade on the streets built or zoned. Saved; no re-plan |
 | `setMixPattern` | string | Random / Clumps / Even |
 | `setZoneMix` | string | `[{"zone":"...","share":N},...]`; zones not in the catalogue are dropped (a list of only those is refused); `[]` means no zoning: lots are levelled but left unzoned |
 | `setServiceMix` | string | `[{"name":"...","count":N},...]` (N 1–20); buildings not in the `services` catalogue are dropped; `[]` is allowed |
@@ -60,7 +63,9 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setTreeDensity`, `setSeed` | double | 10–100 %, 1–99999 |
 | `setLevelLots`, `setRetainingWalls`, `setTrees` | bool | Switches |
 | `setShapeGround` | bool | Off: no terrain changes at all (and no level lots) |
-| `setExistingStreets` | bool | On: zone the empty cells along streets already in the area; no roads, ground or trees |
+| `setExistingStreets` | bool | On: zone the empty cells along streets already in the area; no new roads |
+| `setFootpaths`, `setPocketParks` | bool | Paths through long blocks; small parks on frontage too short for a lot |
+| `setLevelExistingLots` | bool | Use existing: level the lots before zoning (changes the ground) |
 | `setSteepGround` | bool | Steep hills; on lifts `steepestBuildablePercent` to at least 50 and `earthworkLimit` to at least 8, off caps them at 30 and 8 |
 | `setCrosswalks` | bool | Off: the new streets' junctions get the game's crosswalk-removal upgrade. Saved; no re-plan; read when the roads are built |
 | `setPanelCollapsed` | bool | Fold the panel to its header. Saved; no re-plan; works during a build |

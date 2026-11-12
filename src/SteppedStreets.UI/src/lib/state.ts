@@ -20,6 +20,7 @@ export const isExperimental = (style: NeighbourhoodStyle) => !TRIED_STYLES.inclu
 export const usesJunctions = (style: NeighbourhoodStyle) => JUNCTION_STYLES.includes(style);
 export type JunctionPattern = "Crossroads" | "Staggered" | "TrafficOptimised";
 export type MixPattern = "Random" | "Clumps" | "Even";
+export type StreetPlanting = "None" | "Grass" | "Trees";
 
 /** A catalogue entry; icon is the game's own menu icon for it, when the game has one; group heads its part of a list. */
 export interface Option { name: string; label: string; icon?: string; group?: string }
@@ -57,6 +58,17 @@ export interface Settings {
     retainingWalls: boolean;
     /** Painted crosswalks where the new streets meet. Saved without re-planning. */
     crosswalks: boolean;
+    /** The road for main streets and connectors; empty: the same road for every street. */
+    mainRoad: string;
+    /** The game's grass or tree upgrade on the streets. Saved without re-planning. */
+    streetTrees: StreetPlanting;
+    footpaths: boolean;
+    pocketParks: boolean;
+    /** Use existing: grade the lots into level pads. */
+    levelExistingLots: boolean;
+    /** Zones for corner lots and lots on a main street; empty: from the mix. */
+    cornerZone: string;
+    mainStreetZone: string;
     trees: boolean;
     treeDensityPercent: number;
     seed: number;
@@ -204,6 +216,13 @@ export function readState(raw: unknown): ToolState {
             lotSpacing: whole(settings.lotSpacing, -1, -1, 2),
             retainingWalls: flag(settings.retainingWalls, false),
             crosswalks: flag(settings.crosswalks, true),
+            mainRoad: text(settings.mainRoad),
+            streetTrees: choice(settings.streetTrees, ["None", "Grass", "Trees"], "None"),
+            footpaths: flag(settings.footpaths, false),
+            pocketParks: flag(settings.pocketParks, false),
+            levelExistingLots: flag(settings.levelExistingLots, false),
+            cornerZone: text(settings.cornerZone),
+            mainStreetZone: text(settings.mainStreetZone),
             trees: flag(settings.trees, false),
             treeDensityPercent: number(settings.treeDensityPercent, 50, 10, 100),
             seed: whole(settings.seed, 1, 1, 99999),

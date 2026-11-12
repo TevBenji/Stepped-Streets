@@ -87,6 +87,30 @@ namespace SteppedStreets.Panel
                     settings.RoadName = value;
                     return true;
                 }));
+                // Empty means "the same road for every street".
+                Trigger<string>("setMainRoad", value => ChangeSettings(settings =>
+                {
+                    if (value == null || value.Length > 200) return false;
+                    settings.MainRoadName = value;
+                    return true;
+                }));
+                // Empty means "from the zone mix"; otherwise only a zone the game has.
+                Trigger<string>("setCornerZone", value => ChangeSettings(settings =>
+                {
+                    if (!ZoneOrMix(value)) return false;
+                    settings.CornerZone = value;
+                    return true;
+                }));
+                Trigger<string>("setMainStreetZone", value => ChangeSettings(settings =>
+                {
+                    if (!ZoneOrMix(value)) return false;
+                    settings.MainStreetZone = value;
+                    return true;
+                }));
+                Trigger<string>("setStreetTrees", value => SaveOnly(settings =>
+                {
+                    if (Enum.TryParse(value, out StreetPlanting planting) && Enum.IsDefined(typeof(StreetPlanting), planting)) settings.StreetTrees = planting;
+                }));
                 Trigger<string>("setZoneMix", value => ChangeSettings(settings =>
                 {
                     if (value == null || value.Length > 4000) return false;
@@ -124,6 +148,9 @@ namespace SteppedStreets.Panel
                 BoolTrigger("setSteepGround", (settings, value) => settings.SetSteepGround(value));
                 BoolTrigger("setShapeGround", (settings, value) => settings.ShapeGround = value);
                 BoolTrigger("setExistingStreets", (settings, value) => settings.UseExistingStreets = value);
+                BoolTrigger("setFootpaths", (settings, value) => settings.Footpaths = value);
+                BoolTrigger("setPocketParks", (settings, value) => settings.PocketParks = value);
+                BoolTrigger("setLevelExistingLots", (settings, value) => settings.LevelExistingLots = value);
                 // A key, not an address, so nothing the panel sends can open any other link.
                 Trigger<string>("openLink", key =>
                 {
@@ -181,10 +208,12 @@ namespace SteppedStreets.Panel
             finally { _tool.SettingsChanged(); }
         }
 
+        private bool ZoneOrMix(string value) => value != null && value.Length <= 200 && (value.Length == 0 || _zones.Count == 0 || _zones.ContainsKey(value));
+
         // Negative is the usual docked place.
         private static float PanelFraction(double value) => value < 0 ? -1f : (float)Math.Min(value, 1);
 
-        // Crosswalks and the panel's fold and place: saved like a setting, but the plan doesn't depend on them, so unlike
+        // Crosswalks, street trees and the panel's fold and place: saved like a setting, but the plan doesn't depend on them, so unlike
         // ChangeSettings this doesn't re-plan and still works during a build.
         private static void SaveOnly(Action<SteppedStreetsSettings> write)
         {
@@ -389,6 +418,13 @@ namespace SteppedStreets.Panel
             json.Append(",\"lotSpacing\":").Append(Integer(settings.LotSpacing));
             json.Append(",\"retainingWalls\":").Append(settings.RetainingWalls ? "true" : "false");
             json.Append(",\"crosswalks\":").Append(settings.Crosswalks ? "true" : "false");
+            json.Append(",\"mainRoad\":"); String(json, settings.MainRoadName ?? "");
+            json.Append(",\"streetTrees\":"); String(json, settings.StreetTrees.ToString());
+            json.Append(",\"footpaths\":").Append(settings.Footpaths ? "true" : "false");
+            json.Append(",\"pocketParks\":").Append(settings.PocketParks ? "true" : "false");
+            json.Append(",\"levelExistingLots\":").Append(settings.LevelExistingLots ? "true" : "false");
+            json.Append(",\"cornerZone\":"); String(json, settings.CornerZone ?? "");
+            json.Append(",\"mainStreetZone\":"); String(json, settings.MainStreetZone ?? "");
             json.Append(",\"trees\":").Append(settings.Trees ? "true" : "false");
             json.Append(",\"treeDensityPercent\":").Append(Integer(settings.TreeDensityPercent));
             json.Append(",\"seed\":").Append(Integer(settings.Seed));

@@ -625,6 +625,13 @@ namespace SteppedStreets.Tool
                 Trees = settings.Trees,
                 TreeDensity = settings.TreeDensityPercent / 100f,
                 Seed = (uint)math.max(1, settings.Seed),
+                MainRoadHalfWidth = string.IsNullOrEmpty(settings.MainRoadName) ? 0f
+                    : RoadCatalog.Find(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), settings.MainRoadName)?.HalfWidth ?? 0f,
+                Footpaths = settings.Footpaths,
+                PocketParks = settings.PocketParks,
+                LevelExistingLots = settings.LevelExistingLots,
+                CornerZone = settings.CornerZone ?? "",
+                MainStreetZone = settings.MainStreetZone ?? "",
             };
         }
 

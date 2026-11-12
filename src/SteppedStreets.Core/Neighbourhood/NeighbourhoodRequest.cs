@@ -398,5 +398,23 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>The same request and seed give the same plan; another seed gives another layout.</summary>
         public uint Seed = 1;
+
+        /// <summary>Half width of the road for main streets and connectors; 0 uses <see cref="RoadHalfWidth"/> for every street.</summary>
+        public float MainRoadHalfWidth;
+
+        /// <summary>Paths for people on foot through long blocks, from street to street.</summary>
+        public bool Footpaths;
+
+        /// <summary>Frontage too short for a lot becomes a small park instead of grass.</summary>
+        public bool PocketParks;
+
+        /// <summary>Existing streets: grade each lot into a level pad, as new streets do. Off unless asked: it changes the ground.</summary>
+        public bool LevelExistingLots;
+
+        /// <summary>The zone for corner lots; empty takes the mix.</summary>
+        public string CornerZone = "";
+
+        /// <summary>The zone for lots on a main street; empty takes the mix.</summary>
+        public string MainStreetZone = "";
     }
 }
