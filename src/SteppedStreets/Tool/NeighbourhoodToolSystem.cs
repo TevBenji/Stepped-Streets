@@ -558,6 +558,7 @@ namespace SteppedStreets.Tool
             PlanVersion++;
             State.Summary = plan.SummaryLine;
             State.Messages = plan.Messages.ToArray();
+            if (taskRequest?.ExistingStreets != true && plan.Roads.Count > 0) WarnIfRoadMissing();
             State.RoadKilometres = plan.RoadLength / 1000f;
             State.Lots = plan.Lots.Count;
             State.ZonedCells = plan.ZonedCells;
@@ -575,6 +576,17 @@ namespace SteppedStreets.Tool
             Touch();
             Log(Invariant($"plan in {plan.Milliseconds:0} ms ({plan.Timings}): {plan.Roads.Count} roads, {plan.RoadLength / 1000f:0.00} km, {plan.Lots.Count} lots, {plan.ZonedCells} cells, {plan.Trees.Count} trees, {plan.Walls.Count} wall pieces, connected {plan.Connected}; {plan.SummaryLine}"));
             foreach (var message in plan.Messages) Log(message);
+        }
+
+        // RoadCatalog.Find stands in another road when the saved one is gone (a Road Builder road deleted, its mod removed), so
+        // say which one rather than swap it silently.
+        private void WarnIfRoadMissing()
+        {
+            string saved = Mod.Settings?.RoadName;
+            var road = RoadCatalog.Find(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), saved);
+            if (road == null || string.Equals(road.Name, saved, StringComparison.OrdinalIgnoreCase)) return;
+            string label = Panel.PanelSystem.Localised("Assets.NAME[" + road.Name + "]", road.Name);
+            Message($"The chosen road isn't in the game now, so the plan uses {label}. Pick another under More settings.");
         }
 
         private NeighbourhoodRequest BuildRequest(float2[] boundary, SiteSnapshot snapshot, Settings.SteppedStreetsSettings settings)

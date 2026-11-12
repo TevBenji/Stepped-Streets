@@ -32,9 +32,9 @@ and read defensively by `src/lib/state.ts` (`readState` never throws and clamps 
 open; the tool clears it on Esc, a new plan and the build), `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
 `connected`, `trees`), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings), `progress` (0–1),
-`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), and the catalogues `zones` and
-`roads` (`name`/`label`) and `services` (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read
-again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
+`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `crosswalks`, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), and the catalogues `zones` and
+`roads` (`name`/`label`, read again each time the tool opens, so Road Builder roads made since appear) and `services`
+(`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
 the game's own menu icon path (ImageSystem.GetIconOrGroupIcon); it is left out when the game has none. While Planning and Building, `summary` is the current step; once Built,
 it is the build report (the panel shows it under the status line). The state is rebuilt only when ToolState.Version, a setting or a catalogue changes.
 
@@ -62,13 +62,14 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setShapeGround` | bool | Off: no terrain changes at all (and no level lots) |
 | `setExistingStreets` | bool | On: zone the empty cells along streets already in the area; no roads, ground or trees |
 | `setSteepGround` | bool | Steep hills; on lifts `steepestBuildablePercent` to at least 50 and `earthworkLimit` to at least 8, off caps them at 30 and 8 |
+| `setCrosswalks` | bool | Off: the new streets' junctions get the game's crosswalk-removal upgrade. Saved; no re-plan; read when the roads are built |
 | `setPanelCollapsed` | bool | Fold the panel to its header. Saved; no re-plan; works during a build |
 | `setPanelPosition` | double, double | Left and top as fractions of the screen (above 1 is capped); negative puts the panel back in its usual place. Saved; no re-plan; works during a build |
 | `openLink` | string | `bug` or `discord`, mapped in C# to a fixed address; anything else does nothing |
 
 Numeric triggers reject NaN/infinity and clamp before saving. Valid writes call `Mod.Settings.ApplyAndSave()` and then
-`tool.SettingsChanged()`, which re-plans the area. All triggers catch exceptions and log through `Mod.Logger`. The zone and road
-catalogues are read once; labels use the active localisation's `Assets.NAME[<name>]`, falling back to the prefab name.
+`tool.SettingsChanged()`, which re-plans the area. All triggers catch exceptions and log through `Mod.Logger`. The zone
+catalogue is read once; labels use the active localisation's `Assets.NAME[<name>]`, falling back to the prefab name.
 
 ## Game UI API verification
 

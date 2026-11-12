@@ -4,7 +4,7 @@
 // PLT; RESEARCH-NOTES rule 22). The UI parses them (JSON.parse). Values are rebuilt only when
 // their inputs changed (version stamps) and pushed only when the JSON actually differs
 // (ValueBinding compares) — not ~100 bindings per frame like GRG.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: one Stepped Streets state value for the neighbourhood tool, validated settings triggers, and one-time zone and road catalogues.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: one Stepped Streets state value for the neighbourhood tool, validated settings triggers, a one-time zone catalogue, and road and service catalogues read again whenever the tool opens.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -130,11 +130,12 @@ namespace SteppedStreets.Panel
                     string link = key == "bug" ? BugLink : key == "discord" ? DiscordLink : "";
                     if (link.Length > 0) UnityEngine.Application.OpenURL(link);
                 });
-                Trigger<bool>("setPanelCollapsed", value => SavePanel(settings => settings.PanelCollapsed = value));
+                Trigger<bool>("setCrosswalks", value => SaveOnly(settings => settings.Crosswalks = value));
+                Trigger<bool>("setPanelCollapsed", value => SaveOnly(settings => settings.PanelCollapsed = value));
                 AddBinding(new TriggerBinding<double, double>(Group, "setPanelPosition", (left, top) => Safe("setPanelPosition", () =>
                 {
                     if (double.IsNaN(left) || double.IsInfinity(left) || double.IsNaN(top) || double.IsInfinity(top)) return;
-                    SavePanel(settings => { settings.PanelLeft = PanelFraction(left); settings.PanelTop = PanelFraction(top); });
+                    SaveOnly(settings => { settings.PanelLeft = PanelFraction(left); settings.PanelTop = PanelFraction(top); });
                 })));
             }
             catch (Exception exception)
@@ -183,9 +184,9 @@ namespace SteppedStreets.Panel
         // Negative is the usual docked place.
         private static float PanelFraction(double value) => value < 0 ? -1f : (float)Math.Min(value, 1);
 
-        // The panel's fold and place: saved like a setting, but the plan doesn't depend on them, so unlike ChangeSettings this
-        // doesn't re-plan and still works during a build.
-        private static void SavePanel(Action<SteppedStreetsSettings> write)
+        // Crosswalks and the panel's fold and place: saved like a setting, but the plan doesn't depend on them, so unlike
+        // ChangeSettings this doesn't re-plan and still works during a build.
+        private static void SaveOnly(Action<SteppedStreetsSettings> write)
         {
             var settings = Mod.Settings;
             if (settings == null) return;
@@ -327,11 +328,15 @@ namespace SteppedStreets.Panel
             finally { _tool.SettingsChanged(); }
         }
 
+        /// <summary>
+        /// The zoning roads, read again each time the tool opens: Road Builder adds and renames its roads while the game runs.
+        /// </summary>
         private bool BuildRoads()
         {
+            if (_tool.State.Stage == ToolStage.Closed) { _roadsBuilt = false; return false; }
             if (_roadsBuilt) return false;
+            _roadsBuilt = true;
             var roads = RoadCatalog.List(EntityManager, _prefabs, Localised);
-            if (roads.Count == 0) return false;
             var json = new StringBuilder("[");
             foreach (var road in roads)
             {
@@ -340,8 +345,9 @@ namespace SteppedStreets.Panel
                 json.Append(",\"label\":"); String(json, road.Label);
                 json.Append('}');
             }
-            _roadsJson = json.Append(']').ToString();
-            _roadsBuilt = true;
+            string next = json.Append(']').ToString();
+            if (next == _roadsJson) return false;
+            _roadsJson = next;
             return true;
         }
 
@@ -382,6 +388,7 @@ namespace SteppedStreets.Panel
             json.Append(",\"bankGradePercent\":").Append(Integer((int)Math.Round(settings.BankGrade * 100f)));
             json.Append(",\"lotSpacing\":").Append(Integer(settings.LotSpacing));
             json.Append(",\"retainingWalls\":").Append(settings.RetainingWalls ? "true" : "false");
+            json.Append(",\"crosswalks\":").Append(settings.Crosswalks ? "true" : "false");
             json.Append(",\"trees\":").Append(settings.Trees ? "true" : "false");
             json.Append(",\"treeDensityPercent\":").Append(Integer(settings.TreeDensityPercent));
             json.Append(",\"seed\":").Append(Integer(settings.Seed));

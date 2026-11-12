@@ -4,7 +4,7 @@
 // Upgraded composition flags on the definition). Object definitions follow ParkingLotTool's
 // "field by field like ObjectToolBaseSystem" ObjectDefinition. Credits: tomkpunkt, Ti4goc,
 // KruemelGames (GPL-3.0).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: road courses only, from the neighbourhood plan's roads cut into short cubic pieces at their planned heights; MakeCoursePos reduced to attaching a road end to an existing edge or node; the standalone build-tool cadence, a temporaries count before Apply and a count of the built edges afterwards; no fitting, elevation, fences, objects, surfaces or audit machinery.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: road courses only, from the neighbourhood plan's roads cut into short cubic pieces at their planned heights; MakeCoursePos reduced to attaching a road end to an existing edge or node; the standalone build-tool cadence, a temporaries count before Apply and a count of the built edges afterwards; the crosswalk-removal upgrade on every piece when crosswalks are off; no fitting, elevation, fences, objects, surfaces or audit machinery.
 
 using System;
 using System.Collections.Generic;
@@ -49,6 +49,7 @@ namespace SteppedStreets.Build
         private NeighbourhoodPlan _plan;
         private Entity _prefab;
         private string _roadName;
+        private bool _crosswalks;
         private Action<NetBuildReport> _whenDone;
         private int _activationFrame, _emitFrame = -1, _applyFrame = -1, _lastTemporaryCount = -1, _stableSince;
         private int _refusedCount;
@@ -86,6 +87,7 @@ namespace SteppedStreets.Build
                 if (road == null) { Finish("no road prefab is available"); return; }
                 _prefab = road.Prefab;
                 _roadName = road.Name;
+                _crosswalks = Mod.Settings?.Crosswalks ?? true;
                 _tool.Activate();
                 _activationFrame = UnityEngine.Time.frameCount;
             }
@@ -172,10 +174,19 @@ namespace SteppedStreets.Build
                     m_StartPosition = start,
                     m_EndPosition = end,
                 });
+                // The game copies Upgraded from a definition onto the edges it builds (CourseSplitSystem), the same flag the
+                // crosswalk upgrade tool sets. Both sides, because which side holds an end's crosswalk depends on the node's
+                // composition; the joints between pieces are two-way nodes with no crosswalk, so only the junctions change.
+                if (!_crosswalks)
+                    EntityManager.AddComponentData(definition, new Upgraded { m_Flags = new CompositionFlags
+                    {
+                        m_Left = CompositionFlags.Side.RemoveCrosswalk,
+                        m_Right = CompositionFlags.Side.RemoveCrosswalk,
+                    } });
                 _pieceMiddles.Add(MathUtils.Position(curve, 0.5f).xz);
             }
             _emitFrame = frame;
-            Mod.Logger.Info($"Stepped Streets roads: emitted {pieceTotal} courses for {_plan.Roads.Count} roads as '{_roadName}' in one frame.");
+            Mod.Logger.Info($"Stepped Streets roads: emitted {pieceTotal} courses for {_plan.Roads.Count} roads as '{_roadName}' in one frame{(_crosswalks ? "" : ", without crosswalks")}.");
         }
 
         // The road's direction at a point, from its neighbours; one-sided at the ends, so the pieces of a street that meet at a

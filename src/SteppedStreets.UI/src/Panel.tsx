@@ -574,6 +574,7 @@ function NeighbourhoodPanel() {
                         {moreOpen && !existing ? <>
                             <Section title="Roads">
                                 <Picker label="Road" options={state.roads} value={settings.road} disabled={disabled} onPick={road => act("setRoad", road)} />
+                                <ToggleRow label="Crosswalks" value={settings.crosswalks} trigger="setCrosswalks" disabled={disabled} />
                                 <NumberRow label="Block depth" value={settings.blockDepth} minimum={60} maximum={200} step={5}
                                     format={metres} trigger="setBlockDepth" disabled={disabled} />
                                 <NumberRow label="Max road grade" value={settings.maxRoadGradePercent} minimum={4} maximum={12} step={1}
