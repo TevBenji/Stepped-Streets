@@ -97,9 +97,14 @@ namespace SteppedStreets.Core.Neighbourhood
             return component;
         }
 
-        /// <summary>Roads between nodes; <paramref name="owners"/> gets the street each road came from.</summary>
-        public static void Assemble(List<Street> streets, NeighbourhoodPlan plan, List<int> owners)
+        /// <summary>
+        /// Roads between nodes; <paramref name="owners"/> gets the street each road came from. A road is main when it joins the
+        /// network to the city's roads (a connection), when the connector planner laid it (a link between contour streets or
+        /// between pieces), or when its layout marked the street as one its traffic runs along (<see cref="Street.Main"/>).
+        /// </summary>
+        public static void Assemble(List<Street> streets, NeighbourhoodPlan plan, List<int> owners, NeighbourhoodRequest request)
         {
+            float mainHalfWidth = MainHalfWidth(request);
             plan.Nodes.Clear();
             plan.Roads.Clear();
             owners.Clear();
@@ -195,7 +200,9 @@ namespace SteppedStreets.Core.Neighbourhood
                         StartNode = Node(index, first % count),
                         EndNode = Node(index, last % count),
                         SteepestGrade = RoadProfile.SteepestGrade(points),
+                        Main = street.Main || street.Kind == RoadKind.Connection,
                     };
+                    road.HalfWidth = road.Main ? mainHalfWidth : request.RoadHalfWidth;
                     for (int offset = 1; offset < points.Length; offset++) road.Length += math.distance(points[offset].xz, points[offset - 1].xz);
                     // Ends sit exactly on their nodes, so the game merges the junctions.
                     road.Points[0] = plan.Nodes[road.StartNode].Position;
@@ -212,10 +219,11 @@ namespace SteppedStreets.Core.Neighbourhood
                 }
             }
             foreach (var road in plan.Roads)
-            {
-                plan.Nodes[road.StartNode].Degree++;
-                plan.Nodes[road.EndNode].Degree++;
-            }
+                foreach (var node in new[] { plan.Nodes[road.StartNode], plan.Nodes[road.EndNode] })
+                {
+                    node.Degree++;
+                    node.HalfWidth = math.max(node.HalfWidth, road.HalfWidth);
+                }
             foreach (var node in plan.Nodes) node.DeadEnd = node.Degree == 1 && node.ExistingRoadId == 0;
         }
 
@@ -308,7 +316,8 @@ namespace SteppedStreets.Core.Neighbourhood
                     {
                         if (other.x < road || (other.x == road && other.y <= point)) continue;
                         var otherRoad = plan.Roads[other.x];
-                        float needed = clearance + math.abs(otherRoad.Points[other.y].y - planned.Points[point].y) / bank;
+                        float needed = clearance + Wider(planned, request) + Wider(otherRoad, request)
+                            + math.abs(otherRoad.Points[other.y].y - planned.Points[point].y) / bank;
                         if (other.x == road)
                         {
                             float apart = along[other.y] - along[point];
@@ -319,7 +328,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         if (distance >= needed) continue;
                         // Only two different roads share a node: a road is let off near its own ends by the along-road test above,
                         // so a lane that comes back past its start is still checked there.
-                        if (other.x != road && NearShared(planned, otherRoad, plan, position, nodeReach)) continue;
+                        if (other.x != road && NearShared(planned, otherRoad, plan, position, nodeReach + Wider(planned, request) + Wider(otherRoad, request))) continue;
                         // Two connections clashing: the later one goes, as the first serves the largest network.
                         var kind = streets[owners[road]].Kind;
                         int blamed = kind.IsMain() || (kind == RoadKind.Connection && streets[owners[other.x]].Kind == RoadKind.Connection)
@@ -341,7 +350,13 @@ namespace SteppedStreets.Core.Neighbourhood
         /// Closer than that, the bank between them must take their whole difference in height, which the rule asks room for.
         /// </summary>
         internal static float ClearanceReach(NeighbourhoodRequest request) =>
-            Clearance(request) + 2f * GroundField.BankReach(request);
+            Clearance(request) + 2f * math.max(0f, MainHalfWidth(request) - request.RoadHalfWidth) + 2f * GroundField.BankReach(request);
+
+        /// <summary>Half the width of a main street or connector: the main road's when one is chosen, else the street road's.</summary>
+        internal static float MainHalfWidth(NeighbourhoodRequest request) => request.MainRoadHalfWidth > 0f ? request.MainRoadHalfWidth : request.RoadHalfWidth;
+
+        /// <summary>How much wider than the street road a road is, each side; the main road's rules add it to the street road's.</summary>
+        internal static float Wider(PlannedRoad road, NeighbourhoodRequest request) => road.HalfWidth - request.RoadHalfWidth;
 
         /// <summary>
         /// The first point of a road that comes too close to an earlier stretch of itself (the legs of a hairpin), or -1. Points

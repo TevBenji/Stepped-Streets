@@ -119,6 +119,9 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     {
                         var street = Street(survey, request, line, RoadKind.Street);
                         if (street == null) continue;
+                        // Every fourth row from the middle one is an avenue, about one every 400 m; a traffic-optimised grid has
+                        // its through road instead, and a filtered or organic grid carries no through traffic.
+                        street.Main = !traffic && !filtered && !organic && (row - offsets.Count / 2) % 4 == 0;
                         stretches.Add((streets.Count, start));
                         streets.Add(street);
                     }
@@ -179,7 +182,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     float road = collector + (offsets[row] - offsets[0]) * lean, roadNext = road + (offsets[row + 1] - offsets[row]) * lean;
                     if (traffic && (math.abs(at - road) < crossSpacing * 0.35f || math.abs(next - roadNext) < crossSpacing * 0.35f
                         || (at - road) * (next - roadNext) < 0f)) continue;
-                    Cross(survey, request, streets, rows[row], rows[row + 1], along, at, next);
+                    int avenue = Cross(survey, request, streets, rows[row], rows[row + 1], along, at, next);
+                    if (avenue >= 0) streets[avenue].Main = true;
                 }
             for (int row = 0; row + 1 < rows.Count; row++)
             {
@@ -246,6 +250,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     else if ((request.ExistingRoads?.Length ?? 0) > 0) end.Broken = true;
                     else through.Add(stub);
                 }
+                foreach (int index in through) streets[index].Main = true;
                 return streets;
             }
 
@@ -445,7 +450,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             for (int index = 1; index < line.Count - 1; index++)
             {
                 if (request.Blocked != null && request.Blocked(line[index])) return false;
-                if (math.distance(line[index], hit.xz) > target.HalfWidth + request.RoadHalfWidth + 8f && survey.ConnectionRoomAt(line[index]) < 0f
+                if (math.distance(line[index], hit.xz) > target.HalfWidth + RoadNetwork.MainHalfWidth(request) + 8f && survey.ConnectionRoomAt(line[index]) < 0f
                     && survey.StreetRoomAt(line[index]) < 0f) return false;
             }
             // An even grade from the grid to the city's road: the landings a longer road gets don't fit in a short join on a slope.

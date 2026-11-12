@@ -34,6 +34,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>How many new roads end here.</summary>
         public int Degree;
+
+        /// <summary>Half the width of the widest new road ending here, centreline to kerb.</summary>
+        public float HalfWidth;
     }
 
     public sealed class PlannedRoad
@@ -53,6 +56,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>A main street or connector: built with the main road type, and its lots can take the main-street zone.</summary>
         public bool Main;
+
+        /// <summary>Half the road's width, centreline to kerb: the main road's for a main street when one is chosen.</summary>
+        public float HalfWidth;
     }
 
     public sealed class PlannedLot

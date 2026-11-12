@@ -98,14 +98,14 @@ namespace SteppedStreets.Core.Neighbourhood
             void Settle()
             {
                 connected = RoadNetwork.Prune(streets, out leftOut);
-                RoadNetwork.Assemble(streets, plan, owners);
+                RoadNetwork.Assemble(streets, plan, owners, request);
                 for (int round = 0; round < 4; round++)
                 {
                     var bad = RoadNetwork.Violations(plan, owners, streets, request, radius, LinkRadius(request), notes);
                     if (bad.Count == 0) break;
                     foreach (int street in bad) streets[street].Broken = true;
                     connected = RoadNetwork.Prune(streets, out leftOut);
-                    RoadNetwork.Assemble(streets, plan, owners);
+                    RoadNetwork.Assemble(streets, plan, owners, request);
                 }
             }
             Settle();
@@ -378,6 +378,7 @@ namespace SteppedStreets.Core.Neighbourhood
             if (request.Boundary == null || request.Boundary.Length < 3) throw new ArgumentException("The area needs at least three corners.", nameof(request));
             if (request.GroundHeight == null) throw new ArgumentException("The request needs a ground height sampler.", nameof(request));
             request.RoadHalfWidth = math.clamp(Finite(request.RoadHalfWidth, 6f), 2f, 20f);
+            request.MainRoadHalfWidth = Finite(request.MainRoadHalfWidth, 0f) > 0f ? math.clamp(request.MainRoadHalfWidth, 2f, 20f) : 0f;
             request.BlockDepth = math.clamp(Finite(request.BlockDepth, 90f), 50f, 250f);
             request.MaxRoadGrade = math.clamp(Finite(request.MaxRoadGrade, 0.08f), 0.03f, 0.12f);
             request.SteepestBuildable = math.clamp(Finite(request.SteepestBuildable, 0.15f), 0.05f, request.SteepGround ? 0.6f : 0.4f);

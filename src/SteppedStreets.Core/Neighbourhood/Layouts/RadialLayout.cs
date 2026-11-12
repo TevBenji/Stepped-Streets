@@ -60,6 +60,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             {
                 cancellation.ThrowIfCancellationRequested();
                 rings.Add((radius, Ring(survey, request, streets, centre, start, radius)));
+                // A star's second ring is its boulevard.
+                if (star && rings.Count == 2) foreach (var arc in rings[1].Arcs) streets[arc.Street].Main = true;
             }
             if (rings.Count == 0) return streets;
 
@@ -81,7 +83,11 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                         float nudge = (attempt + 1) / 2 * (attempt % 2 == 0 ? 1f : -1f) * Step / (2f * math.PI * rings[ring].Radius);
                         if (!Find(streets, rings[ring].Arcs, turn + nudge, share, out int a, out int pointA)
                             || !Find(streets, rings[ring + 1].Arcs, turn + nudge, share, out int b, out int pointB)) continue;
-                        if (GridLayout.Join(survey, request, streets, a, pointA, b, pointB) >= 0) break;
+                        int link = GridLayout.Join(survey, request, streets, a, pointA, b, pointB);
+                        if (link < 0) continue;
+                        // A fan's trunk: its first radial street, straight in from the way in at its apex.
+                        if (fan && radial == 0) streets[link].Main = true;
+                        break;
                     }
                 }
             }

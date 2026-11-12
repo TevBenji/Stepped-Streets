@@ -49,6 +49,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         public bool Removed => Broken || Pruned;
 
+        /// <summary>A street the layout's traffic runs along (a trunk, a through street, a connector): see <see cref="RoadNetwork.Assemble"/>.</summary>
+        public bool Main;
+
         public Street(RoadKind kind, List<float2> points, float[] heights)
         {
             Kind = kind;
