@@ -118,6 +118,9 @@ namespace SteppedStreets.Core.Neighbourhood
             float halfWidth = request.RoadHalfWidth;
             foreach (var building in placed)
                 if (Overlap(quad, Quad(building.Pad), 6f)) return float.MaxValue;
+            // Off the footpaths' corridors, which the lots kept off too.
+            foreach (var path in plan.Paths)
+                if (Overlap(quad, new[] { path.Start.xz, path.End.xz, path.End.xz, path.Start.xz }, Footpaths.Clearance)) return float.MaxValue;
             // The house lot it replaces kept off the roads already there, but the building reaches further back. The whole
             // outline is tested, not the sample points below: a road could pass between those.
             foreach (var (start, end, clearance) in existing.Within((quad[0] + quad[2]) * 0.5f, math.distance(quad[0], quad[2]) * 0.5f))

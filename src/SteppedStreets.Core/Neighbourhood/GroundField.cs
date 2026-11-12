@@ -157,8 +157,8 @@ namespace SteppedStreets.Core.Neighbourhood
 
             // Road corridors: level across each road at its centreline's planned height. Where corridors overlap (a junction)
             // the heights blend by how deep the node sits in each, so the ground is continuous from one road into the other.
-            // Distances are measured less how much wider than the street road a corridor is, so every corridor compares with the
-            // street road's.
+            // Footpaths get corridors too, their own width, climbing evenly from street to street. Distances are measured less
+            // how much wider than the street road a corridor is, so every corridor compares with the street road's.
             var roadDistance = new float[count];
             var weightSum = new float[count];
             var weightedHeight = new float[count];
@@ -174,6 +174,7 @@ namespace SteppedStreets.Core.Neighbourhood
             var corridors = new List<(float3[] Points, float Wider, bool SquareStart, bool SquareEnd)>();
             foreach (var road in plan.Roads)
                 corridors.Add((road.Points, RoadNetwork.Wider(road, request), plan.Nodes[road.StartNode].ExistingRoadId != 0, plan.Nodes[road.EndNode].ExistingRoadId != 0));
+            foreach (var path in plan.Paths) corridors.Add((new[] { path.Start, path.End }, Footpaths.HalfWidth - halfWidth, false, false));
             for (int roadIndex = 0; roadIndex < corridors.Count; roadIndex++)
             {
                 var (points, wider, squareStart, squareEnd) = corridors[roadIndex];
@@ -268,6 +269,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 }
                 var order = new List<int>();
                 for (int road = 0; road < corridors.Count; road++) order.Add(road);
+                // Footpaths last.
                 int Rank(int road) => road >= plan.Roads.Count ? 2 : plan.Roads[road].Kind.IsMain() ? 0 : 1;
                 order.Sort((first, second) =>
                 {

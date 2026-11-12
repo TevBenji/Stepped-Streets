@@ -56,6 +56,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (radius > 0f) keepAway.Add(node.Position.xz - radius, node.Position.xz + radius, (node.Position.xz, radius));
             }
             var occupied = new SpatialBuckets<Pad>(32f);
+            var paths = Footpaths.Buckets(plan);
 
             var lots = new List<PlannedLot>();
             var reasons = new Dictionary<EmptyLotReason, int>();
@@ -86,7 +87,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         if (math.distancesq(point, centre) < radius * radius) return true;
                     foreach (var pad in occupied.Near(point))
                         if (InsidePad(pad, point, 0.3f)) return true;
-                    return false;
+                    return Footpaths.Near(paths, point, Footpaths.Clearance);
                 }
 
                 StepPlan stepPlan;

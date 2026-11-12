@@ -144,6 +144,8 @@ namespace SteppedStreets.Core.Neighbourhood
                 foreach (var road in roads.Roads) roads.RoadLength += road.Length;
                 roadsReady(roads);
             }
+            // Before the lots, which keep off them.
+            plan.Paths = Footpaths.Plan(plan, survey, request, cancellation);
             var lots = LotLayout.Plan(plan, owners, survey, request, plan.Messages, cancellation);
             plan.Buildings = ServiceSites.Place(plan, lots, survey, request, plan.Messages, cancellation);
             Stage("lots");

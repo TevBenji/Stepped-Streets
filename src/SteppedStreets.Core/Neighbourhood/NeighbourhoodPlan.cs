@@ -61,6 +61,19 @@ namespace SteppedStreets.Core.Neighbourhood
         public float HalfWidth;
     }
 
+    /// <summary>
+    /// A footpath through a long block, straight from the kerb of one street to the kerb of the street behind or opposite it,
+    /// its ends just short of each kerb so the game joins them to the sidewalks.
+    /// </summary>
+    public sealed class PlannedPath
+    {
+        /// <summary>The ends, at the planned height of the street each one meets; the path climbs evenly between them.</summary>
+        public float3 Start, End;
+
+        /// <summary>Indexes into <see cref="NeighbourhoodPlan.Roads"/> of the streets the path joins.</summary>
+        public int StartRoad, EndRoad;
+    }
+
     public sealed class PlannedLot
     {
         /// <summary>The level pad: corners, height, width and depth in cells.</summary>
@@ -110,6 +123,7 @@ namespace SteppedStreets.Core.Neighbourhood
         public List<PlannedBuilding> Buildings = new List<PlannedBuilding>();
         public List<PlannedTree> Trees = new List<PlannedTree>();
         public List<WallSegment> Walls = new List<WallSegment>();
+        public List<PlannedPath> Paths = new List<PlannedPath>();
 
         /// <summary>The planned ground; null when nothing changes.</summary>
         public GroundField Ground;

@@ -25,6 +25,7 @@ namespace SteppedStreets.Core.Neighbourhood
             if (!request.Trees) return trees;
             float density = math.clamp(request.TreeDensity, 0.1f, 1f);
             var roads = RoadBuckets(plan, 4f);
+            var paths = Footpaths.Buckets(plan);
             var pads = new SpatialBuckets<Pad>(32f);
             foreach (var lot in lots)
             {
@@ -53,7 +54,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     float2 point = survey.BoundaryMinimum + (new float2(column, row) + 0.15f + jitter * 0.7f) * TreeSpacing;
                     if (!Poly.Contains(survey.Boundary, point)) continue;
                     if (request.Blocked != null && request.Blocked(point)) continue;
-                    if (NearRoad(roads, plan, point, 3.5f)) continue;
+                    if (NearRoad(roads, plan, point, 3.5f) || Footpaths.Near(paths, point, Footpaths.HalfWidth + 2f)) continue;
                     bool nearExisting = false;
                     foreach (var (start, end, clearance) in existing.Near(point))
                         if (Geometry.DistanceToSegment(point, start, end) < clearance) { nearExisting = true; break; }
@@ -120,6 +121,8 @@ namespace SteppedStreets.Core.Neighbourhood
                 float junctionReach = node.HalfWidth + 12f;
                 if (node.Degree >= 3 || node.ExistingRoadId != 0) junctionNodes.Add(node.Position.xz - junctionReach, node.Position.xz + junctionReach, (node.Position.xz, junctionReach));
             }
+            // No wall across the end of a footpath.
+            var paths = Footpaths.Buckets(plan);
 
             foreach (var road in plan.Roads)
             {
@@ -147,6 +150,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         bool clear = true;
                         foreach (var pad in pads.Near(middle)) if (LotLayout.InsidePad(pad, middle, -4f)) { clear = false; break; }
                         foreach (var (node, junctionReach) in junctionNodes.Near(middle)) if (math.distance(node, middle) < junctionReach) { clear = false; break; }
+                        if (Footpaths.Near(paths, middle, Footpaths.HalfWidth + 3f)) clear = false;
                         if (clear && cut >= 0.8f && cut <= 3f) run.Add((start, end, roadHeight));
                         else Flush();
                     }
