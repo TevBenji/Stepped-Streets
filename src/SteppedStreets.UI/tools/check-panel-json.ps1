@@ -46,9 +46,18 @@ try {
     $settings = [Runtime.CompilerServices.RuntimeHelpers]::GetUninitializedObject($settingsType)
     $before = $signature.Invoke($null, @($settings))
     $settings.PanelLeft = 0.5; $settings.PanelTop = 0.5; $settings.PanelCollapsed = $true
+    $settings.Presets = '[{"name":"Hill town"}]'
     if ($signature.Invoke($null, @($settings)) -cne $before) { throw 'The panel fold or place changed the plan signature.' }
     $settings.BlockDepth = 120
     if ($signature.Invoke($null, @($settings)) -ceq $before) { throw 'A real setting did not change the plan signature.' }
     'Plan signature self-check: the panel leaves a plan ready and a setting does not.'
+
+    # A preset holds every plan setting, the crosswalks and the street trees; never the panel's fold or place, or the presets.
+    $held = @($panel.GetMethod('PresetProperties', $flags).Invoke($null, @()) | ForEach-Object { $_.Name })
+    foreach ($name in @('Style', 'RoadName', 'ZoneMix', 'ServiceMix', 'CornerZone', 'MainStreetZone', 'BankGrade', 'Seed', 'Crosswalks', 'StreetTrees')) {
+        if ($held -notcontains $name) { throw "A preset leaves out $name." }
+    }
+    foreach ($name in @('PanelCollapsed', 'PanelLeft', 'PanelTop', 'Presets')) { if ($held -contains $name) { throw "A preset holds $name." } }
+    "Preset self-check: a preset holds $($held.Count) settings and none of the panel's own."
 }
 finally { [AppDomain]::CurrentDomain.remove_AssemblyResolve($resolver) }

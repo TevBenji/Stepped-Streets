@@ -337,3 +337,32 @@ test("thousands separators for counts", async () => {
     assert.equal(thousands(38000.4), "38,000");
     assert.equal(thousands(1234567), "1,234,567");
 });
+
+test("presets, Remove and the removal read safely", async () => {
+    const { readState, statusLine, nextPresetName } = await stateModule();
+    const empty = readState(null);
+    assert.deepEqual(empty.presets, []);
+    assert.equal(empty.canRemoveLast, false);
+    assert.equal(empty.removeLastSummary, "");
+    assert.equal(empty.removing, false);
+
+    // Names are trimmed text of 1-40 characters; a name repeated in another case is the same preset.
+    const forty = "x".repeat(40);
+    const state = readState({
+        stage: "Building", presets: ["  Hill town ", "hill TOWN", "", "   ", 7, null, forty + "x", forty, "Grid"],
+        canRemoveLast: true, removeLastSummary: "34 road pieces and the zoning of 210 cells", removing: true,
+    });
+    assert.deepEqual(state.presets, ["Hill town", forty, "Grid"]);
+    assert.equal(state.canRemoveLast, true);
+    assert.equal(state.removeLastSummary, "34 road pieces and the zoning of 210 cells");
+    assert.equal(statusLine(state), "Removing...");
+    assert.equal(statusLine(readState({ stage: "Building", removing: "yes" })), "Building...");
+    for (const value of ["true", 1, {}, null]) assert.equal(readState({ canRemoveLast: value }).canRemoveLast, false);
+    assert.equal(readState({ removeLastSummary: 5 }).removeLastSummary, "");
+    assert.deepEqual(readState({ presets: "Hill town" }).presets, []);
+    assert.equal(readState({ presets: Array.from({ length: 30 }, (_, index) => `P${index}`) }).presets.length, 20);
+
+    assert.equal(nextPresetName([]), "Preset 1");
+    assert.equal(nextPresetName(["Preset 2", "A"]), "Preset 3");
+    assert.equal(nextPresetName(["preset 2", "Preset 3"]), "Preset 4");
+});

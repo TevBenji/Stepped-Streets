@@ -20,9 +20,9 @@ export function useToolState() {
     return useMemo(() => readState(raw), [raw]);
 }
 
-export type Action = "toggleTool" | "close" | "clearArea" | "closeArea" | "undo" | "build" | "reroll";
+export type Action = "toggleTool" | "close" | "clearArea" | "closeArea" | "undo" | "build" | "reroll" | "removeLast";
 export type TextTrigger = "setStyle" | "setJunctions" | "setRoad" | "setMixPattern" | "setZoneMix" | "setServiceMix" | "openLink"
-    | "setMainRoad" | "setStreetTrees" | "setCornerZone" | "setMainStreetZone";
+    | "setMainRoad" | "setStreetTrees" | "setCornerZone" | "setMainStreetZone" | "savePreset" | "loadPreset" | "deletePreset";
 export type NumberTrigger = "setBlockDepth" | "setMaxRoadGrade" | "setSteepestBuildable" | "setLotWidth" | "setLotDepth"
     | "setEarthworkLimit" | "setBankGrade" | "setLotSpacing" | "setTreeDensity" | "setSeed";
 export type ToggleTrigger = "setLevelLots" | "setRetainingWalls" | "setTrees" | "setSteepGround" | "setShapeGround" | "setExistingStreets"
