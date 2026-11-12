@@ -33,10 +33,18 @@ namespace SteppedStreets.Tool
             foreach (var centre in takenNow)
                 if (!takenThen.Contains(CellKey(centre)) && Graded(centre))
                     return string.Format(System.Globalization.CultureInfo.InvariantCulture, "the cell at ({0:0}, {1:0}) was zoned or built on since the plan", centre.x, centre.y);
+            // The plan's buildings by where they stand, so each live one is matched against its neighbours only: a big built-up
+            // area would otherwise compare every building with every other on the main thread as Build is clicked.
+            var then = new Core.Neighbourhood.SpatialBuckets<float2[]>(32f);
+            foreach (var old in buildingsThen)
+            {
+                float2 middle = (old[0] + old[2]) * 0.5f;
+                then.Add(middle - 2f, middle + 2f, old);
+            }
             foreach (var lot in buildingsNow)
             {
                 bool known = false;
-                foreach (var then in buildingsThen) if (SameLot(lot, then)) { known = true; break; }
+                foreach (var old in then.Near((lot[0] + lot[2]) * 0.5f)) if (SameLot(lot, old)) { known = true; break; }
                 if (known) continue;
                 // The lot a metre in from its edges every 4 m or so: a new house beside a pad, touching it, isn't under it.
                 float2 a = lot[0], b = lot[1], d = lot[3];
