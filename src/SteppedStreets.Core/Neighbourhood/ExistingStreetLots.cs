@@ -56,6 +56,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (run.Count > 0) Flush(block.Key);
             }
             LotLayout.AssignZones(lots, request);
+            PositionZones.ForExistingStreets(lots, request);
             return lots;
         }
 

@@ -146,6 +146,7 @@ namespace SteppedStreets.Core.Neighbourhood
             }
             var lots = LotLayout.Plan(plan, owners, survey, request, plan.Messages, cancellation);
             plan.Buildings = ServiceSites.Place(plan, lots, survey, request, plan.Messages, cancellation);
+            PositionZones.ForNewStreets(lots, plan, request);
             Stage("lots");
             // The buildings' pads are graded like the lots' and keep the trees off.
             var buildingPads = new List<PlannedLot>();
@@ -419,6 +420,10 @@ namespace SteppedStreets.Core.Neighbourhood
                 foreach (var share in request.Mix ?? new ZoneShare[0])
                     if (share != null && counts.TryGetValue(share.Zone ?? "", out int count) && !plan.ZoneCounts.Exists(entry => entry.Key == share.Zone))
                         plan.ZoneCounts.Add(new KeyValuePair<string, int>(share.Zone, count));
+                // The corner and main-street zones follow the mix's, when it doesn't have them.
+                foreach (string zone in new[] { request.CornerZone, request.MainStreetZone })
+                    if (!string.IsNullOrEmpty(zone) && counts.TryGetValue(zone, out int count) && !plan.ZoneCounts.Exists(entry => entry.Key == zone))
+                        plan.ZoneCounts.Add(new KeyValuePair<string, int>(zone, count));
                 if (!plan.Connected && plan.Roads.Count > 0)
                     plan.Messages.Insert(0, "Not connected: no existing road within reach. The new streets are built on their own.");
                 if (plan.WildShare >= 0.05f)

@@ -33,6 +33,8 @@ namespace SteppedStreets.Tool
         // The fingerprint watches only the area and a strip round it (its banks): houses growing further out while the plan is
         // open must not keep sending Build back to re-plan.
         private const float FingerprintMargin = 40f;
+        // A zone block reaches six cells back from its road.
+        private const float ZoneRoadReach = 80f;
 
         private readonly float2 origin;
         private readonly float HeightSpacing;
@@ -54,10 +56,11 @@ namespace SteppedStreets.Tool
             foreach (var corner in boundary) { low = math.min(low, corner); high = math.max(high, corner); }
             if (zoneCells)
             {
-                // Zoning existing streets needs only the free cells (with their blocks' heights), so the heights, water,
-                // buildings and roads that cost most of a big area's snapshot are left out; there are no roads to plan.
+                // Zoning existing streets needs only the free cells (with their blocks' heights), so the heights, water and
+                // buildings that cost most of a big area's snapshot are left out; there are no roads to plan.
                 ZoneCells = CaptureZoneCells(entities, low, high);
-                ExistingRoads = new ExistingRoad[0];
+                // The roads the blocks line and meet, for corner and main-street zoning.
+                ExistingRoads = CaptureRoads(entities, low - ZoneRoadReach, high + ZoneRoadReach);
                 origin = low;
                 HeightSpacing = FinestSpacing;
                 columns = rows = 2;
