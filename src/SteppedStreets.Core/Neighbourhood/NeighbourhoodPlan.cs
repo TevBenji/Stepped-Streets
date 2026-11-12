@@ -137,9 +137,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>
         /// At least one road (the area need not touch a road, so a standalone network is buildable too), or, on existing
-        /// streets, at least one cell to zone or one building to place.
+        /// streets, anything to do: a cell to zone, a building to place, greenery to plant or ground to level.
         /// </summary>
-        public bool Buildable => Roads.Count > 0 || ZonedCells > 0 || Buildings.Count > 0;
+        public bool Buildable => Roads.Count > 0 || ZonedCells > 0 || Buildings.Count > 0 || Trees.Count > 0 || Ground != null;
 
         public float RoadLength;
         public float SteepestRoadGrade;

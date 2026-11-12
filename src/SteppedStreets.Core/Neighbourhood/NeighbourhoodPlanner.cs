@@ -194,7 +194,7 @@ namespace SteppedStreets.Core.Neighbourhood
         private static NeighbourhoodPlan ZoneExisting(NeighbourhoodRequest request, NeighbourhoodPlan plan, Stopwatch clock, CancellationToken cancellation)
         {
             var survey = request.Trees || request.LevelExistingLots ? new SiteSurvey(request, cancellation) : null;
-            var lots = ExistingStreetLots.Plan(request, survey, plan.Buildings, plan.Messages, cancellation);
+            var lots = ExistingStreetLots.Plan(request, plan.Buildings, plan.Messages, cancellation);
             var taken = ExistingStreetLots.TakenCells(request);
             if (request.LevelExistingLots) plan.Ground = LevelExisting(request, plan, lots, taken, cancellation);
             foreach (var lot in lots)
@@ -203,9 +203,6 @@ namespace SteppedStreets.Core.Neighbourhood
                 plan.Lots.Add(lot);
                 if (lot.Zone.Length > 0) plan.ZonedCells += lot.LevelCells.Count;
             }
-            if (plan.Lots.Count == 0 && plan.Buildings.Count == 0)
-                plan.Messages.Add("No empty zone cells along streets in this area. Draw it over streets whose zoning is still empty.");
-            else if (plan.Lots.Count > 0 && plan.ZonedCells == 0) plan.Messages.Add("The zone mix is empty, so there is nothing to zone. Add a zone.");
             if (request.Trees)
             {
                 // Lots and buildings alike keep the greenery off.
@@ -213,10 +210,21 @@ namespace SteppedStreets.Core.Neighbourhood
                 foreach (var building in plan.Buildings) occupied.Add(new PlannedLot { Pad = building.Pad, Road = building.Road });
                 plan.Trees = Landscaping.Trees(plan, occupied, survey, request, cancellation, taken);
             }
+            if (plan.Lots.Count == 0 && plan.Buildings.Count == 0)
+                plan.Messages.Add("No empty zone cells along streets in this area. Draw it over streets whose zoning is still empty.");
+            // With greenery, buildings or levelling still to build, an empty mix only leaves the lots unzoned.
+            else if (plan.Lots.Count > 0 && plan.ZonedCells == 0)
+                plan.Messages.Add(plan.Buildable ? "The zone mix is empty, so the lots stay unzoned. Add a zone to zone them."
+                    : "The zone mix is empty, so there is nothing to zone. Add a zone.");
             Finish(plan, clock, request);
+            var summary = new List<string>();
             if (plan.ZonedCells > 0)
-                plan.SummaryLine = string.Format(CultureInfo.InvariantCulture, "{0} lots, {1} cells to zone along existing streets", plan.Lots.Count, plan.ZonedCells)
-                    + (plan.Ground != null ? string.Format(CultureInfo.InvariantCulture, ", {0:N0} m³ of earth moved", plan.CutVolume + plan.FillVolume) : "");
+                summary.Add(string.Format(CultureInfo.InvariantCulture, "{0} lots, {1} cells to zone along existing streets", plan.Lots.Count, plan.ZonedCells));
+            if (plan.ZonedCells == 0 && plan.Buildings.Count > 0) summary.Add(string.Format(CultureInfo.InvariantCulture, "{0} buildings along existing streets", plan.Buildings.Count));
+            if (plan.ZonedCells == 0 && plan.Buildings.Count == 0 && plan.Trees.Count > 0)
+                summary.Add(string.Format(CultureInfo.InvariantCulture, "{0} pieces of greenery along existing streets", plan.Trees.Count));
+            if (plan.Ground != null) summary.Add(string.Format(CultureInfo.InvariantCulture, "{0:N0} m³ of earth moved", plan.CutVolume + plan.FillVolume));
+            if (plan.Buildable) plan.SummaryLine = string.Join(", ", summary);
             return plan;
         }
 
