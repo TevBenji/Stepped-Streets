@@ -115,7 +115,7 @@ namespace SteppedStreets.Tool
                     record.Created.Add(entity);
                 }
                 State.CanRemoveLast = true;
-                State.RemoveLastSummary = Contents(record, "and any houses grown on its lots");
+                State.RemoveLastSummary = Contents(record, "any houses grown on its lots");
                 Log("remove record: " + State.RemoveLastSummary);
             }
             catch (Exception exception)
