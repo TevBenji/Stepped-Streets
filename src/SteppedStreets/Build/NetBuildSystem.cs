@@ -79,6 +79,12 @@ namespace SteppedStreets.Build
 
         public bool Busy { get; private set; }
 
+        /// <summary>
+        /// The new courses emitted since the list was last cleared, each with its prefab and its line: Remove last neighbourhood
+        /// takes only edges of these prefabs lying along them. Upgrades of edges that already stand are no new courses.
+        /// </summary>
+        internal readonly List<(Entity Prefab, float2[] Line)> Emitted = new List<(Entity, float2[])>();
+
         [Preserve]
         protected override void OnCreate()
         {
@@ -534,8 +540,22 @@ namespace SteppedStreets.Build
         {
             foreach (var definition in _definitions)
                 if (EntityManager.Exists(definition) && !EntityManager.HasComponent<Deleted>(definition))
+                {
+                    RememberCourse(definition);
                     EntityManager.AddComponent<Deleted>(definition);
+                }
             _definitions.Clear();
+        }
+
+        private void RememberCourse(Entity definition)
+        {
+            if (!EntityManager.HasComponent<NetCourse>(definition) || !EntityManager.HasComponent<CreationDefinition>(definition)) return;
+            var creation = EntityManager.GetComponentData<CreationDefinition>(definition);
+            if (creation.m_Original != Entity.Null) return;
+            var curve = EntityManager.GetComponentData<NetCourse>(definition).m_Curve;
+            var line = new float2[9];
+            for (int index = 0; index < line.Length; index++) line[index] = MathUtils.Position(curve, index / 8f).xz;
+            Emitted.Add((creation.m_Prefab, line));
         }
 
         private void Finish(string details)
