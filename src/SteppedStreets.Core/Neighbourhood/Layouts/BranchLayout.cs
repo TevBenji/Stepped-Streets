@@ -312,8 +312,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             float2 facing = GridLayout.Facing(survey, request);
             float2 middle = (survey.BoundaryMinimum + survey.BoundaryMaximum) * 0.5f, nearest = default;
             float best = 400f;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                foreach (var point in road?.Points ?? new float3[0])
+            foreach (var road in request.JoinableRoads)
+                foreach (var point in road.Points ?? new float3[0])
                 {
                     float distance = Poly.Contains(survey.Boundary, point.xz) ? 0f : Poly.DistanceToBoundary(survey.Boundary, point.xz);
                     if (distance < best) { best = distance; nearest = point.xz; }

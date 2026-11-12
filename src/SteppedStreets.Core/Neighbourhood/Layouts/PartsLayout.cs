@@ -65,8 +65,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             float2 across = size.x >= size.y ? new float2(1f, 0f) : new float2(0f, 1f);
             // The near side: the half the city's nearest road lies towards.
             float best = float.MaxValue, toward = 1f;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                foreach (var point in road?.Points ?? new float3[0])
+            foreach (var road in request.JoinableRoads)
+                foreach (var point in road.Points ?? new float3[0])
                 {
                     float distance = Poly.Contains(boundary, point.xz) ? 0f : Poly.DistanceToBoundary(boundary, point.xz);
                     if (distance < best) { best = distance; toward = math.dot(point.xz - middle, across) >= 0f ? 1f : -1f; }

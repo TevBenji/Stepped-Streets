@@ -249,8 +249,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             int corners = boundary.Length, side = -1;
             float best = float.MaxValue;
             float2 found = default, middle = (survey.BoundaryMinimum + survey.BoundaryMaximum) * 0.5f;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                foreach (var point in road?.Points ?? new float3[0])
+            foreach (var road in request.JoinableRoads)
+                foreach (var point in road.Points ?? new float3[0])
                     for (int corner = 0; corner < corners; corner++)
                     {
                         float2 a = boundary[corner], b = boundary[(corner + 1) % corners], edge = b - a;

@@ -111,7 +111,7 @@ namespace SteppedStreets.Core.Neighbourhood
             Settle();
             // A layout that met the city's road straight on can still lose every one of those joins to the rules; then it
             // gets the winding connection the hillside layouts use, rather than standing apart beside the road.
-            if (!connected && straight && (request.ExistingRoads?.Length ?? 0) > 0 && plan.Roads.Count > 0)
+            if (!connected && straight && request.AnyJoinable && plan.Roads.Count > 0)
             {
                 Connect(streets, new RoadLinks(survey, request, streets, LinkRadius(request)),
                     through.Count > 0 ? street => through.Contains(street) : (Func<int, bool>)null, cancellation);
@@ -348,8 +348,8 @@ namespace SteppedStreets.Core.Neighbourhood
         private static float EntryHeight(SiteSurvey survey, NeighbourhoodRequest request)
         {
             float best = float.MaxValue, height = float.NaN;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                foreach (var point in road?.Points ?? new float3[0])
+            foreach (var road in request.JoinableRoads)
+                foreach (var point in road.Points ?? new float3[0])
                 {
                     float distance = Poly.Contains(survey.Boundary, point.xz) ? 0f : Poly.DistanceToBoundary(survey.Boundary, point.xz);
                     if (distance >= best) continue;

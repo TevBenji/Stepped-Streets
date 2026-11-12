@@ -247,7 +247,7 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                     // An end of the through road that meets no city road would be a road to nowhere, unless no city road is near
                     // at all; then both stay, for a winding connection to find.
                     if (reached) { joined = true; through.Add(stub); }
-                    else if ((request.ExistingRoads?.Length ?? 0) > 0) end.Broken = true;
+                    else if (request.AnyJoinable) end.Broken = true;
                     else through.Add(stub);
                 }
                 foreach (int index in through) streets[index].Main = true;
@@ -480,8 +480,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
             targetT = 0f;
             if (math.lengthsq(direction) < 0.5f) return false;
             float best = ReachLength;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                for (int index = 1; index < (road?.Points?.Length ?? 0); index++)
+            foreach (var road in request.JoinableRoads)
+                for (int index = 1; index < (road.Points?.Length ?? 0); index++)
                 {
                     float3 a = road.Points[index - 1], b = road.Points[index];
                     float2 edge = b.xz - a.xz;
@@ -509,8 +509,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
         {
             float best = 400f;
             float2 facing = float2.zero;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                for (int point = 1; point < (road?.Points?.Length ?? 0); point++)
+            foreach (var road in request.JoinableRoads)
+                for (int point = 1; point < (road.Points?.Length ?? 0); point++)
                 {
                     float2 start = road.Points[point - 1].xz, end = road.Points[point].xz, middle = (start + end) * 0.5f;
                     if (math.distance(start, end) < 1f) continue;

@@ -67,9 +67,10 @@ namespace SteppedStreets.Tool
                 return;
             }
             ExistingRoads = CaptureRoads(entities, low - RoadReach, high + RoadReach);
+            // Heights reach as far as a road new streets may join: highways only need keeping clear of.
             float nearestRoad = float.MaxValue;
             foreach (var road in ExistingRoads)
-                foreach (var point in road.Points)
+                foreach (var point in road.Joinable ? road.Points : new float3[0])
                     nearestRoad = math.min(nearestRoad, Core.Terrain.Poly.Contains(boundary, point.xz) ? 0f : Core.Terrain.Poly.DistanceToBoundary(boundary, point.xz));
             float margin = nearestRoad == float.MaxValue ? MinimumMargin : math.clamp(nearestRoad + 64f, MinimumMargin, MaximumMargin);
             origin = low - margin;
@@ -217,7 +218,7 @@ namespace SteppedStreets.Tool
         {
             var result = new List<ExistingRoad>();
             using (var query = entities.CreateEntityQuery(ComponentType.ReadOnly<Road>(), ComponentType.ReadOnly<Edge>(),
-                ComponentType.ReadOnly<Curve>(), ComponentType.ReadOnly<Composition>(),
+                ComponentType.ReadOnly<Curve>(), ComponentType.ReadOnly<Composition>(), ComponentType.ReadOnly<PrefabRef>(),
                 ComponentType.Exclude<Temp>(), ComponentType.Exclude<Deleted>()))
             using (var edges = query.ToEntityArray(Allocator.Temp))
                 foreach (var edge in edges)
@@ -232,7 +233,11 @@ namespace SteppedStreets.Tool
                     int segments = math.max(1, (int)math.ceil(curve.m_Length / 4f));
                     var points = new float3[segments + 1];
                     for (int index = 0; index <= segments; index++) points[index] = MathUtils.Position(curve.m_Bezier, index / (float)segments);
-                    result.Add(new ExistingRoad { Id = Pack(edge), Points = points, HalfWidth = data.m_Width * 0.5f });
+                    // A highway is kept clear of but never joined: the same test the road list uses.
+                    var prefab = entities.GetComponentData<PrefabRef>(edge).m_Prefab;
+                    bool highway = entities.HasComponent<RoadData>(prefab)
+                        && (entities.GetComponentData<RoadData>(prefab).m_Flags & Game.Prefabs.RoadFlags.UseHighwayRules) != 0;
+                    result.Add(new ExistingRoad { Id = Pack(edge), Points = points, HalfWidth = data.m_Width * 0.5f, Joinable = !highway });
                 }
             return result.ToArray();
         }
