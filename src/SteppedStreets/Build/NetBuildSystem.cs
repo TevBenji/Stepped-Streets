@@ -455,12 +455,15 @@ namespace SteppedStreets.Build
             return definition;
         }
 
-        /// <summary>Whether an edge carries the whole planting.</summary>
+        /// <summary>
+        /// Whether an edge carries the planting on both sides. Only the sides count: the game drops the median's flag on a
+        /// street without a median, which otherwise read as nothing planted (2.12.0 in-game test: "0 streets planted" for 3).
+        /// </summary>
         private bool Planted(Entity edge)
         {
             if (!EntityManager.HasComponent<Upgraded>(edge)) return false;
             var flags = EntityManager.GetComponentData<Upgraded>(edge).m_Flags;
-            return Union(flags, _planting).Equals(flags);
+            return (flags.m_Left & _planting.m_Left) == _planting.m_Left && (flags.m_Right & _planting.m_Right) == _planting.m_Right;
         }
 
         // The road's direction at a point, from its neighbours; one-sided at the ends, so the pieces of a street that meet at a
