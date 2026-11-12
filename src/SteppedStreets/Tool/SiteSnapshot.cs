@@ -47,6 +47,9 @@ namespace SteppedStreets.Tool
         public readonly long Fingerprint;
         public readonly int BuildingCount;
 
+        /// <summary>Every building lot the snapshot saw, as its four corners: what levelling already keeps off.</summary>
+        public readonly List<float2[]> BuildingLots = new List<float2[]>();
+
         /// <summary>The cells of the zone blocks round the area, free and taken; empty unless asked for (zoning existing streets).</summary>
         public readonly ZoneCell[] ZoneCells = new ZoneCell[0];
 
@@ -205,6 +208,7 @@ namespace SteppedStreets.Tool
                     float2 upper = math.max(math.max(lot[0], lot[1]), math.max(lot[2], lot[3]));
                     if (math.any(upper < minimum) || math.any(lower > maximum)) continue;
                     count++;
+                    BuildingLots.Add(lot);
                     // Its corners, rounded to the metre: a building moved, turned, added or removed changes the sum (a turn can
                     // keep the same bounding box); one levelling up in place doesn't.
                     if (math.all(upper >= watchLow) && math.all(lower <= watchHigh))

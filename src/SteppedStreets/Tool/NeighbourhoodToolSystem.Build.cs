@@ -113,22 +113,21 @@ namespace SteppedStreets.Tool
 
         /// <summary>
         /// Level lots on existing streets: true when, since the plan was made, a cell where the planned ground changes (under a
-        /// pad or on its banks) was zoned or built on, or a building stands there. The plan held what stood and was zoned then;
-        /// grading over anything newer would cut under a house. Only that ground is read, so growth elsewhere doesn't re-plan.
+        /// pad or on its banks) was zoned or built on, or a new building stands there. What was taken or built when the plan was
+        /// made is held at its own ground already, so only what is new counts (<see cref="SiteGeometry.LevellingMeetsNewWork"/>);
+        /// and only that ground is read, so growth elsewhere doesn't re-plan.
         /// </summary>
         private bool LevelledGroundTaken(NeighbourhoodPlan plan)
         {
             var ground = plan.Ground;
-            var pads = new SpatialBuckets<float2[]>(32f);
-            foreach (var pad in plan.Lots.Select(lot => lot.Pad).Concat(plan.Buildings.Select(building => building.Pad)))
-            {
-                var quad = new[] { pad.Corners[0].xz, pad.Corners[1].xz, pad.Corners[2].xz, pad.Corners[3].xz };
-                pads.Add(math.min(math.min(quad[0], quad[1]), math.min(quad[2], quad[3])), math.max(math.max(quad[0], quad[1]), math.max(quad[2], quad[3])), quad);
-            }
-            // The ground field's own threshold for a changed texel (GroundField.ToRaster).
-            bool Graded(float2 point) => math.abs(ground.ChangeAt(point)) >= 0.02f || pads.Near(point).Any(quad => SiteGeometry.Inside(point, quad));
             float2 low = ground.Origin, high = ground.Origin + new float2(ground.Columns - 1, ground.Rows - 1) * ground.Cell;
+            bool Within(float2 point) => math.all(point >= low) && math.all(point <= high);
+            var pads = plan.Lots.Select(lot => lot.Pad).Concat(plan.Buildings.Select(building => building.Pad))
+                .Select(pad => new[] { pad.Corners[0].xz, pad.Corners[1].xz, pad.Corners[2].xz, pad.Corners[3].xz }).ToList();
+            var takenThen = new HashSet<long>((plannedSnapshot?.ZoneCells ?? new ZoneCell[0]).Where(cell => cell.Taken).Select(cell => SiteGeometry.CellKey(cell.Centre)));
+            var buildingsThen = plannedSnapshot?.BuildingLots ?? new List<float2[]>();
 
+            var takenNow = new List<float2>();
             using (var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Block>(), ComponentType.ReadOnly<Cell>(),
                 ComponentType.Exclude<Game.Tools.Temp>(), ComponentType.Exclude<Game.Common.Deleted>()))
             using (var blocks = query.ToEntityArray(Unity.Collections.Allocator.Temp))
@@ -147,12 +146,11 @@ namespace SteppedStreets.Tool
                             var cell = cells[row * block.m_Size.x + column];
                             if ((cell.m_State & CellFlags.Visible) == 0 || SiteSnapshot.FreeCell(cell)) continue;
                             float2 centre = ZoneUtils.GetCellPosition(block, new int2(column, row)).xz;
-                            if (math.any(centre < low) || math.any(centre > high) || !Graded(centre)) continue;
-                            Log(Invariant($"levelling: the cell at ({centre.x:0}, {centre.y:0}) was zoned or built on since the plan"));
-                            return true;
+                            if (Within(centre)) takenNow.Add(centre);
                         }
                 }
 
+            var buildingsNow = new List<float2[]>();
             using (var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Game.Buildings.Building>(),
                 ComponentType.ReadOnly<Game.Objects.Transform>(), ComponentType.ReadOnly<Game.Prefabs.PrefabRef>(),
                 ComponentType.Exclude<Game.Tools.Temp>(), ComponentType.Exclude<Game.Common.Deleted>()))
@@ -164,22 +162,17 @@ namespace SteppedStreets.Tool
                     float2 size = (float2)EntityManager.GetComponentData<Game.Prefabs.BuildingData>(prefab).m_LotSize * 8f;
                     if (!math.all(size > 0f)) continue;
                     var transform = EntityManager.GetComponentData<Game.Objects.Transform>(entity);
+                    // The same corners the snapshot takes, so a building that stood then matches itself.
                     var corners = Game.Objects.ObjectUtils.CalculateBaseCorners(transform.m_Position, transform.m_Rotation, size);
-                    float2 a = corners.a.xz, b = corners.b.xz, d = corners.d.xz;
-                    float2 lower = math.min(math.min(a, b), math.min(corners.c.xz, d)), upper = math.max(math.max(a, b), math.max(corners.c.xz, d));
+                    var lot = new[] { corners.a.xz, corners.b.xz, corners.c.xz, corners.d.xz };
+                    float2 lower = math.min(math.min(lot[0], lot[1]), math.min(lot[2], lot[3])), upper = math.max(math.max(lot[0], lot[1]), math.max(lot[2], lot[3]));
                     if (math.any(upper < low) || math.any(lower > high)) continue;
-                    // The lot every 4 m, edges included: the plan held each building that stood then, with a margin round it.
-                    int across = (int)math.ceil(size.x / 4f), deep = (int)math.ceil(size.y / 4f);
-                    for (int i = 0; i <= across; i++)
-                        for (int j = 0; j <= deep; j++)
-                        {
-                            float2 point = a + (b - a) * (i / (float)across) + (d - a) * (j / (float)deep);
-                            if (!Graded(point)) continue;
-                            Log(Invariant($"levelling: a building at ({transform.m_Position.x:0}, {transform.m_Position.z:0}) stands where the ground would change"));
-                            return true;
-                        }
+                    buildingsNow.Add(lot);
                 }
-            return false;
+
+            string found = SiteGeometry.LevellingMeetsNewWork(ground.ChangeAt, pads, takenNow, takenThen, buildingsNow, buildingsThen);
+            if (found != null) Log("levelling: " + found);
+            return found != null;
         }
 
         private void AfterExistingGround(TerrainBuildReport report)
