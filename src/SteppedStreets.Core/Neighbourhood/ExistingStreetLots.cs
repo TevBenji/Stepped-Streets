@@ -20,10 +20,9 @@ namespace SteppedStreets.Core.Neighbourhood
     {
         private const float Half = StepPlanner.CellSize * 0.5f;
 
-        /// <param name="survey">The ground, for Auto spacing; null when it wasn't read (spacing Auto then leaves no gaps).</param>
         /// <param name="buildings">Receives the service buildings and pocket parks, each on its own run of free cells.</param>
-        public static List<PlannedLot> Plan(NeighbourhoodRequest request, SiteSurvey survey, List<PlannedBuilding> buildings,
-            List<string> messages, CancellationToken cancellation)
+        public static List<PlannedLot> Plan(NeighbourhoodRequest request, List<PlannedBuilding> buildings, List<string> messages,
+            CancellationToken cancellation)
         {
             var free = new Dictionary<(int Block, int Column, int Row), ZoneCell>();
             foreach (var cell in request.ZoneCells ?? new ZoneCell[0])
@@ -45,6 +44,7 @@ namespace SteppedStreets.Core.Neighbourhood
             }
 
             PlaceServices(request, free, fronts, Depth, buildings, messages, cancellation);
+            var streets = StreetPieces(request);
 
             var lots = new List<PlannedLot>();
             var parks = new List<PlannedBuilding>();
@@ -59,7 +59,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     return;
                 }
                 int gap = request.LotSpacingCells >= 0 ? request.LotSpacingCells
-                    : survey == null ? 0 : LotLayout.SlopeGap(survey.SlopeAt(Outline(run, 0, run.Count, runDepth).PointAt(run.Count * 0.5f, runDepth * 0.5f)), request);
+                    : LotLayout.SlopeGap(StreetGrade(Outline(run, 0, run.Count, runDepth), streets), request);
                 // About the lot width each with the gaps between, spread evenly, so no sliver of one cell is left at the end.
                 int count = math.max(1, (int)math.round((run.Count + gap) / (float)(request.LotWidthCells + gap)));
                 int cells = run.Count - (count - 1) * gap;
@@ -203,6 +203,52 @@ namespace SteppedStreets.Core.Neighbourhood
                 DepthCells = depth,
                 Corners = new[] { Corner(frontStart), Corner(frontEnd), Corner(frontEnd + back), Corner(frontStart + back) },
             };
+        }
+
+        /// <summary>
+        /// Auto spacing reads the grade of the street a run fronts, from the existing road's own heights at the two ends of
+        /// the run's front: neighbouring lots step apart by that grade, so it decides the room their banks need. The snapshot
+        /// always has the roads, so the lots come out the same whether or not greenery or levelling read the ground.
+        /// </summary>
+        private static float StreetGrade(Pad run, SpatialBuckets<(float3 Start, float3 End)> streets)
+        {
+            float2 start = run.Corners[0].xz, end = run.Corners[1].xz;
+            float length = math.distance(start, end);
+            if (length < 1f) return 0f;
+            float2 along = (end - start) / length;
+            float? Height(float2 point)
+            {
+                float best = StreetReach;
+                float? height = null;
+                foreach (var (from, to) in streets.Near(point))
+                {
+                    float2 direction = to.xz - from.xz;
+                    float lengthSquared = math.lengthsq(direction);
+                    // The street the run lines, not one crossing it at a corner.
+                    if (lengthSquared < 1e-4f || math.abs(math.dot(math.normalize(direction), along)) < 0.7f) continue;
+                    float share = math.saturate(math.dot(point - from.xz, direction) / lengthSquared);
+                    float distance = math.distance(point, from.xz + direction * share);
+                    if (distance < best) { best = distance; height = math.lerp(from.y, to.y, share); }
+                }
+                return height;
+            }
+            float? first = Height(start), last = Height(end);
+            return first.HasValue && last.HasValue ? math.abs(last.Value - first.Value) / length : 0f;
+        }
+
+        // A block's front lies at its road's edge: the centreline is within half the widest road's width.
+        private const float StreetReach = 24f;
+
+        private static SpatialBuckets<(float3 Start, float3 End)> StreetPieces(NeighbourhoodRequest request)
+        {
+            var pieces = new SpatialBuckets<(float3, float3)>(32f);
+            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
+                for (int point = 1; point < (road?.Points?.Length ?? 0); point++)
+                {
+                    float3 from = road.Points[point - 1], to = road.Points[point];
+                    pieces.Add(math.min(from.xz, to.xz) - StreetReach, math.max(from.xz, to.xz) + StreetReach, (from, to));
+                }
+            return pieces;
         }
 
         /// <summary>

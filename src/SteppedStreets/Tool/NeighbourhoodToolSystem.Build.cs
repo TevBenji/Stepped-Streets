@@ -48,7 +48,17 @@ namespace SteppedStreets.Tool
                     Message("The settings changed. Review the updated plan before building.");
                     return;
                 }
-                if (PlannedRequest?.ExistingStreets == true) { ZoneExistingStreets(); return; }
+                if (PlannedRequest?.ExistingStreets == true)
+                {
+                    if (Plan.Ground != null && LevelledGroundTaken(Plan))
+                    {
+                        Replan();
+                        Message("The site changed. Review the updated plan before building.");
+                        return;
+                    }
+                    ZoneExistingStreets();
+                    return;
+                }
                 // Buildings, roads and the ground can change while the plan is open.
                 var fresh = SiteSnapshot.Capture(EntityManager, World, corners.ToArray());
                 if (plannedSnapshot == null || fresh.Fingerprint != plannedSnapshot.Fingerprint)
@@ -80,10 +90,10 @@ namespace SteppedStreets.Tool
 
         /// <summary>
         /// Existing streets: no roads, and their zone blocks are already there, so the lots are levelled (when asked) and zoned
-        /// straight away; then the services, parks and greenery as on new streets. No site check: the zoning reads the live
-        /// cells and only paints the free ones, so houses growing along the streets while the plan is open can't spoil it, and
-        /// in a living city they would otherwise send every Build back to re-plan. The levelling keeps off what was built and
-        /// zoned when the plan was made.
+        /// straight away; then the services, parks and greenery as on new streets. No full site check: the zoning reads the
+        /// live cells and only paints the free ones, so houses growing along the streets while the plan is open can't spoil it,
+        /// and in a living city they would otherwise send every Build back to re-plan. Levelling checks only the ground it
+        /// changes (<see cref="LevelledGroundTaken"/>).
         /// </summary>
         private void ZoneExistingStreets()
         {
@@ -99,6 +109,77 @@ namespace SteppedStreets.Tool
             if (buildPlan.Ground == null) { ZoneExistingLots(); return; }
             var ground = buildPlan.Ground;
             World.GetOrCreateSystemManaged<TerrainBuildSystem>().Begin(() => ground.ToRaster(), AfterExistingGround);
+        }
+
+        /// <summary>
+        /// Level lots on existing streets: true when, since the plan was made, a cell where the planned ground changes (under a
+        /// pad or on its banks) was zoned or built on, or a building stands there. The plan held what stood and was zoned then;
+        /// grading over anything newer would cut under a house. Only that ground is read, so growth elsewhere doesn't re-plan.
+        /// </summary>
+        private bool LevelledGroundTaken(NeighbourhoodPlan plan)
+        {
+            var ground = plan.Ground;
+            var pads = new SpatialBuckets<float2[]>(32f);
+            foreach (var pad in plan.Lots.Select(lot => lot.Pad).Concat(plan.Buildings.Select(building => building.Pad)))
+            {
+                var quad = new[] { pad.Corners[0].xz, pad.Corners[1].xz, pad.Corners[2].xz, pad.Corners[3].xz };
+                pads.Add(math.min(math.min(quad[0], quad[1]), math.min(quad[2], quad[3])), math.max(math.max(quad[0], quad[1]), math.max(quad[2], quad[3])), quad);
+            }
+            // The ground field's own threshold for a changed texel (GroundField.ToRaster).
+            bool Graded(float2 point) => math.abs(ground.ChangeAt(point)) >= 0.02f || pads.Near(point).Any(quad => SiteGeometry.Inside(point, quad));
+            float2 low = ground.Origin, high = ground.Origin + new float2(ground.Columns - 1, ground.Rows - 1) * ground.Cell;
+
+            using (var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Block>(), ComponentType.ReadOnly<Cell>(),
+                ComponentType.Exclude<Game.Tools.Temp>(), ComponentType.Exclude<Game.Common.Deleted>()))
+            using (var blocks = query.ToEntityArray(Unity.Collections.Allocator.Temp))
+                foreach (var entity in blocks)
+                {
+                    var block = EntityManager.GetComponentData<Block>(entity);
+                    float extent = math.length((float2)block.m_Size) * 4f;
+                    if (math.any(block.m_Position.xz < low - extent) || math.any(block.m_Position.xz > high + extent)) continue;
+                    var cells = EntityManager.GetBuffer<Cell>(entity, true);
+                    if (cells.Length < block.m_Size.x * block.m_Size.y) continue;
+                    var area = EntityManager.HasComponent<ValidArea>(entity) ? EntityManager.GetComponentData<ValidArea>(entity).m_Area
+                        : new int4(0, block.m_Size.x, 0, block.m_Size.y);
+                    for (int row = area.z; row < area.w; row++)
+                        for (int column = area.x; column < area.y; column++)
+                        {
+                            var cell = cells[row * block.m_Size.x + column];
+                            if ((cell.m_State & CellFlags.Visible) == 0 || SiteSnapshot.FreeCell(cell)) continue;
+                            float2 centre = ZoneUtils.GetCellPosition(block, new int2(column, row)).xz;
+                            if (math.any(centre < low) || math.any(centre > high) || !Graded(centre)) continue;
+                            Log(Invariant($"levelling: the cell at ({centre.x:0}, {centre.y:0}) was zoned or built on since the plan"));
+                            return true;
+                        }
+                }
+
+            using (var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Game.Buildings.Building>(),
+                ComponentType.ReadOnly<Game.Objects.Transform>(), ComponentType.ReadOnly<Game.Prefabs.PrefabRef>(),
+                ComponentType.Exclude<Game.Tools.Temp>(), ComponentType.Exclude<Game.Common.Deleted>()))
+            using (var buildings = query.ToEntityArray(Unity.Collections.Allocator.Temp))
+                foreach (var entity in buildings)
+                {
+                    var prefab = EntityManager.GetComponentData<Game.Prefabs.PrefabRef>(entity).m_Prefab;
+                    if (!EntityManager.HasComponent<Game.Prefabs.BuildingData>(prefab)) continue;
+                    float2 size = (float2)EntityManager.GetComponentData<Game.Prefabs.BuildingData>(prefab).m_LotSize * 8f;
+                    if (!math.all(size > 0f)) continue;
+                    var transform = EntityManager.GetComponentData<Game.Objects.Transform>(entity);
+                    var corners = Game.Objects.ObjectUtils.CalculateBaseCorners(transform.m_Position, transform.m_Rotation, size);
+                    float2 a = corners.a.xz, b = corners.b.xz, d = corners.d.xz;
+                    float2 lower = math.min(math.min(a, b), math.min(corners.c.xz, d)), upper = math.max(math.max(a, b), math.max(corners.c.xz, d));
+                    if (math.any(upper < low) || math.any(lower > high)) continue;
+                    // The lot every 4 m, edges included: the plan held each building that stood then, with a margin round it.
+                    int across = (int)math.ceil(size.x / 4f), deep = (int)math.ceil(size.y / 4f);
+                    for (int i = 0; i <= across; i++)
+                        for (int j = 0; j <= deep; j++)
+                        {
+                            float2 point = a + (b - a) * (i / (float)across) + (d - a) * (j / (float)deep);
+                            if (!Graded(point)) continue;
+                            Log(Invariant($"levelling: a building at ({transform.m_Position.x:0}, {transform.m_Position.z:0}) stands where the ground would change"));
+                            return true;
+                        }
+                }
+            return false;
         }
 
         private void AfterExistingGround(TerrainBuildReport report)
@@ -503,7 +584,7 @@ namespace SteppedStreets.Tool
             State.Stage = ToolStage.Built;
             State.Progress = 1f;
             FinishTracking();
-            State.Summary = (buildRequest.ExistingStreets ? Invariant($"Zoned {buildPlan.Lots.Count} lots along existing streets: ")
+            State.Summary = (buildRequest.ExistingStreets ? (buildPlan.ZonedCells > 0 ? Invariant($"Zoned {buildPlan.Lots.Count} lots along existing streets: ") : "Along existing streets: ")
                 : Invariant($"Built {buildPlan.RoadLength / 1000f:0.0} km of road and {buildPlan.Lots.Count} lots: ")) + string.Join(", ", buildReport) + ".";
             Log(State.Summary);
             // The built area is history now: its plan cannot be built twice, and the preview stops drawing it over the real thing.
