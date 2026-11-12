@@ -24,10 +24,15 @@ namespace SteppedStreets.Core.Neighbourhood
         internal const float Clearance = 2.5f;
 
         /// <summary>
-        /// A path end stops this far short of the kerb, facing it: the game then joins the path to the sidewalk without a
-        /// crossing (Footbridge Builder's ramp feet, tested in game).
+        /// How far a path's round end stays off the road's edge (the outer edge of its sidewalk), facing it: the game then
+        /// joins the path to the sidewalk without a crossing (Footbridge Builder's ramp feet, tested in game). Any closer and
+        /// the path overlaps the road, and the game cuts the road there for a junction with a crosswalk (in-game test,
+        /// 12 November 2026).
         /// </summary>
         internal const float KerbGap = 0.25f;
+
+        /// <summary>From the road's edge to the path's end node: the path's half width and the kerb gap.</summary>
+        internal const float EndGap = HalfWidth + KerbGap;
 
         /// <summary>The steepest a path climbs: the game refuses a Pavement Path steeper than 20 %, measured end to end.</summary>
         internal const float SteepestGrade = 0.18f;
@@ -53,7 +58,7 @@ namespace SteppedStreets.Core.Neighbourhood
             for (int road = 0; road < plan.Roads.Count; road++)
             {
                 var points = plan.Roads[road].Points;
-                float reach = plan.Roads[road].HalfWidth + 1f;
+                float reach = plan.Roads[road].HalfWidth + EndGap + 1f;
                 for (int point = 1; point < points.Length; point++)
                     segments.Add(math.min(points[point - 1].xz, points[point].xz) - reach, math.max(points[point - 1].xz, points[point].xz) + reach, new int2(road, point));
             }
@@ -155,7 +160,7 @@ namespace SteppedStreets.Core.Neighbourhood
             SpatialBuckets<(float2 Start, float2 End, float Clearance)> existing, SiteSurvey survey, NeighbourhoodRequest request,
             int road, float2 point, float2 outward, float height, float farthest, float shortest)
         {
-            float2 start = point + outward * (plan.Roads[road].HalfWidth + KerbGap);
+            float2 start = point + outward * (plan.Roads[road].HalfWidth + EndGap);
             if (NearNodes(plan, plan.Roads[road], start)) return null;
             int hit = -1;
             float travelled = 0f;
@@ -167,19 +172,19 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (!Poly.Contains(survey.Boundary, at) || (request.Blocked != null && request.Blocked(at))) return null;
                 foreach (var (from, to, clearance) in existing.Near(at))
                     if (Geometry.DistanceToSegment(at, from, to) < clearance) return null;
-                hit = Inside(plan, segments, at, KerbGap, out _);
+                hit = Inside(plan, segments, at, EndGap, out _);
             }
             if (hit == road) return null;
-            // Back to just short of the kerb: halve the last metre until the end is within a couple of centimetres of it.
+            // Back to the end gap off the far road: halve the last metre until the end is within a couple of centimetres of it.
             float clear = travelled - 1f, inside = travelled;
             for (int halving = 0; halving < 6; halving++)
             {
                 float middle = (clear + inside) * 0.5f;
-                if (Inside(plan, segments, start + outward * middle, KerbGap, out _) >= 0) inside = middle; else clear = middle;
+                if (Inside(plan, segments, start + outward * middle, EndGap, out _) >= 0) inside = middle; else clear = middle;
             }
             float length = clear;
             float2 end = start + outward * length;
-            Inside(plan, segments, start + outward * inside, KerbGap, out int segment);
+            Inside(plan, segments, start + outward * inside, EndGap, out int segment);
             var far = plan.Roads[hit];
             float3 a = far.Points[segment - 1], b = far.Points[segment];
             if (math.abs(math.dot(math.normalizesafe(b.xz - a.xz), outward)) > MostSideways || NearNodes(plan, far, end)) return null;

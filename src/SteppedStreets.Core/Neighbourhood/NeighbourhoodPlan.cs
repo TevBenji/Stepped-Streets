@@ -62,8 +62,8 @@ namespace SteppedStreets.Core.Neighbourhood
     }
 
     /// <summary>
-    /// A footpath through a long block, straight from the kerb of one street to the kerb of the street behind or opposite it,
-    /// its ends just short of each kerb so the game joins them to the sidewalks.
+    /// A footpath through a long block, straight from one street to the street behind or opposite it, each round end a quarter
+    /// metre off the road's edge so the game joins it to the sidewalk.
     /// </summary>
     public sealed class PlannedPath
     {

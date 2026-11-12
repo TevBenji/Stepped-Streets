@@ -71,7 +71,6 @@ namespace SteppedStreets.Build
         private CompositionFlags _planting;
         private bool _grass;
         private float2[] _area;
-        private readonly List<Entity> _plantedEdges = new List<Entity>();
         private int _skipped, _roadPieces, _roadsBuilt;
         private EntityQuery _anyEdges, _streets;
         private Action<NetBuildReport> _whenDone;
@@ -176,7 +175,6 @@ namespace SteppedStreets.Build
             _refusedCount = _skipped = _roadPieces = _roadsBuilt = 0;
             _pathPrefab = Entity.Null;
             _pieceMiddles.Clear();
-            _plantedEdges.Clear();
             return true;
         }
 
@@ -415,11 +413,12 @@ namespace SteppedStreets.Build
                     var planted = Union(flags, _planting);
                     if (planted.Equals(flags)) continue;
                     _definitions.Add(Upgrade(edge, curve, prefab, planted));
-                    _plantedEdges.Add(edge);
+                    // Counted afterwards by place, like the new roads: the planted edge is found wherever the game keeps it.
+                    _pieceMiddles.Add(MathUtils.Position(curve, 0.5f).xz);
                 }
             _emitFrame = frame;
-            Mod.Logger.Info($"Stepped Streets street planting: {_plantedEdges.Count} streets to plant with {(_grass ? "grass" : "trees")}, {_skipped} kept as they are for their bike lanes or wide sidewalks.");
-            return _plantedEdges.Count;
+            Mod.Logger.Info($"Stepped Streets street planting: {_pieceMiddles.Count} streets to plant with {(_grass ? "grass" : "trees")}, {_skipped} kept as they are for their bike lanes or wide sidewalks.");
+            return _pieceMiddles.Count;
         }
 
         private Entity Upgrade(Entity edge, Bezier4x3 curve, Entity prefab, CompositionFlags flags)
@@ -456,17 +455,12 @@ namespace SteppedStreets.Build
             return definition;
         }
 
-        /// <summary>How many of the streets the planting was for now carry it.</summary>
-        private int CountPlanted()
+        /// <summary>Whether an edge carries the whole planting.</summary>
+        private bool Planted(Entity edge)
         {
-            int planted = 0;
-            foreach (var edge in _plantedEdges)
-            {
-                if (!EntityManager.Exists(edge) || !EntityManager.HasComponent<Upgraded>(edge)) continue;
-                var flags = EntityManager.GetComponentData<Upgraded>(edge).m_Flags;
-                if (Union(flags, _planting).Equals(flags)) planted++;
-            }
-            return planted;
+            if (!EntityManager.HasComponent<Upgraded>(edge)) return false;
+            var flags = EntityManager.GetComponentData<Upgraded>(edge).m_Flags;
+            return Union(flags, _planting).Equals(flags);
         }
 
         // The road's direction at a point, from its neighbours; one-sided at the ends, so the pieces of a street that meet at a
@@ -510,7 +504,8 @@ namespace SteppedStreets.Build
             return course;
         }
 
-        private int CountBuilt(EntityQuery query)
+        /// <summary>How many of the planned pieces have a built edge at their middle (that <paramref name="accept"/> takes, when given).</summary>
+        private int CountBuilt(EntityQuery query, Func<Entity, bool> accept = null)
         {
             if (_pieceMiddles.Count == 0) return 0;
             var buckets = new Dictionary<long, List<float2>>();
@@ -526,7 +521,7 @@ namespace SteppedStreets.Build
                 foreach (var edge in edges)
                 {
                     float2 middle = MathUtils.Position(EntityManager.GetComponentData<Curve>(edge).m_Bezier, 0.5f).xz;
-                    if (!buckets.TryGetValue(Key(middle), out var list)) continue;
+                    if (!buckets.TryGetValue(Key(middle), out var list) || (accept != null && !accept(edge))) continue;
                     foreach (var planned in list) if (math.distance(planned, middle) < 3f) found.Add(planned);
                 }
             return found.Count;
@@ -560,8 +555,9 @@ namespace SteppedStreets.Build
                         report.PathsBuilt = applied ? CountBuilt(_anyEdges) : 0;
                         break;
                     default:
-                        report.Pieces = _plantedEdges.Count;
-                        report.Built = applied ? CountPlanted() : 0;
+                        // The streets in the area that carry the planting now, however the run ended.
+                        report.Pieces = _pieceMiddles.Count;
+                        report.Built = CountBuilt(_streets, Planted);
                         break;
                 }
             }
