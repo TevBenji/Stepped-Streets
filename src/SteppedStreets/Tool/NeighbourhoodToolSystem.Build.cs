@@ -63,6 +63,7 @@ namespace SteppedStreets.Tool
                 buildRequest = PlannedRequest;
                 // The settings match the plan (checked above), so this is the road it was laid out for.
                 buildRoadName = Mod.Settings?.RoadName ?? Settings.SteppedStreetsSettings.DefaultRoad;
+                TrackBuild();
                 State.Stage = ToolStage.Building;
                 State.Progress = 0.05f;
                 State.Summary = "Building the ground...";
@@ -86,6 +87,7 @@ namespace SteppedStreets.Tool
             ResetBuild();
             buildPlan = Plan;
             buildRequest = PlannedRequest;
+            TrackBuild();
             State.Stage = ToolStage.Building;
             State.Progress = 0.3f;
             State.Summary = "Zoning...";
@@ -97,7 +99,7 @@ namespace SteppedStreets.Tool
         private bool BuildSystemsBusy() =>
             World.GetOrCreateSystemManaged<TerrainBuildSystem>().Busy || World.GetOrCreateSystemManaged<NetBuildSystem>().Busy
             || World.GetOrCreateSystemManaged<ZoneBuildSystem>().Busy || World.GetOrCreateSystemManaged<ObjectBuildSystem>().Busy
-            || World.GetOrCreateSystemManaged<WallBuildSystem>().Busy;
+            || World.GetOrCreateSystemManaged<WallBuildSystem>().Busy || World.GetOrCreateSystemManaged<RemoveBuildSystem>().Busy;
 
         private void AfterGround(TerrainBuildReport report)
         {
@@ -160,6 +162,7 @@ namespace SteppedStreets.Tool
             zoneQueue = null;
             idleBuildFrames = 0;
             buildReport.Clear();
+            ForgetLastBuild();
         }
 
         /// <summary>
@@ -196,6 +199,7 @@ namespace SteppedStreets.Tool
             try
             {
                 var byZone = ZoneCells();
+                RememberZoning(byZone);
                 zoneQueue = new Queue<(string, List<float2[]>)>(byZone.Select(pair => (pair.Key, pair.Value)));
                 zonedRuns = requestedRuns = 0;
                 Log(Invariant($"zoning: {levelCells} cells in {byZone.Count} zones"));
@@ -427,6 +431,7 @@ namespace SteppedStreets.Tool
             if (report != null) { Log("walls: " + report.Summary); buildReport.Add(Invariant($"{report.Placed} wall pieces")); }
             State.Stage = ToolStage.Built;
             State.Progress = 1f;
+            FinishTracking();
             State.Summary = (buildRequest.ExistingStreets ? Invariant($"Zoned {buildPlan.Lots.Count} lots along existing streets: ")
                 : Invariant($"Built {buildPlan.RoadLength / 1000f:0.0} km of road and {buildPlan.Lots.Count} lots: ")) + string.Join(", ", buildReport) + ".";
             Log(State.Summary);

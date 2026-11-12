@@ -62,6 +62,7 @@ namespace SteppedStreets.Panel
                 Trigger("undo", () => _tool.Undo());
                 Trigger("build", () => { if (_tool.State.Stage == ToolStage.Planned) _tool.Build(); });
                 Trigger("reroll", () => _tool.Reroll());
+                Trigger("removeLast", () => _tool.RemoveLast());
                 AddPresetTriggers();
                 Trigger<bool>("setConfirming", value => _tool.SetConfirming(value));
                 Trigger<string>("setStyle", value => ChangeSettings(settings =>
@@ -478,6 +479,9 @@ namespace SteppedStreets.Panel
             json.Append(",\"settings\":").Append(settingsJson);
             json.Append(",\"discord\":").Append(DiscordLink.Length > 0 ? "true" : "false");
             json.Append(",\"presets\":").Append(PresetNamesJson(Mod.Settings));
+            json.Append(",\"canRemoveLast\":").Append(state.CanRemoveLast && state.Stage != ToolStage.Building ? "true" : "false");
+            json.Append(",\"removeLastSummary\":"); String(json, state.RemoveLastSummary);
+            json.Append(",\"removing\":").Append(state.Removing && state.Stage == ToolStage.Building ? "true" : "false");
             return json.Append(",\"zones\":").Append(_zonesJson).Append(",\"roads\":").Append(_roadsJson)
                 .Append(",\"services\":").Append(_servicesJson).Append('}').ToString();
         }

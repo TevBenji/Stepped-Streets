@@ -43,6 +43,8 @@ namespace SteppedStreets
             catch (Exception exception) { Logger.Error(exception, "Stepped Streets road builder registration failed"); }
             try { updateSystem.UpdateBefore<Build.ObjectBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
             catch (Exception exception) { Logger.Error(exception, "Stepped Streets object builder registration failed"); }
+            try { updateSystem.UpdateBefore<Build.RemoveBuildSystem, Build.BuildToolSystem>(SystemUpdatePhase.ToolUpdate); }
+            catch (Exception exception) { Logger.Error(exception, "Stepped Streets removal registration failed"); }
             try
             {
                 updateSystem.UpdateAt<Build.TerrainBuildSystem>(SystemUpdatePhase.ToolUpdate);
