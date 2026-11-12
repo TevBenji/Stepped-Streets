@@ -39,7 +39,8 @@ namespace SteppedStreets.Core.Neighbourhood
             if (!request.Trees) return trees;
             float density = math.clamp(request.TreeDensity, 0.1f, 1f);
             // Reaching past the verge, so a bush there finds the road it lines.
-            var roads = RoadBuckets(plan, request.RoadHalfWidth + VergeWidth);
+            var roads = RoadBuckets(plan, VergeWidth);
+            var paths = Footpaths.Buckets(plan);
             var pads = new SpatialBuckets<Pad>(32f);
             foreach (var lot in lots)
             {
@@ -69,7 +70,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     if (!Poly.Contains(survey.Boundary, point)) continue;
                     if (request.Blocked != null && request.Blocked(point)) continue;
                     if (keepOff != null && keepOff(point)) continue;
-                    if (NearRoad(roads, plan, point, request.RoadHalfWidth + 3.5f)) continue;
+                    if (NearRoad(roads, plan, point, 3.5f) || Footpaths.Near(paths, point, Footpaths.HalfWidth + 2f)) continue;
                     bool nearExisting = false;
                     foreach (var (start, end, halfWidth) in existing.Near(point))
                         if (Geometry.DistanceToSegment(point, start, end) < halfWidth + 4f) { nearExisting = true; break; }
@@ -104,7 +105,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     });
                 }
             }
-            Clusters(trees, plan, pads, roads, existing, survey, request, keepOff, density, cancellation);
+            Clusters(trees, plan, pads, roads, existing, paths, survey, request, keepOff, density, cancellation);
             if (trees.Count > MostTrees)
             {
                 // Thin evenly rather than cut off one side of the area.
@@ -123,8 +124,8 @@ namespace SteppedStreets.Core.Neighbourhood
         /// water, <paramref name="keepOff"/> and every road and its sidewalk (a road's half width includes it).
         /// </summary>
         private static void Clusters(List<PlannedTree> plants, NeighbourhoodPlan plan, SpatialBuckets<Pad> pads, SpatialBuckets<int2> roads,
-            SpatialBuckets<(float2 Start, float2 End, float HalfWidth)> existing, SiteSurvey survey, NeighbourhoodRequest request,
-            System.Func<float2, bool> keepOff, float density, System.Threading.CancellationToken cancellation)
+            SpatialBuckets<(float2 Start, float2 End, float HalfWidth)> existing, SpatialBuckets<PlannedPath> paths, SiteSurvey survey,
+            NeighbourhoodRequest request, System.Func<float2, bool> keepOff, float density, System.Threading.CancellationToken cancellation)
         {
             // How far past the nearest road's edge a point is; far when no road is within its verge.
             float PastKerb(float2 point)
@@ -133,7 +134,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 foreach (var item in roads.Near(point))
                 {
                     var points = plan.Roads[item.x].Points;
-                    best = math.min(best, Geometry.DistanceToSegment(point, points[item.y - 1].xz, points[item.y].xz) - request.RoadHalfWidth);
+                    best = math.min(best, Geometry.DistanceToSegment(point, points[item.y - 1].xz, points[item.y].xz) - plan.Roads[item.x].HalfWidth);
                 }
                 foreach (var (start, end, halfWidth) in existing.Near(point))
                     best = math.min(best, Geometry.DistanceToSegment(point, start, end) - halfWidth);
@@ -145,6 +146,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (request.Blocked != null && request.Blocked(point)) return false;
                 if (keepOff != null && keepOff(point)) return false;
                 if (PastKerb(point) < kerb) return false;
+                if (Footpaths.Near(paths, point, Footpaths.HalfWidth + 1f)) return false;
                 foreach (var pad in pads.Near(point))
                     if (LotLayout.InsidePad(pad, point, -LotMargin)) return false;
                 return true;
@@ -216,7 +218,6 @@ namespace SteppedStreets.Core.Neighbourhood
         {
             var walls = new List<WallSegment>();
             if (!request.Walls || plan.Ground == null) return walls;
-            float halfWidth = request.RoadHalfWidth;
             var pads = new SpatialBuckets<Pad>(32f);
             foreach (var lot in lots)
             {
@@ -226,14 +227,19 @@ namespace SteppedStreets.Core.Neighbourhood
                 pads.Add(low - 6f, high + 6f, lot.Pad);
             }
             // In buckets: a 6.4 km area has thousands of junctions and every shoulder segment asks about them.
-            float junctionReach = halfWidth + 12f;
-            var junctionNodes = new SpatialBuckets<float2>(32f);
+            var junctionNodes = new SpatialBuckets<(float2 Position, float Reach)>(32f);
             foreach (var node in plan.Nodes)
-                if (node.Degree >= 3 || node.ExistingRoadId != 0) junctionNodes.Add(node.Position.xz - junctionReach, node.Position.xz + junctionReach, node.Position.xz);
+            {
+                float junctionReach = node.HalfWidth + 12f;
+                if (node.Degree >= 3 || node.ExistingRoadId != 0) junctionNodes.Add(node.Position.xz - junctionReach, node.Position.xz + junctionReach, (node.Position.xz, junctionReach));
+            }
+            // No wall across the end of a footpath.
+            var paths = Footpaths.Buckets(plan);
 
             foreach (var road in plan.Roads)
             {
                 var points = road.Points;
+                float halfWidth = road.HalfWidth;
                 foreach (float side in new[] { 1f, -1f })
                 {
                     var run = new List<(float2 Start, float2 End, float Height)>();
@@ -255,7 +261,8 @@ namespace SteppedStreets.Core.Neighbourhood
                         float cut = plan.Ground.HeightAt(middle + outward * 3.5f) - roadHeight;
                         bool clear = true;
                         foreach (var pad in pads.Near(middle)) if (LotLayout.InsidePad(pad, middle, -4f)) { clear = false; break; }
-                        foreach (var node in junctionNodes.Near(middle)) if (math.distance(node, middle) < junctionReach) { clear = false; break; }
+                        foreach (var (node, junctionReach) in junctionNodes.Near(middle)) if (math.distance(node, middle) < junctionReach) { clear = false; break; }
+                        if (Footpaths.Near(paths, middle, Footpaths.HalfWidth + 3f)) clear = false;
                         if (clear && cut >= 0.8f && cut <= 3f) run.Add((start, end, roadHeight));
                         else Flush();
                     }
@@ -275,24 +282,27 @@ namespace SteppedStreets.Core.Neighbourhood
             return new WallSegment { Start = new float3(start.x, height, start.y), End = new float3(end.x, height, end.y) };
         }
 
-        private static SpatialBuckets<int2> RoadBuckets(NeighbourhoodPlan plan, float reach)
+        /// <summary>Every road's pieces, each box grown by its half width and <paramref name="margin"/>.</summary>
+        private static SpatialBuckets<int2> RoadBuckets(NeighbourhoodPlan plan, float margin)
         {
             var buckets = new SpatialBuckets<int2>(24f);
             for (int road = 0; road < plan.Roads.Count; road++)
             {
                 var points = plan.Roads[road].Points;
+                float reach = plan.Roads[road].HalfWidth + margin;
                 for (int point = 1; point < points.Length; point++)
                     buckets.Add(math.min(points[point - 1].xz, points[point].xz) - reach, math.max(points[point - 1].xz, points[point].xz) + reach, new int2(road, point));
             }
             return buckets;
         }
 
-        private static bool NearRoad(SpatialBuckets<int2> buckets, NeighbourhoodPlan plan, float2 point, float distance)
+        /// <summary>Whether a point is within a road's half width and <paramref name="margin"/> of its centreline.</summary>
+        private static bool NearRoad(SpatialBuckets<int2> buckets, NeighbourhoodPlan plan, float2 point, float margin)
         {
             foreach (var item in buckets.Near(point))
             {
                 var points = plan.Roads[item.x].Points;
-                if (Geometry.DistanceToSegment(point, points[item.y - 1].xz, points[item.y].xz) < distance) return true;
+                if (Geometry.DistanceToSegment(point, points[item.y - 1].xz, points[item.y].xz) < plan.Roads[item.x].HalfWidth + margin) return true;
             }
             return false;
         }

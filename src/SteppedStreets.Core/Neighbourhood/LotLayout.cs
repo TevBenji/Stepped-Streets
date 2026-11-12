@@ -39,12 +39,11 @@ namespace SteppedStreets.Core.Neighbourhood
         public static List<PlannedLot> Plan(NeighbourhoodPlan plan, List<int> owners, SiteSurvey survey, NeighbourhoodRequest request,
             List<string> messages, CancellationToken cancellation, List<PlannedBuilding> parks = null)
         {
-            float halfWidth = request.RoadHalfWidth;
             var segments = new SpatialBuckets<int3>(32f);
-            float reach = halfWidth + Shoulder + 1f;
             for (int road = 0; road < plan.Roads.Count; road++)
             {
                 var points = plan.Roads[road].Points;
+                float reach = plan.Roads[road].HalfWidth + Shoulder + 1f;
                 for (int point = 1; point < points.Length; point++)
                     segments.Add(math.min(points[point - 1].xz, points[point].xz) - reach, math.max(points[point - 1].xz, points[point].xz) + reach,
                         new int3(road, point, owners[road]));
@@ -54,10 +53,11 @@ namespace SteppedStreets.Core.Neighbourhood
             foreach (var node in plan.Nodes)
             {
                 // Lots keep off junctions (the game's junction and its corner radii) and the turning end of a cul-de-sac.
-                float radius = node.Degree >= 3 || node.ExistingRoadId != 0 ? halfWidth + 10f : node.DeadEnd ? halfWidth + 4f : 0f;
+                float radius = node.Degree >= 3 || node.ExistingRoadId != 0 ? node.HalfWidth + 10f : node.DeadEnd ? node.HalfWidth + 4f : 0f;
                 if (radius > 0f) keepAway.Add(node.Position.xz - radius, node.Position.xz + radius, (node.Position.xz, radius));
             }
             var occupied = new SpatialBuckets<Pad>(32f);
+            var paths = Footpaths.Buckets(plan);
 
             var lots = new List<PlannedLot>();
             var reasons = new Dictionary<EmptyLotReason, int>();
@@ -80,6 +80,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     foreach (var item in segments.Near(point))
                     {
                         var points = plan.Roads[item.x].Points;
+                        float halfWidth = plan.Roads[item.x].HalfWidth;
                         float distance = Geometry.DistanceToSegment(point, points[item.y - 1].xz, points[item.y].xz);
                         // Its own street only stops a lot that cuts into the carriageway on the inside of a bend.
                         if (distance < (item.z == street ? halfWidth - 2f : halfWidth + Shoulder)) return true;
@@ -88,7 +89,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         if (math.distancesq(point, centre) < radius * radius) return true;
                     foreach (var pad in occupied.Near(point))
                         if (InsidePad(pad, point, 0.3f)) return true;
-                    return false;
+                    return Footpaths.Near(paths, point, Footpaths.Clearance);
                 }
 
                 StepPlan stepPlan;
@@ -97,7 +98,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     stepPlan = StepPlanner.Plan(new StepPlanRequest
                     {
                         Centreline = planned.Points,
-                        RoadHalfWidth = halfWidth,
+                        RoadHalfWidth = planned.HalfWidth,
                         Side = StreetSide.Both,
                         LotWidthCells = request.LotWidthCells,
                         NarrowestWidthCells = math.clamp(request.NarrowestWidthCells, StepPlanner.MinimumWidthCells, request.LotWidthCells),

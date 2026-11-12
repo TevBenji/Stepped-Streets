@@ -30,6 +30,7 @@ namespace SteppedStreets.Tool
         private static readonly Color Bush = new Color(0.4f, 0.62f, 0.2f, 0.9f);
         private static readonly Color Flower = new Color(0.95f, 0.55f, 0.75f, 0.95f);
         private static readonly Color Rock = new Color(0.62f, 0.6f, 0.56f, 0.95f);
+        private static readonly Color Footpath = new Color(0.98f, 0.9f, 0.72f, 0.95f);
         private const int MostTrees = 4000;
         private const int MostShading = 5000;
 
@@ -196,13 +197,17 @@ namespace SteppedStreets.Tool
                 dots.Add((tree.Position, PlantSize(tree.Kind), PlantColour(tree.Kind)));
             }
 
+            // Footpaths: pale paving as wide as the path, under the roads they meet.
+            foreach (var path in plan.Paths) lines.Add((path.Start, path.End, 3f, Footpath));
+
+            // Each road as wide as it is planned: main streets wider when the main road is.
             foreach (var road in plan.Roads)
                 for (int index = 1; index < road.Points.Length; index++)
                 {
                     float3 start = road.Points[index - 1], end = road.Points[index];
                     float run = math.distance(start.xz, end.xz);
                     float grade = run > 0.01f ? math.abs(end.y - start.y) / run : 0f;
-                    lines.Add((start, end, request.RoadHalfWidth * 1.6f, GradeColour(grade, request.MaxRoadGrade)));
+                    lines.Add((start, end, road.HalfWidth * 1.6f, GradeColour(grade, request.MaxRoadGrade)));
                 }
             foreach (var node in plan.Nodes)
                 if (node.ExistingRoadId != 0) dots.Add((node.Position, 8f, new Color(1f, 0.3f, 0.85f, 1f)));

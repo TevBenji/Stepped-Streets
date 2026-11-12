@@ -23,7 +23,7 @@ namespace SteppedStreets.Tool
 
         private NeighbourhoodPlan buildPlan;
         private NeighbourhoodRequest buildRequest;
-        private string buildRoadName;
+        private string buildRoadName, buildMainRoadName;
         private readonly List<string> buildReport = new List<string>();
         private bool waitingForBlocks;
         private int blocksWaitStart, blockCount = -1, blocksStableSince;
@@ -63,12 +63,13 @@ namespace SteppedStreets.Tool
                 buildRequest = PlannedRequest;
                 // The settings match the plan (checked above), so this is the road it was laid out for.
                 buildRoadName = Mod.Settings?.RoadName ?? Settings.SteppedStreetsSettings.DefaultRoad;
+                buildMainRoadName = Mod.Settings?.MainRoadName ?? "";
                 TrackBuild();
                 State.Stage = ToolStage.Building;
                 State.Progress = 0.05f;
                 State.Summary = "Building the ground...";
                 Touch();
-                Log(Invariant($"build: {buildPlan.Roads.Count} roads, {buildPlan.Lots.Count} lots, {buildPlan.Trees.Count} trees, {buildPlan.Walls.Count} wall pieces"));
+                Log(Invariant($"build: {buildPlan.Roads.Count} roads, {buildPlan.Paths.Count} footpaths, {buildPlan.Lots.Count} lots, {buildPlan.Trees.Count} trees, {buildPlan.Walls.Count} wall pieces"));
                 if (buildPlan.Ground == null) { AfterGround(null); return; }
                 var ground = buildPlan.Ground;
                 // The planner already held buildings, water and existing roads at their own ground, so no blend can reach them.
@@ -114,7 +115,40 @@ namespace SteppedStreets.Tool
             catch (Exception exception) { BuildFailed(exception, "Zoning failed to start. The ground changes remain."); }
         }
 
+        /// <summary>
+        /// Use existing, once the lots are levelled (when asked): the street planting the player picked, as the game's own grass
+        /// or tree upgrade on the streets in the area, then the zoning. Read now, as Crosswalks is for new streets: it doesn't
+        /// change the plan.
+        /// </summary>
         private void ZoneExistingLots()
+        {
+            try
+            {
+                var planting = Mod.Settings?.StreetTrees ?? Settings.StreetPlanting.None;
+                if (planting == Settings.StreetPlanting.None) { ZoneOrPlace(); return; }
+                State.Summary = "Planting the streets...";
+                Touch();
+                World.GetOrCreateSystemManaged<NetBuildSystem>().BeginPlanting(corners.ToArray(), planting, AfterStreetPlanting);
+            }
+            catch (Exception exception) { BuildFailed(exception, "Planting the streets failed. Nothing was zoned."); }
+        }
+
+        private void AfterStreetPlanting(NetBuildReport report)
+        {
+            try
+            {
+                if (State.Stage != ToolStage.Building) return;
+                Log("street planting: " + report.Summary);
+                if (StoppedByAnotherTool("planting the streets")) return;
+                buildReport.Add(Invariant($"{report.Built} streets planted"));
+                if (report.Skipped > 0)
+                    Message(Invariant($"{report.Skipped} streets kept their bike lanes or wide sidewalks, so they got no grass."));
+                ZoneOrPlace();
+            }
+            catch (Exception exception) { BuildFailed(exception, "Planting the streets failed. Nothing was zoned."); }
+        }
+
+        private void ZoneOrPlace()
         {
             // Nothing to zone (an empty mix): the services, parks and greenery still go in.
             if (buildPlan.ZonedCells == 0)
@@ -151,7 +185,7 @@ namespace SteppedStreets.Tool
                 State.Progress = 0.35f;
                 State.Summary = "Building the roads...";
                 Touch();
-                World.GetOrCreateSystemManaged<NetBuildSystem>().Begin(buildPlan, buildRoadName, AfterRoads);
+                World.GetOrCreateSystemManaged<NetBuildSystem>().Begin(buildPlan, buildRoadName, buildMainRoadName, AfterRoads);
             }
             catch (Exception exception) { BuildFailed(exception, "Building the roads failed. The ground changes remain."); }
         }
@@ -164,6 +198,7 @@ namespace SteppedStreets.Tool
                 Log("roads: " + report.Summary);
                 if (StoppedByAnotherTool("laying the roads")) return;
                 buildReport.Add(Invariant($"{report.Built} of {report.Pieces} road pieces"));
+                if (report.PathPieces > 0) buildReport.Add(Invariant($"{report.PathsBuilt} of {report.PathPieces} footpath pieces"));
                 if (report.Built == 0)
                 {
                     Stop("The game did not build the roads, so nothing was zoned. The ground changes remain.");

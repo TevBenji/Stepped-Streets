@@ -86,6 +86,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 {
                     var street = GridLayout.Street(survey, request, points, RoadKind.Street);
                     if (street == null) continue;
+                    // The trunk carries every branch's traffic.
+                    street.Main = true;
                     pieces.Add((streets.Count, from));
                     streets.Add(street);
                 }

@@ -131,15 +131,18 @@ namespace SteppedStreets.Core.Neighbourhood
         {
             // Existing streets plan no roads, only pads to level.
             if (plan.Roads.Count == 0 && lots.Count == 0) return null;
-            float halfWidth = request.RoadHalfWidth;
+            float halfWidth = request.RoadHalfWidth, widest = halfWidth;
             float bankGrade = NeighbourhoodPlanner.EffectiveBankGrade(request);
             float bankReach = BankReach(request);
             float2 minimum = float.MaxValue, maximum = float.MinValue;
             foreach (var road in plan.Roads)
+            {
+                widest = math.max(widest, road.HalfWidth);
                 foreach (var point in road.Points) { minimum = math.min(minimum, point.xz); maximum = math.max(maximum, point.xz); }
+            }
             foreach (var lot in lots)
                 foreach (var corner in lot.Pad.Corners) { minimum = math.min(minimum, corner.xz); maximum = math.max(maximum, corner.xz); }
-            float margin = halfWidth + bankReach + 12f;
+            float margin = widest + bankReach + 12f;
             var field = new GroundField(minimum - margin, maximum + margin, bankGrade, request.EarthworkLimit, request.GroundHeight)
             {
                 // ponytail: only in steep mode, where ground at the bank limit is common; gentle sites keep the plain cones
@@ -155,6 +158,8 @@ namespace SteppedStreets.Core.Neighbourhood
 
             // Road corridors: level across each road at its centreline's planned height. Where corridors overlap (a junction)
             // the heights blend by how deep the node sits in each, so the ground is continuous from one road into the other.
+            // Footpaths get corridors too, their own width, climbing evenly from street to street. Distances are measured less
+            // how much wider than the street road a corridor is, so every corridor compares with the street road's.
             var roadDistance = new float[count];
             var weightSum = new float[count];
             var weightedHeight = new float[count];
@@ -166,17 +171,20 @@ namespace SteppedStreets.Core.Neighbourhood
             // The road each corridor node belongs to most (the deepest corridor), for steep mode's road-by-road test.
             var owner = new int[count];
             var ownerWeight = new float[count];
-            for (int roadIndex = 0; roadIndex < plan.Roads.Count; roadIndex++)
+            // At an existing road the corridor stops square: past the join is that road's ground, not ours.
+            var corridors = new List<(float3[] Points, float Wider, bool SquareStart, bool SquareEnd)>();
+            foreach (var road in plan.Roads)
+                corridors.Add((road.Points, RoadNetwork.Wider(road, request), plan.Nodes[road.StartNode].ExistingRoadId != 0, plan.Nodes[road.EndNode].ExistingRoadId != 0));
+            foreach (var path in plan.Paths) corridors.Add((new[] { path.Start, path.End }, Footpaths.HalfWidth - halfWidth, false, false));
+            for (int roadIndex = 0; roadIndex < corridors.Count; roadIndex++)
             {
-                var road = plan.Roads[roadIndex];
+                var (points, wider, squareStart, squareEnd) = corridors[roadIndex];
                 touched.Clear();
-                // At an existing road the corridor stops square: past the join is that road's ground, not ours.
-                bool squareStart = plan.Nodes[road.StartNode].ExistingRoadId != 0, squareEnd = plan.Nodes[road.EndNode].ExistingRoadId != 0;
-                for (int point = 1; point < road.Points.Length; point++)
+                for (int point = 1; point < points.Length; point++)
                 {
-                    float3 start = road.Points[point - 1], end = road.Points[point];
-                    bool first = point == 1 && squareStart, last = point == road.Points.Length - 1 && squareEnd;
-                    field.ForBox(math.min(start.xz, end.xz) - corridor, math.max(start.xz, end.xz) + corridor, index =>
+                    float3 start = points[point - 1], end = points[point];
+                    bool first = point == 1 && squareStart, last = point == points.Length - 1 && squareEnd;
+                    field.ForBox(math.min(start.xz, end.xz) - (corridor + wider), math.max(start.xz, end.xz) + (corridor + wider), index =>
                     {
                         float2 position = field.Position(index);
                         float2 direction = end.xz - start.xz;
@@ -184,7 +192,7 @@ namespace SteppedStreets.Core.Neighbourhood
                         float along = lengthSquared > 1e-9f ? math.dot(position - start.xz, direction) / lengthSquared : 0f;
                         if ((first && along < 0f) || (last && along > 1f)) return;
                         float fraction = math.saturate(along);
-                        float distance = math.distance(position, start.xz + direction * fraction);
+                        float distance = math.distance(position, start.xz + direction * fraction) - wider;
                         if (distance > corridor || distance >= nearest[index]) return;
                         if (nearest[index] == float.MaxValue) touched.Add(index);
                         nearest[index] = distance;
@@ -253,7 +261,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 // ground, or a bank to the road above that steep: it is left to the game's road (its own retaining walls)
                 // rather than forced into a cliff. Roads go one at a time, contour streets first, each tested against those
                 // already held.
-                var byRoad = new List<int>[plan.Roads.Count];
+                var byRoad = new List<int>[corridors.Count];
                 for (int index = 0; index < count; index++)
                 {
                     if (field.state[index] != Free || !(roadDistance[index] <= corridor)) continue;
@@ -261,10 +269,12 @@ namespace SteppedStreets.Core.Neighbourhood
                     (byRoad[owner[index]] ?? (byRoad[owner[index]] = new List<int>())).Add(index);
                 }
                 var order = new List<int>();
-                for (int road = 0; road < plan.Roads.Count; road++) order.Add(road);
+                for (int road = 0; road < corridors.Count; road++) order.Add(road);
+                // Footpaths last.
+                int Rank(int road) => road >= plan.Roads.Count ? 2 : plan.Roads[road].Kind.IsMain() ? 0 : 1;
                 order.Sort((first, second) =>
                 {
-                    int kind = (plan.Roads[first].Kind.IsMain() ? 0 : 1).CompareTo(plan.Roads[second].Kind.IsMain() ? 0 : 1);
+                    int kind = Rank(first).CompareTo(Rank(second));
                     return kind != 0 ? kind : first.CompareTo(second);
                 });
                 var held = new List<int>();

@@ -54,6 +54,8 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 {
                     var street = GridLayout.Street(survey, request, points, RoadKind.Street);
                     if (street == null) continue;
+                    // The through streets round the big blocks are the main streets; inside, the streets only serve the block.
+                    street.Main = true;
                     stretches.Add((streets.Count, from));
                     streets.Add(street);
                 }
@@ -68,7 +70,9 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 for (int column = firstColumn; column <= lastColumn; column++)
                 {
                     int link = GridLayout.Cross(survey, request, streets, rows[row], rows[row + 1], along, Column(column), Column(column));
-                    if (link >= 0) crossings[(row, column)] = link;
+                    if (link < 0) continue;
+                    crossings[(row, column)] = link;
+                    streets[link].Main = true;
                 }
 
             // Inside the blocks: from each row, into the blocks above and below it (the edge blocks too, as far as they reach).

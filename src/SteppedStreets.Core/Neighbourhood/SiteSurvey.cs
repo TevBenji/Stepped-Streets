@@ -117,6 +117,8 @@ namespace SteppedStreets.Core.Neighbourhood
             // Clearances from chamfer distance fields: a street keeps its whole corridor on buildable ground inside the area,
             // and keeps clear of buildings, water and existing roads by its half width plus a shoulder and a bank.
             float halfWidth = request.RoadHalfWidth;
+            // Any street may turn out to be main, so buildings and water are kept clear of the wider road.
+            float widest = math.max(halfWidth, request.MainRoadHalfWidth);
             var outside = new bool[count];
             for (int index = 0; index < count; index++) outside[index] = !Inside[index];
             cancellation.ThrowIfCancellationRequested();
@@ -127,7 +129,7 @@ namespace SteppedStreets.Core.Neighbourhood
             ConnectionRoom = new float[count];
             for (int index = 0; index < count; index++)
             {
-                float edges = math.min(toObstacle[index] - (halfWidth + 6f), toWild[index] - halfWidth);
+                float edges = math.min(toObstacle[index] - (widest + 6f), toWild[index] - halfWidth);
                 StreetRoom[index] = math.min(edges, toOutside[index] - (halfWidth + 4f));
                 ConnectionRoom[index] = math.min(edges, BorderDistance(index) - 24f);
             }

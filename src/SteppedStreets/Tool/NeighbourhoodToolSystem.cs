@@ -576,7 +576,7 @@ namespace SteppedStreets.Tool
             State.Stage = plan.Buildable ? ToolStage.Planned : ToolStage.Drawing;
             if (!IsActive && State.Stage != ToolStage.Building) State.Stage = ToolStage.Closed;
             Touch();
-            Log(Invariant($"plan in {plan.Milliseconds:0} ms ({plan.Timings}): {plan.Roads.Count} roads, {plan.RoadLength / 1000f:0.00} km, {plan.Lots.Count} lots, {plan.ZonedCells} cells, {plan.Trees.Count} trees, {plan.Walls.Count} wall pieces, connected {plan.Connected}; {plan.SummaryLine}"));
+            Log(Invariant($"plan in {plan.Milliseconds:0} ms ({plan.Timings}): {plan.Roads.Count} roads ({plan.Roads.Count(road => road.Main)} main), {plan.RoadLength / 1000f:0.00} km, {plan.Paths.Count} footpaths, {plan.Lots.Count} lots, {plan.ZonedCells} cells, {plan.Trees.Count} trees, {plan.Walls.Count} wall pieces, connected {plan.Connected}; {plan.SummaryLine}"));
             foreach (var message in plan.Messages) Log(message);
         }
 
@@ -584,11 +584,22 @@ namespace SteppedStreets.Tool
         // say which one rather than swap it silently.
         private void WarnIfRoadMissing()
         {
+            WarnIfMainRoadMissing();
             string saved = Mod.Settings?.RoadName;
             var road = RoadCatalog.Find(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), saved);
             if (road == null || string.Equals(road.Name, saved, StringComparison.OrdinalIgnoreCase)) return;
             string label = Panel.PanelSystem.Localised("Assets.NAME[" + road.Name + "]", road.Name);
             Message($"The chosen road isn't in the game now, so the plan uses {label}. Pick another under More settings.");
+        }
+
+        private void WarnIfMainRoadMissing()
+        {
+            string saved = Mod.Settings?.MainRoadName;
+            if (string.IsNullOrEmpty(saved)) return;
+            var road = RoadCatalog.Find(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), saved);
+            if (road == null || string.Equals(road.Name, saved, StringComparison.OrdinalIgnoreCase)) return;
+            string label = Panel.PanelSystem.Localised("Assets.NAME[" + road.Name + "]", road.Name);
+            Message($"The chosen main road isn't in the game now, so the plan uses {label}. Pick another under More settings.");
         }
 
         private NeighbourhoodRequest BuildRequest(float2[] boundary, SiteSnapshot snapshot, Settings.SteppedStreetsSettings settings)

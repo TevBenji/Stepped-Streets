@@ -107,7 +107,9 @@ namespace SteppedStreets.Core.Neighbourhood.Layouts
                 foreach (var run in Runs(survey, Gentle(Geometry.Resample(Geometry.Chaikin(line, 2), Step))))
                 {
                     var street = Level(survey, request, run);
-                    if (street != null) result.Add(street);
+                    if (street == null) continue;
+                    street.Main = true;
+                    result.Add(street);
                 }
             }
             return result;

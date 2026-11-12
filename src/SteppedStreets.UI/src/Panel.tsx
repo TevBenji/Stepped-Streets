@@ -631,7 +631,6 @@ function NeighbourhoodPanel() {
                                     <Segmented options={STREET_PLANTINGS} value={settings.streetTrees} disabled={disabled}
                                         onChange={planting => act("setStreetTrees", planting)} />
                                 </Row>
-                                <ToggleRow label="Footpaths" value={settings.footpaths} trigger="setFootpaths" disabled={disabled} />
                             </Section>
 
                             <Section title="Lots">

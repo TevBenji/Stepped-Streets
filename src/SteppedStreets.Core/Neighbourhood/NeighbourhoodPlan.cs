@@ -34,6 +34,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>How many new roads end here.</summary>
         public int Degree;
+
+        /// <summary>Half the width of the widest new road ending here, centreline to kerb.</summary>
+        public float HalfWidth;
     }
 
     public sealed class PlannedRoad
@@ -53,6 +56,22 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>A main street or connector: built with the main road type, and its lots can take the main-street zone.</summary>
         public bool Main;
+
+        /// <summary>Half the road's width, centreline to kerb: the main road's for a main street when one is chosen.</summary>
+        public float HalfWidth;
+    }
+
+    /// <summary>
+    /// A footpath through a long block, straight from the kerb of one street to the kerb of the street behind or opposite it,
+    /// its ends just short of each kerb so the game joins them to the sidewalks.
+    /// </summary>
+    public sealed class PlannedPath
+    {
+        /// <summary>The ends, at the planned height of the street each one meets; the path climbs evenly between them.</summary>
+        public float3 Start, End;
+
+        /// <summary>Indexes into <see cref="NeighbourhoodPlan.Roads"/> of the streets the path joins.</summary>
+        public int StartRoad, EndRoad;
     }
 
     public sealed class PlannedLot
@@ -105,6 +124,7 @@ namespace SteppedStreets.Core.Neighbourhood
         public List<PlannedBuilding> Buildings = new List<PlannedBuilding>();
         public List<PlannedTree> Trees = new List<PlannedTree>();
         public List<WallSegment> Walls = new List<WallSegment>();
+        public List<PlannedPath> Paths = new List<PlannedPath>();
 
         /// <summary>The planned ground; null when nothing changes.</summary>
         public GroundField Ground;
