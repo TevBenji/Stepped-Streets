@@ -197,6 +197,13 @@ namespace SteppedStreets.Settings
         [SettingsUIHidden]
         public float PanelTop { get; set; }
 
+        /// <summary>
+        /// The player's named presets, as the panel saves them (Core PresetList). Set from the panel, so not on the Options page,
+        /// and not in SetDefaults, so resetting the settings keeps them.
+        /// </summary>
+        [SettingsUIHidden]
+        public string Presets { get; set; } = "[]";
+
         [SettingsUIKeyboardBinding(BindingKeyboard.S, StepStreetAction, ctrl: true, shift: true)]
         [SettingsUISection(Section, Group)]
         public ProxyBinding StepStreetBinding { get; set; }
