@@ -50,6 +50,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>The steepest grade along the road, rise over run.</summary>
         public float SteepestGrade;
+
+        /// <summary>A main street or connector: built with the main road type, and its lots can take the main-street zone.</summary>
+        public bool Main;
     }
 
     public sealed class PlannedLot
