@@ -33,7 +33,8 @@ namespace SteppedStreets.Tool
         {
             public float2 Low, High;
             public readonly HashSet<Entity> Before = new HashSet<Entity>();
-            public readonly Dictionary<Entity, Bezier4x3> EdgesBefore = new Dictionary<Entity, Bezier4x3>();
+            /// <summary>The edges standing before the build, with their prefab and line, to tell a split one's pieces.</summary>
+            public readonly Dictionary<Entity, (Entity Prefab, float2[] Line)> EdgesBefore = new Dictionary<Entity, (Entity, float2[])>();
             /// <summary>The zoned lots' outlines, for the houses that grow on them.</summary>
             public readonly List<float2[]> Lots = new List<float2[]>();
             public readonly List<(string Zone, List<float2[]> Quads)> Zoned = new List<(string, List<float2[]>)>();
@@ -60,7 +61,7 @@ namespace SteppedStreets.Tool
                 foreach (var (edge, curve) in StandingEdges(record))
                 {
                     record.Before.Add(edge);
-                    record.EdgesBefore[edge] = curve;
+                    record.EdgesBefore[edge] = (PrefabOf(edge), Line(curve));
                 }
                 foreach (var lot in buildPlan.Lots)
                     if (lot.Zone.Length > 0) record.Lots.Add(lot.Pad.Corners.Select(corner => corner.xz).ToArray());
@@ -84,8 +85,9 @@ namespace SteppedStreets.Tool
         }
 
         /// <summary>
-        /// What the build added: what stands in the box now that didn't before. Not the two halves of a player's road a connection
-        /// split (they lie along the old edge), nor houses grown meanwhile: those count only on the build's lots, when removing.
+        /// What the build added: what stands in the box now that didn't before. Not the pieces of an edge of the city's that a
+        /// connection joined or a street crossed on the level (same prefab, along the old edge: SiteGeometry.PieceOf), nor houses
+        /// grown meanwhile: those count only on the build's lots, when removing.
         /// </summary>
         private void FinishTracking()
         {
@@ -93,12 +95,14 @@ namespace SteppedStreets.Tool
             if (record == null) return;
             try
             {
-                var split = record.EdgesBefore.Where(pair => Gone(pair.Key)).Select(pair => pair.Value.xz).ToList();
+                var split = record.EdgesBefore.Where(pair => Gone(pair.Key)).Select(pair => pair.Value).ToList();
                 foreach (var (edge, curve) in StandingEdges(record))
                 {
                     if (record.Before.Contains(edge)) continue;
+                    var prefab = PrefabOf(edge);
                     float2 middle = MathUtils.Position(curve, 0.5f).xz;
-                    if (split.Any(old => MathUtils.Distance(old, middle, out _) < 1f)) continue;
+                    float2 direction = MathUtils.Position(curve, 0.55f).xz - MathUtils.Position(curve, 0.45f).xz;
+                    if (split.Any(old => SiteGeometry.PieceOf(old.Line, middle, direction, old.Prefab == prefab))) continue;
                     record.Created.Add(edge);
                     record.Edges++;
                 }
@@ -263,6 +267,16 @@ namespace SteppedStreets.Tool
             && EntityManager.HasComponent<SpawnableBuildingData>(EntityManager.GetComponentData<PrefabRef>(building).m_Prefab);
 
         private bool Gone(Entity entity) => !EntityManager.Exists(entity) || EntityManager.HasComponent<Deleted>(entity);
+
+        private Entity PrefabOf(Entity entity) => EntityManager.HasComponent<PrefabRef>(entity) ? EntityManager.GetComponentData<PrefabRef>(entity).m_Prefab : Entity.Null;
+
+        // An edge's line in 16 pieces: close enough to its curve for telling its pieces within 2 m.
+        private static float2[] Line(Bezier4x3 curve)
+        {
+            var line = new float2[17];
+            for (int index = 0; index < line.Length; index++) line[index] = MathUtils.Position(curve, index / 16f).xz;
+            return line;
+        }
 
         /// <summary>
         /// The objects and buildings of their own (not parts of another) standing in the record's box: trees and plants, props,

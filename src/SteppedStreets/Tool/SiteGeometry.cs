@@ -27,6 +27,29 @@ namespace SteppedStreets.Tool
             return math.distancesq(point, start + fraction * direction);
         }
 
+        /// <summary>
+        /// Whether a new edge is a piece of an old edge the build split, where a connection joined it or a street crossed it on
+        /// the level: the same prefab, its middle within 2 m of the old edge's line, running along it within 10°. A street of the
+        /// build's that crosses the old edge fails the direction, even when the game cut it into short stubs right at the crossing.
+        /// </summary>
+        internal static bool PieceOf(float2[] oldLine, float2 middle, float2 direction, bool samePrefab)
+        {
+            if (!samePrefab || oldLine == null || math.lengthsq(direction) < 1e-8f) return false;
+            float nearest = float.MaxValue;
+            float2 along = float2.zero;
+            for (int index = 1; index < oldLine.Length; index++)
+            {
+                if (math.lengthsq(oldLine[index] - oldLine[index - 1]) < 1e-8f) continue;
+                float distance = DistanceSquared(middle, oldLine[index - 1], oldLine[index]);
+                if (distance < nearest) { nearest = distance; along = oldLine[index] - oldLine[index - 1]; }
+            }
+            return nearest <= PieceReach * PieceReach && math.abs(math.dot(math.normalize(along), math.normalize(direction))) >= PieceAlong;
+        }
+
+        private const float PieceReach = 2f;
+        // cos 10°
+        private const float PieceAlong = 0.985f;
+
         internal static bool Inside(float2 point, float2[] quad)
         {
             bool positive = false;
