@@ -77,9 +77,11 @@ namespace SteppedStreets.Tool
         }
 
         /// <summary>
-        /// Existing streets go straight to zoning: no ground, no roads, and their zone blocks are already there. No site check
-        /// either: the zoning reads the live cells and only paints the free ones, so houses growing along the streets while the
-        /// plan is open can't spoil it, and in a living city they would otherwise send every Build back to re-plan.
+        /// Existing streets: no roads, and their zone blocks are already there, so the lots are levelled (when asked) and zoned
+        /// straight away; then the services, parks and greenery as on new streets. No site check: the zoning reads the live
+        /// cells and only paints the free ones, so houses growing along the streets while the plan is open can't spoil it, and
+        /// in a living city they would otherwise send every Build back to re-plan. The levelling keeps off what was built and
+        /// zoned when the plan was made.
         /// </summary>
         private void ZoneExistingStreets()
         {
@@ -87,10 +89,41 @@ namespace SteppedStreets.Tool
             buildPlan = Plan;
             buildRequest = PlannedRequest;
             State.Stage = ToolStage.Building;
-            State.Progress = 0.3f;
+            State.Progress = 0.1f;
+            State.Summary = buildPlan.Ground != null ? "Levelling the lots..." : "Zoning...";
+            Touch();
+            Log(Invariant($"zoning existing streets: {buildPlan.Lots.Count} lots, {buildPlan.ZonedCells} cells, {buildPlan.Buildings.Count} buildings, {buildPlan.Trees.Count} trees and plants, ground {(buildPlan.Ground != null ? "levelled" : "as it is")}"));
+            if (buildPlan.Ground == null) { ZoneExistingLots(); return; }
+            var ground = buildPlan.Ground;
+            World.GetOrCreateSystemManaged<TerrainBuildSystem>().Begin(() => ground.ToRaster(), AfterExistingGround);
+        }
+
+        private void AfterExistingGround(TerrainBuildReport report)
+        {
+            try
+            {
+                if (State.Stage != ToolStage.Building) return;
+                Log("ground: " + report.Summary);
+                buildReport.Add(report.Reached
+                    ? Invariant($"lots levelled in {report.Passes} passes")
+                    : Invariant($"lots levelled within {report.WorstError:0.0} m of the plan ({100f - report.FractionOff * 100f:0}% exact)"));
+                ZoneExistingLots();
+            }
+            catch (Exception exception) { BuildFailed(exception, "Zoning failed to start. The ground changes remain."); }
+        }
+
+        private void ZoneExistingLots()
+        {
+            // Nothing to zone (an empty mix): the services, parks and greenery still go in.
+            if (buildPlan.ZonedCells == 0)
+            {
+                buildReport.Add("nothing to zone");
+                PlaceServices();
+                return;
+            }
+            State.Progress = 0.4f;
             State.Summary = "Zoning...";
             Touch();
-            Log(Invariant($"zoning existing streets: {buildPlan.Lots.Count} lots, {buildPlan.ZonedCells} cells"));
             StartZoning();
         }
 
@@ -356,7 +389,10 @@ namespace SteppedStreets.Tool
             try
             {
                 if (State.Stage != ToolStage.Building) return;
-                var catalogue = ServiceCatalog.List(EntityManager, World.GetOrCreateSystemManaged<Game.Prefabs.PrefabSystem>(), Panel.PanelSystem.Localised);
+                var prefabs = World.GetOrCreateSystemManaged<Game.Prefabs.PrefabSystem>();
+                var catalogue = ServiceCatalog.List(EntityManager, prefabs, Panel.PanelSystem.Localised);
+                // Pocket parks come from the game's park buildings, which the services list may not hold.
+                catalogue.AddRange(ServiceCatalog.Parks(EntityManager, prefabs, Panel.PanelSystem.Localised));
                 var placements = new List<ObjectBuildSystem.Placement>();
                 foreach (var building in buildPlan.Buildings)
                 {
@@ -410,7 +446,7 @@ namespace SteppedStreets.Tool
             {
                 if (State.Stage != ToolStage.Building) return;
                 if (report != null && StoppedByAnotherTool("planting trees")) return;
-                if (report != null) { Log("trees: " + report.Summary); buildReport.Add(Invariant($"{report.Placed} trees")); }
+                if (report != null) { Log("trees: " + report.Summary); buildReport.Add(Invariant($"{report.Placed} trees, bushes and rocks")); }
                 if (buildPlan.Walls.Count == 0) { FinishBuild(null); return; }
                 State.Progress = 0.93f;
                 State.Summary = "Building walls...";

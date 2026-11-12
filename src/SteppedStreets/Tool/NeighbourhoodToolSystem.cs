@@ -498,7 +498,9 @@ namespace SteppedStreets.Tool
             var settings = Mod.Settings ?? throw new InvalidOperationException("Stepped Streets settings are unavailable.");
             var boundary = corners.ToArray();
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            var snapshot = SiteSnapshot.Capture(EntityManager, World, boundary, settings.UseExistingStreets);
+            // Existing streets read the ground only for what needs it: greenery and levelled lots.
+            var snapshot = SiteSnapshot.Capture(EntityManager, World, boundary, settings.UseExistingStreets,
+                !settings.UseExistingStreets || settings.Trees || settings.LevelExistingLots);
             var request = BuildRequest(boundary, snapshot, settings);
             double captureMilliseconds = clock.Elapsed.TotalMilliseconds;
             var cancel = new CancellationTokenSource();
@@ -516,7 +518,7 @@ namespace SteppedStreets.Tool
             }), cancel.Token);
             State.Stage = ToolStage.Planning;
             Touch();
-            Log(Invariant($"planning an area of {State.AreaSquareMetres / 10000f:0.0} ha with {boundary.Length} corners; snapshot {captureMilliseconds:0} ms, {snapshot.ExistingRoads.Length} existing road edges, {snapshot.BuildingCount} buildings{(request.ExistingStreets ? Invariant($", existing streets: {snapshot.ZoneCells.Length} free zone cells nearby") : "")}"));
+            Log(Invariant($"planning an area of {State.AreaSquareMetres / 10000f:0.0} ha with {boundary.Length} corners; snapshot {captureMilliseconds:0} ms, {snapshot.ExistingRoads.Length} existing road edges, {snapshot.BuildingCount} buildings{(request.ExistingStreets ? Invariant($", existing streets: {snapshot.ZoneCells.Count(cell => !cell.Taken)} free zone cells nearby") : "")}"));
         }
 
         private void AdoptFinishedPlan()
@@ -629,6 +631,7 @@ namespace SteppedStreets.Tool
                     : RoadCatalog.Find(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), settings.MainRoadName)?.HalfWidth ?? 0f,
                 Footpaths = settings.Footpaths,
                 PocketParks = settings.PocketParks,
+                Parks = settings.PocketParks ? ParkRequests() : new ServiceRequest[0],
                 LevelExistingLots = settings.LevelExistingLots,
                 CornerZone = settings.CornerZone ?? "",
                 MainStreetZone = settings.MainStreetZone ?? "",
@@ -672,6 +675,11 @@ namespace SteppedStreets.Tool
             }
             return services.ToArray();
         }
+
+        /// <summary>The small parks the game has unlocked, with their lot sizes, for pocket parks.</summary>
+        private ServiceRequest[] ParkRequests() =>
+            ServiceCatalog.Parks(EntityManager, World.GetOrCreateSystemManaged<PrefabSystem>(), null)
+                .Select(park => new ServiceRequest { Name = park.Name, WidthCells = park.WidthCells, DepthCells = park.DepthCells }).ToArray();
 
         private void RefreshStage()
         {

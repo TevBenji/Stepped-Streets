@@ -68,6 +68,48 @@ namespace SteppedStreets.Build
             return buildings;
         }
 
+        /// <summary>The small park buildings for pocket parks, by the game's names (2.12.0 game facts).</summary>
+        private static readonly string[] ParkNames =
+        {
+            "PocketPark01", "PocketPark02", "PocketPark03", "PocketPark04", "PocketPark05", "PocketPark06", "PocketPark07", "PocketPark08",
+            "PocketPark09", "PocketPark10", "Playground01", "GymPark01", "ChirperPark01", "Playground03", "Playground05", "CityPark05",
+            "DogPark01", "CityPark01",
+        };
+
+        /// <summary>
+        /// The unlocked pocket parks and other small parks with their lot sizes. Read from the game's park buildings rather than
+        /// <see cref="List"/>, so a park is found whatever its placement flags.
+        /// </summary>
+        public static List<Building> Parks(EntityManager entities, PrefabSystem prefabs, Func<string, string, string> localise)
+        {
+            var parks = new List<Building>();
+            using (var query = entities.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[] { ComponentType.ReadOnly<ParkData>(), ComponentType.ReadOnly<BuildingData>(), ComponentType.ReadOnly<PrefabData>() },
+                None = new[] { ComponentType.ReadOnly<Locked>() },
+            }))
+            using (var list = query.ToEntityArray(Allocator.Temp))
+                foreach (var entity in list)
+                {
+                    if (!Available(entities, prefabs, entity)) continue;
+                    if (!prefabs.TryGetPrefab<PrefabBase>(entities.GetComponentData<PrefabData>(entity), out var prefab) || prefab == null) continue;
+                    string name = prefab.name;
+                    if (Array.IndexOf(ParkNames, name) < 0) continue;
+                    var lot = entities.GetComponentData<BuildingData>(entity).m_LotSize;
+                    parks.Add(new Building
+                    {
+                        Name = name,
+                        Label = localise?.Invoke("Assets.NAME[" + name + "]", name) ?? name,
+                        Group = "",
+                        Prefab = entity,
+                        WidthCells = lot.x,
+                        DepthCells = lot.y,
+                    });
+                }
+            parks.Sort((first, second) => string.CompareOrdinal(first.Name, second.Name));
+            return parks;
+        }
+
         /// <summary>
         /// A building from a DLC or content pack the player doesn't have stays among the game's prefabs, but the game refuses to
         /// place it (owner's in-game test, 3 November 2026): it is left off the list, as the game's own menus grey it out.

@@ -27,6 +27,9 @@ namespace SteppedStreets.Tool
         private static readonly Color Raised = new Color(0.9f, 0.8f, 0.55f, 0.45f);
         private static readonly Color Conifer = new Color(0.1f, 0.32f, 0.16f, 0.9f);
         private static readonly Color Broadleaf = new Color(0.22f, 0.46f, 0.16f, 0.9f);
+        private static readonly Color Bush = new Color(0.4f, 0.62f, 0.2f, 0.9f);
+        private static readonly Color Flower = new Color(0.95f, 0.55f, 0.75f, 0.95f);
+        private static readonly Color Rock = new Color(0.62f, 0.6f, 0.56f, 0.95f);
         private const int MostTrees = 4000;
         private const int MostShading = 5000;
 
@@ -190,7 +193,7 @@ namespace SteppedStreets.Tool
             for (int index = 0; index < plan.Trees.Count; index += stride)
             {
                 var tree = plan.Trees[index];
-                dots.Add((tree.Position, 3f, tree.Kind == TreeKind.Conifer ? Conifer : Broadleaf));
+                dots.Add((tree.Position, PlantSize(tree.Kind), PlantColour(tree.Kind)));
             }
 
             foreach (var road in plan.Roads)
@@ -204,6 +207,13 @@ namespace SteppedStreets.Tool
             foreach (var node in plan.Nodes)
                 if (node.ExistingRoadId != 0) dots.Add((node.Position, 8f, new Color(1f, 0.3f, 0.85f, 1f)));
         }
+
+        private static float PlantSize(TreeKind kind) =>
+            kind == TreeKind.Boulder ? 4f : kind == TreeKind.Bush ? 2f : kind == TreeKind.Flower || kind == TreeKind.Rock ? 1.4f : 3f;
+
+        private static Color PlantColour(TreeKind kind) =>
+            kind == TreeKind.Conifer ? Conifer : kind == TreeKind.Broadleaf ? Broadleaf : kind == TreeKind.Bush ? Bush
+            : kind == TreeKind.Flower ? Flower : Rock;
 
         private static Color GradeColour(float grade, float maximum)
         {

@@ -5,7 +5,7 @@
 // grid (idea from Grid Road Generator's HeightSnapshot), a coarser water-depth grid, nearby nets
 // as Bézier curves with widths, building lots as obstacles, and the asset info map. The result
 // (SiteContext) is immutable after capture and therefore safe to read from any thread.
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: a drawn area instead of one street; fixed 4 m terrain and 8 m water grids, building lots and water rasterised into one blocked grid (water also on its own, for the coastal layout's shore), existing road edges sampled for the neighbourhood generator with their entity handles, a fingerprint to notice changes before a build, and the free zone cells near the area for zoning existing streets.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: a drawn area instead of one street; fixed 4 m terrain and 8 m water grids, building lots and water rasterised into one blocked grid (water also on its own, for the coastal layout's shore), existing road edges sampled for the neighbourhood generator with their entity handles, a fingerprint to notice changes before a build, and the zone cells near the area, free and taken, for zoning existing streets (with the ground when their greenery or levelling needs it).
 using System;
 using System.Collections.Generic;
 using Colossal.Mathematics;
@@ -45,18 +45,18 @@ namespace SteppedStreets.Tool
         public readonly long Fingerprint;
         public readonly int BuildingCount;
 
-        /// <summary>The free cells of the zone blocks round the area; empty unless asked for (zoning existing streets).</summary>
+        /// <summary>The cells of the zone blocks round the area, free and taken; empty unless asked for (zoning existing streets).</summary>
         public readonly ZoneCell[] ZoneCells = new ZoneCell[0];
 
-        private SiteSnapshot(EntityManager entities, World world, float2[] boundary, bool zoneCells)
+        private SiteSnapshot(EntityManager entities, World world, float2[] boundary, bool zoneCells, bool ground)
         {
             float2 low = new float2(float.MaxValue), high = new float2(float.MinValue);
             foreach (var corner in boundary) { low = math.min(low, corner); high = math.max(high, corner); }
-            if (zoneCells)
+            if (zoneCells) ZoneCells = CaptureZoneCells(entities, low, high);
+            if (zoneCells && !ground)
             {
-                // Zoning existing streets needs only the free cells (with their blocks' heights), so the heights, water,
+                // Zoning existing streets alone needs only the cells (with their blocks' heights), so the heights, water,
                 // buildings and roads that cost most of a big area's snapshot are left out; there are no roads to plan.
-                ZoneCells = CaptureZoneCells(entities, low, high);
                 ExistingRoads = new ExistingRoad[0];
                 origin = low;
                 HeightSpacing = FinestSpacing;
@@ -66,7 +66,9 @@ namespace SteppedStreets.Tool
                 underWater = new bool[4];
                 return;
             }
-            ExistingRoads = CaptureRoads(entities, low - RoadReach, high + RoadReach);
+            // Existing streets' greenery and levelling keep clear of the roads in and beside the area; a new neighbourhood may
+            // connect to one further out.
+            ExistingRoads = CaptureRoads(entities, low - (zoneCells ? MinimumMargin : RoadReach), high + (zoneCells ? MinimumMargin : RoadReach));
             float nearestRoad = float.MaxValue;
             foreach (var road in ExistingRoads)
                 foreach (var point in road.Points)
@@ -126,9 +128,12 @@ namespace SteppedStreets.Tool
             Fingerprint = fingerprint;
         }
 
-        internal static SiteSnapshot Capture(EntityManager entities, World world, float2[] boundary, bool zoneCells = false)
+        /// <param name="zoneCells">Also the zone blocks' cells, for zoning existing streets.</param>
+        /// <param name="ground">The heights, water, buildings and roads; with <paramref name="zoneCells"/> only when greenery or
+        /// levelling needs them.</param>
+        internal static SiteSnapshot Capture(EntityManager entities, World world, float2[] boundary, bool zoneCells = false, bool ground = true)
         {
-            try { return new SiteSnapshot(entities, world, boundary, zoneCells); }
+            try { return new SiteSnapshot(entities, world, boundary, zoneCells, ground); }
             catch (Exception exception)
             {
                 Mod.Logger.Error(exception, "Stepped Streets: taking the site snapshot failed");
@@ -242,7 +247,11 @@ namespace SteppedStreets.Tool
             (cell.m_State & (Game.Zones.CellFlags.Blocked | Game.Zones.CellFlags.Occupied)) == 0
             && (cell.m_State & Game.Zones.CellFlags.Visible) != 0 && cell.m_Zone.Equals(Game.Zones.ZoneType.None);
 
-        /// <summary>Every free cell of the zone blocks that can reach the area's box, with its block, column, row and centre.</summary>
+        /// <summary>
+        /// Every visible cell of the zone blocks that can reach the area's box, with its block, column, row and centre, and
+        /// whether it is taken: greenery and grading keep off a cell the player zoned or something stands on, while land outside
+        /// every block is open to them.
+        /// </summary>
         private static ZoneCell[] CaptureZoneCells(EntityManager entities, float2 low, float2 high)
         {
             var result = new List<ZoneCell>();
@@ -263,13 +272,16 @@ namespace SteppedStreets.Tool
                     for (int row = area.z; row < area.w; row++)
                         for (int column = area.x; column < area.y; column++)
                         {
-                            if (!FreeCell(cells[row * block.m_Size.x + column])) continue;
+                            var cell = cells[row * block.m_Size.x + column];
+                            // A hidden cell lies under another block's visible one.
+                            if ((cell.m_State & Game.Zones.CellFlags.Visible) == 0) continue;
                             result.Add(new ZoneCell
                             {
                                 Block = index, Column = column, Row = row,
                                 Centre = Game.Zones.ZoneUtils.GetCellPosition(block, new int2(column, row)).xz,
                                 Height = block.m_Position.y,
                                 Forward = block.m_Direction,
+                                Taken = !FreeCell(cell),
                             });
                         }
                 }
