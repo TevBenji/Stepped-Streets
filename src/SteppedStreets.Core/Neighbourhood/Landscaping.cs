@@ -146,7 +146,7 @@ namespace SteppedStreets.Core.Neighbourhood
                 if (request.Blocked != null && request.Blocked(point)) return false;
                 if (keepOff != null && keepOff(point)) return false;
                 if (PastKerb(point) < kerb) return false;
-                if (Footpaths.Near(paths, point, Footpaths.HalfWidth + 1f)) return false;
+                if (Footpaths.Near(paths, point, Footpaths.HalfWidth + 1.5f)) return false;
                 foreach (var pad in pads.Near(point))
                     if (LotLayout.InsidePad(pad, point, -LotMargin)) return false;
                 return true;
