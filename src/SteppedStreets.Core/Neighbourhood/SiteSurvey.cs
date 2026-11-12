@@ -55,10 +55,10 @@ namespace SteppedStreets.Core.Neighbourhood
             Boundary = request.Boundary;
             Poly.Bounds(Boundary, out BoundaryMinimum, out BoundaryMaximum);
             AreaSquareMetres = math.abs(SignedArea(Boundary));
-            // Reach as far as the nearest existing road (at most 400 m), so a connection to it can be planned.
+            // Reach as far as the nearest road a connection may join (at most 400 m), so one to it can be planned.
             float nearestRoad = float.MaxValue;
-            foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
-                foreach (var point in road?.Points ?? new float3[0])
+            foreach (var road in request.JoinableRoads)
+                foreach (var point in road.Points ?? new float3[0])
                     nearestRoad = math.min(nearestRoad, Poly.Contains(Boundary, point.xz) ? 0f : Poly.DistanceToBoundary(Boundary, point.xz));
             // No road in reach: only the banks need room past the area.
             float margin = nearestRoad == float.MaxValue ? MinimumMargin : math.clamp(nearestRoad + 48f, MinimumMargin, MaximumMargin);

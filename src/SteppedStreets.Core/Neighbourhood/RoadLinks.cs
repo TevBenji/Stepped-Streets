@@ -269,7 +269,9 @@ namespace SteppedStreets.Core.Neighbourhood
             var roads = request.ExistingRoads ?? new ExistingRoad[0];
             for (int road = 0; road < roads.Length; road++)
             {
-                var points = roads[road]?.Points;
+                // A highway is no place to join; the connection still keeps clear of it.
+                if (roads[road] == null || !roads[road].Joinable) continue;
+                var points = roads[road].Points;
                 if (points == null || points.Length < 2) continue;
                 // Places about every 12 m along the edge's clear middle, whatever its sampling, so a short edge still offers its
                 // middle: the samples alone could all miss a clear stretch of a few metres.

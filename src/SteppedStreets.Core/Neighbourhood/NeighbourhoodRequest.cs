@@ -268,6 +268,12 @@ namespace SteppedStreets.Core.Neighbourhood
         public float HalfWidth = 6f;
 
         /// <summary>
+        /// New streets may join it. False for a highway: a street joined to one at grade cuts into the highway's traffic (the
+        /// in-game test joined a residential street into a one-way highway). New roads still keep clear of it.
+        /// </summary>
+        public bool Joinable = true;
+
+        /// <summary>
         /// How far along the edge from either end a new road may join it. An edge ends at a node of the player's network,
         /// often a junction; a new junction closer than this crowds it and the game's shapes for the two overlap (owner's
         /// in-game test of 2.1.1, 3 November 2026).
@@ -330,6 +336,26 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Existing road edges within 400 m of the area (the connection's reach); may be empty.</summary>
         public ExistingRoad[] ExistingRoads = new ExistingRoad[0];
+
+        /// <summary>The existing roads new streets may join: every one but the highways.</summary>
+        internal IEnumerable<ExistingRoad> JoinableRoads
+        {
+            get
+            {
+                foreach (var road in ExistingRoads ?? new ExistingRoad[0])
+                    if (road != null && road.Joinable) yield return road;
+            }
+        }
+
+        /// <summary>Some existing road within reach may be joined.</summary>
+        internal bool AnyJoinable
+        {
+            get
+            {
+                foreach (var _ in JoinableRoads) return true;
+                return false;
+            }
+        }
 
         public NeighbourhoodStyle Style = NeighbourhoodStyle.ContourSuburb;
 
