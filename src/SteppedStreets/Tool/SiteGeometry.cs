@@ -1,4 +1,5 @@
 // Stepped Streets. Original work by TevBenji, 2026-11. GPL-3.0.
+using System;
 using System.Collections.Generic;
 using SteppedStreets.Core.Planning;
 using Unity.Mathematics;
@@ -28,27 +29,37 @@ namespace SteppedStreets.Tool
         }
 
         /// <summary>
-        /// Whether a new edge is a piece of an old edge the build split, where a connection joined it or a street crossed it on
-        /// the level: the same prefab, its middle within 2 m of the old edge's line, running along it within 10°. A street of the
-        /// build's that crosses the old edge fails the direction, even when the game cut it into short stubs right at the crossing.
+        /// Whether an edge is one the build made: of a prefab the build laid new courses with, and lying along them, its two ends
+        /// and its middle each within 3 m of a course of that prefab and its middle running within 15° of the course there. The
+        /// game may cut a course where it meets a junction or crosses a railway, and every piece still lies along it. An edge of
+        /// the city's, however the build split it, has another prefab or runs off the courses, so Remove can never take it.
         /// </summary>
-        internal static bool PieceOf(float2[] oldLine, float2 middle, float2 direction, bool samePrefab)
+        internal static bool BuiltAlong<TPrefab>(IEnumerable<(TPrefab Prefab, float2[] Line)> courses, TPrefab prefab,
+            float2 start, float2 middle, float2 end, float2 direction) where TPrefab : IEquatable<TPrefab>
         {
-            if (!samePrefab || oldLine == null || math.lengthsq(direction) < 1e-8f) return false;
-            float nearest = float.MaxValue;
-            float2 along = float2.zero;
-            for (int index = 1; index < oldLine.Length; index++)
+            if (math.lengthsq(direction) < 1e-8f) return false;
+            float2 heading = math.normalize(direction);
+            bool startOn = false, endOn = false, middleAlong = false;
+            foreach (var (coursePrefab, line) in courses)
             {
-                if (math.lengthsq(oldLine[index] - oldLine[index - 1]) < 1e-8f) continue;
-                float distance = DistanceSquared(middle, oldLine[index - 1], oldLine[index]);
-                if (distance < nearest) { nearest = distance; along = oldLine[index] - oldLine[index - 1]; }
+                if (line == null || !coursePrefab.Equals(prefab)) continue;
+                for (int index = 1; index < line.Length; index++)
+                {
+                    float2 along = line[index] - line[index - 1];
+                    if (math.lengthsq(along) < 1e-8f) continue;
+                    startOn |= DistanceSquared(start, line[index - 1], line[index]) <= CourseReach * CourseReach;
+                    endOn |= DistanceSquared(end, line[index - 1], line[index]) <= CourseReach * CourseReach;
+                    middleAlong |= DistanceSquared(middle, line[index - 1], line[index]) <= CourseReach * CourseReach
+                        && math.abs(math.dot(math.normalize(along), heading)) >= CourseAlong;
+                }
             }
-            return nearest <= PieceReach * PieceReach && math.abs(math.dot(math.normalize(along), math.normalize(direction))) >= PieceAlong;
+            return startOn && endOn && middleAlong;
         }
 
-        private const float PieceReach = 2f;
-        // cos 10°
-        private const float PieceAlong = 0.985f;
+
+        private const float CourseReach = 3f;
+        // cos 15°
+        private const float CourseAlong = 0.966f;
 
         internal static bool Inside(float2 point, float2[] quad)
         {
