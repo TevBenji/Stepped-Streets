@@ -55,6 +55,8 @@ export interface Settings {
     /** -1 lets the planner choose; 0-2 are cells between lots. */
     lotSpacing: number;
     retainingWalls: boolean;
+    /** Painted crosswalks where the new streets meet. Saved without re-planning. */
+    crosswalks: boolean;
     trees: boolean;
     treeDensityPercent: number;
     seed: number;
@@ -201,6 +203,7 @@ export function readState(raw: unknown): ToolState {
             bankGradePercent: number(settings.bankGradePercent, 40, 20, 50),
             lotSpacing: whole(settings.lotSpacing, -1, -1, 2),
             retainingWalls: flag(settings.retainingWalls, false),
+            crosswalks: flag(settings.crosswalks, true),
             trees: flag(settings.trees, false),
             treeDensityPercent: number(settings.treeDensityPercent, 50, 10, 100),
             seed: whole(settings.seed, 1, 1, 99999),

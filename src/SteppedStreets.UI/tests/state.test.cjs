@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS = {
     style: "ContourSuburb", road: "Small Road", blockDepth: 90, maxRoadGradePercent: 8, steepestBuildablePercent: 15,
     steepGround: false, zoneMix: [{ zone: "Residential Low", share: 100 }], serviceMix: [], mixPattern: "Clumps", lotWidthCells: 3, lotDepthCells: 4,
     shapeGround: true, existingStreets: false, junctions: "Staggered",
-    levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, trees: false,
+    levelLots: true, earthworkLimit: 4, bankGradePercent: 40, lotSpacing: -1, retainingWalls: false, crosswalks: true, trees: false,
     treeDensityPercent: 50, seed: 1, panelCollapsed: false, panelLeft: -1, panelTop: -1,
 };
 const EMPTY_STATS = {
@@ -144,7 +144,7 @@ test("enums are validated, wrong types and non-finite numbers fall back to defau
         stage: "Picking", corners: "5", areaClosed: "true", areaSquareMetres: NaN, progress: Infinity, summary: 5,
         messages: [null, "Kept", {}], stats: { lots: "86", connected: 1, wildPercent: NaN },
         settings: { style: "Grid", road: 7, mixPattern: "random", blockDepth: "120", levelLots: "false", trees: 0,
-            retainingWalls: 1, seed: Infinity, earthworkLimit: -Infinity },
+            retainingWalls: 1, crosswalks: "false", seed: Infinity, earthworkLimit: -Infinity },
     });
     assert.equal(state.stage, "Closed");
     assert.equal(state.corners, 0);
@@ -158,6 +158,7 @@ test("enums are validated, wrong types and non-finite numbers fall back to defau
     assert.equal(state.stats.wildPercent, 0);
     assert.deepEqual(state.settings, DEFAULT_SETTINGS);
     assert.equal(readState({ settings: { mixPattern: "Random", style: "TerracedBlocks", trees: false } }).settings.mixPattern, "Random");
+    assert.equal(readState({ settings: { crosswalks: false } }).settings.crosswalks, false);
     assert.equal(readState({ settings: { steepGround: true } }).settings.steepGround, true);
     assert.equal(readState({ settings: { style: "TerracedBlocks" } }).settings.style, "TerracedBlocks");
     assert.equal(readState({ settings: { trees: false } }).settings.trees, false);

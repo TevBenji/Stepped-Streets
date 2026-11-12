@@ -18,6 +18,8 @@ node_modules/
 src/SteppedStreets.UI/build/
 gallery/
 
-# Kept locally, not published: design notes and the test suite
+# Kept locally, not published: design notes, the test suite and the dev-only game runner
 docs/
 tests/
+tools/dev/
+src/SteppedStreets/Dev/

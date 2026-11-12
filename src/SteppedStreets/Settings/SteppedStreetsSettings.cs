@@ -144,6 +144,14 @@ namespace SteppedStreets.Settings
         [SettingsUISection(Section, Group)]
         public int Seed { get; set; }
 
+        /// <summary>
+        /// Painted crosswalks where the new streets meet. Off gives every new street piece the game's crosswalk-removal upgrade.
+        /// The plan doesn't depend on it, so it's set from the panel without re-planning, and hidden here to keep it out of the
+        /// signature that marks a plan stale.
+        /// </summary>
+        [SettingsUIHidden]
+        public bool Crosswalks { get; set; }
+
         /// <summary>The panel is folded down to its header. Saved here, set from the panel, so not on the Options page.</summary>
         [SettingsUIHidden]
         public bool PanelCollapsed { get; set; }
@@ -188,6 +196,7 @@ namespace SteppedStreets.Settings
             Trees = false;
             TreeDensityPercent = 50;
             Seed = 1;
+            Crosswalks = true;
             PanelCollapsed = false;
             PanelLeft = -1f;
             PanelTop = -1f;

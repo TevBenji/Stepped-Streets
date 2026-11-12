@@ -226,7 +226,8 @@ The panel shows the essentials; everything else is under **More settings**. One 
 
 | Setting | Range | Default | What it does |
 |---|---|---|---|
-| Road type | the game's zoning roads | Small Road | The road used for every new street. |
+| Road type | the game's zoning roads, Road Builder roads included | Small Road | The road used for every new street. A Road Builder road needs zoning turned on to be listed. |
+| Crosswalks | on / off | on | Painted crossings where the new streets meet. Off: none, and people cross there less often. Your existing roads keep theirs. |
 | Block depth | 60–200 m | 90 m | The distance between neighbouring contour streets. |
 | Max road grade | 4–12 % | 8 % | No new road is steeper. |
 | Steepest buildable | 8–30 % (60 % with Steep hills) | 15 % | Steeper ground gets no roads or lots and becomes forest. |
