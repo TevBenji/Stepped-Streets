@@ -54,11 +54,19 @@ In the game:
   you choose. Lots are 4 cells deep by default, so every low-density house fits on level ground. Remove every zone and the
   lots are levelled but left for you to zone.
 - **Zoning for streets you already have**: pick **Use existing**, draw around them, and their empty zone cells get your mix
-  (Random, Clumps or Even, zone packs included), with no new roads and no ground changes. Cells you zoned yourself stay.
+  (Random, Clumps or Even, zone packs included), with no new roads. Cells you zoned yourself stay. It can also plant
+  greenery on the empty land, place your service buildings along the streets, leave space between lots, and level the
+  lots first (off by default).
 - **Service buildings in the mix**: police, fire, health, schools, parks, utilities, any unlocked roadside service building,
   each on a level site of its own, facing the road.
-- **Trees if you want them**: forest on ground too steep to build and trees on the banks (off by default), and optional
-  garden walls.
+- **Greenery if you want it**: forest on ground too steep to build, trees on the banks, and bushes, flowers and rocks
+  between the lots (off by default), plus optional garden walls and **pocket parks** on frontage too short for a lot.
+- **Main roads and side streets**: a wider road for the main streets and the links to your roads, and the game's own
+  **street trees** or grass on the new streets (or on the streets you zone with Use existing).
+- **Footpaths** through long blocks, joining the sidewalks without a crossing.
+- **Shops on the corners**: corner lots and lots on a main street can take their own zone.
+- **Presets**: save all your settings under a name and load them in any city.
+- **Remove last build**: changed your mind? Take away the roads, zoning, greenery and buildings the last build placed.
 - **Forty layouts for hills and flat ground**: five that follow the land (contours, ridges, valleys), and for flat or
   gentle ground grids, tiled triangles and hexagons, radial rings and stars, spines, trees, loops and lollipops, a coastal
   layout, and planners' models from Radburn to Barcelona's superblocks.
@@ -214,10 +222,11 @@ The panel shows the essentials; everything else is under **More settings**. One 
 | Junctions | Crossroads, Staggered, Traffic | Staggered | How a grid's cross streets meet its main streets. |
 | Shape the ground | on / off | on | Grade roads and lots. Off: no terrain changes at all; roads follow the ground. |
 | Zones | zones and shares, or none | Residential Low | Each lot's zone. **Add a zone** mixes in another; with none, the lots are levelled but not zoned. |
-| Services | buildings and counts (1–20) | none | Service buildings on level sites beside the new roads. **Add a service** adds one. |
+| Services | buildings and counts (1–20) | none | Service buildings on level sites beside the new roads, or along the streets with Use existing. **Add a service** adds one. |
 | Mix mode | Random, Clumps, Even | Clumps | How a zone mix is spread: per lot, in runs of neighbouring lots, or evenly. |
 | Steep hills | on / off | off | Build on slopes up to 60 % with up to 12 m of earthwork; connectors may switch back. |
-| Trees | on / off | off | Forest on steep ground, trees on banks and in the gaps between lots. |
+| Trees | on / off | off | Forest on steep ground, trees on banks and in the gaps between lots, with bushes, flowers and rocks. |
+| Greenery (Use existing) | on / off | off | Trees, bushes, flowers and rocks on the empty land in the area, never on roads, buildings or lots. The same setting as Trees. |
 
 <details>
 <summary><strong>More settings</strong></summary>
@@ -227,18 +236,26 @@ The panel shows the essentials; everything else is under **More settings**. One 
 | Setting | Range | Default | What it does |
 |---|---|---|---|
 | Road type | the game's zoning roads, Road Builder roads included | Small Road | The road used for every new street. A Road Builder road needs zoning turned on to be listed. |
+| Main road | Same as streets, or any zoning road | Same as streets | The road for main streets and the links to your roads: trunks, avenues and through streets. Lots, banks and trees keep clear of it. |
+| Street trees | None, Grass, Trees | None | The game's own grass strip or tree upgrade on every new street, or on the streets you zone with Use existing. Grass skips streets with a bike lane or wide sidewalk. |
 | Crosswalks | on / off | on | Painted crossings where the new streets meet. Off: none, and people cross there less often. Your existing roads keep theirs. |
+| Footpaths | on / off | off | Paths through blocks longer than 180 m, from street to street, joining the sidewalks without a crossing. New streets only. |
 | Block depth | 60–200 m | 90 m | The distance between neighbouring contour streets. |
 | Max road grade | 4–12 % | 8 % | No new road is steeper. |
 | Steepest buildable | 8–30 % (60 % with Steep hills) | 15 % | Steeper ground gets no roads or lots and becomes forest. |
 | Lot width, lot depth | 2–6 cells | 3 × 4 | The size of each lot. Only the lot's depth is levelled and zoned; low-density houses are 2 or 4 cells deep. |
-| Space between lots | Auto, 0, 1, 2 cells | Auto | Auto leaves planted gaps on steeper ground. |
+| Space between lots | Auto, 0, 1, 2 cells | Auto | Auto leaves planted gaps on steeper ground. Use existing too. |
+| Corner lots | From the mix, or a zone | From the mix | The zone for lots on a corner, for shops on the corners. On short blocks most lots are corners. |
+| Main street lots | From the mix, or a zone | From the mix | The zone for lots facing a main street. With Use existing, a main street is one wider than the narrowest you zone along. |
 | Level the lots | on / off | on | Grade each lot into a level pad. Off grades only the roads. |
+| Level lots (Use existing) | on / off | off | Grade the lots along existing streets into level pads before zoning. Changes the ground. |
 | Most earth | 1–8 m (12 m with Steep hills) | 4 m | A lot that needs more cut or fill is left out. |
 | Steepest bank | 20–50 % | 40 % | No slope the grading makes is steeper. |
 | Retaining walls | on / off | off | Garden walls where a road runs through a cutting. |
+| Pocket parks | on / off | off | Frontage too short for a lot becomes a small park, facing the road. |
 | Tree density | 10–100 % | 50 % | How many trees to plant. |
 | Seed | 1–99999 | 1 | Which layout. The same seed and settings always give the same plan. |
+| Presets | up to 20 | none | Save every setting under a name, load it back in any city, delete it with the cross. |
 
 </details>
 
@@ -275,7 +292,9 @@ thread, so the game keeps running while a big area is planned.
 - Every group of streets is joined to your roads. A group that no gentle road can join is left out, and the panel tells
   you so.
 - Houses grow only where the city has demand for that zone; the panel tells you when a chosen zone has none yet.
-- **Use existing** zones only; it places no service buildings, and you pick streets by drawing around them.
+- **Use existing**: you pick streets by drawing around them. Footpaths are only laid with new streets.
+- **Remove last build** works until your next build, or until you load a city or quit. The ground changes stay; on
+  existing streets, street trees you added stay too.
 - English only.
 
 ## Found a bug?

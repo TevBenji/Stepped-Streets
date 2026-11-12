@@ -5,7 +5,7 @@
     <TargetFramework>net48</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <!-- Keep in step with ModVersion in Properties/PublishConfiguration.xml: the game's mod list shows this one. -->
-    <Version>2.11.0</Version>
+    <Version>2.12.0</Version>
     <Nullable>disable</Nullable>
     <OutputType>Library</OutputType>
     <AssemblyName>SteppedStreets</AssemblyName>
