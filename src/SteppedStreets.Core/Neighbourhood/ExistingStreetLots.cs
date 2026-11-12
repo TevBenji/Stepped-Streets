@@ -87,6 +87,7 @@ namespace SteppedStreets.Core.Neighbourhood
             }
             buildings.AddRange(parks);
             LotLayout.AssignZones(lots, request);
+            PositionZones.ForExistingStreets(lots, request);
             return lots;
         }
 

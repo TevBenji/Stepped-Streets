@@ -37,6 +37,9 @@ export const SETTING_TIPS: Record<string, string> = {
     "Retaining walls": "Garden walls where a road runs through a cutting.",
     "Tree density": "How many trees to plant.",
     "Seed": "Which layout you get. Reroll picks another; the same seed and settings always give the same plan.",
+    "Preset": "Puts a saved set of settings back and plans the area again. The cross beside a preset deletes it.",
+    "Save as": "Saves every setting under this name, to load again in any city. The same name replaces that preset.",
+    "Remove": "Removes what the last build placed: its roads, zoning, greenery and buildings, and houses grown on its lots. The ground changes stay. Only until the next build, or until you load a city or quit.",
     "Report a bug": "Opens a new issue on GitHub. Add a screenshot and your SteppedStreets.log.",
     "Discord": "Questions, ideas and news.",
 };

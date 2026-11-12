@@ -32,7 +32,10 @@ and read defensively by `src/lib/state.ts` (`readState` never throws and clamps 
 open; the tool clears it on Esc, a new plan and the build), `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
 `connected`, `trees`: every planned tree, bush, flower and rock), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings and pocket parks), `progress` (0–1),
-`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `crosswalks`, `streetTrees`, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), and the catalogues `zones` and
+`settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `crosswalks`, `streetTrees`, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), `presets` (the saved presets' names, trimmed,
+1–40 characters, at most 20), `canRemoveLast` (the last build can still be removed: built in this game session, no build
+since), `removeLastSummary` (what removing it takes away, for the dialog), `removing` (the Building stage is that removal),
+and the catalogues `zones` and
 `roads` (`name`/`label`, read again each time the tool opens, so Road Builder roads made since appear) and `services`
 (`name`/`label`/`group`/`width`/`depth`, the unlocked roadside service buildings, read again each time the tool opens, leaving out any from content the player doesn't have). Zones and services may also carry `icon`,
 the game's own menu icon path (ImageSystem.GetIconOrGroupIcon); it is left out when the game has none. While Planning and Building, `summary` is the current step; once Built,
@@ -45,6 +48,10 @@ it is the build report (the panel shows it under the status line). The state is 
 | `setConfirming` | bool | Open (only when Planned) or close the Build dialog; while it is open the tool ignores the map |
 | `build` | none | Build when Planned, after the UI confirmation; closes the dialog |
 | `reroll` | none | A new seed |
+| `removeLast` | none | Remove what the last build placed (roads, zoning, greenery, service buildings, walls, and houses grown on its lots) the way the bulldozer does; the ground stays. Refused while Building or when there is nothing to remove. Ends in Drawing with the report as the summary |
+| `savePreset` | string | Save every plan setting, `crosswalks` and `streetTrees` (not the panel's fold or place) under the trimmed name, 1–40 characters; the same name in any case is replaced in its place; a new one is refused once there are 20. Saved; no re-plan |
+| `loadPreset` | string | Put that preset's settings back, each checked as its own trigger checks it (zones, services and roads the game no longer has fall back as saved settings do), save and re-plan; refused while Building |
+| `deletePreset` | string | Delete that preset. Saved; no re-plan |
 | `setStyle` | string | ContourSuburb / TerracedBlocks / MountainLane / SquareGrid / RectangularGrid / IrregularGrid / SkewedGrid / FragmentedGrid / DiagonalGrid / CurvedGrid / WarpedGrid / RadialGrid / Star / Rings / Spiderweb / Fan / Spine / Ladder / Comb / Fishbone / Tree / CulDeSacs / Loops / LoopsAndLollipops / Lollipops / TriangularMesh / Hexagonal / HexagonalSpokes / Ridge / Valley / Coastal / Winding / OrganicMesh / Hybrid / Polycentric / Superblock / Radburn / FusedGrid / FilteredGrid / BarcelonaSuperblock |
 | `setJunctions` | string | Crossroads / Staggered / TrafficOptimised (grid layouts) |
 | `setRoad` | string | A road `name` from the catalogue |

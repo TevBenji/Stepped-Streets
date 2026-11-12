@@ -40,5 +40,14 @@ namespace SteppedStreets.Tool
 
         /// <summary>The planned service buildings by prefab name.</summary>
         public List<KeyValuePair<string, int>> ServiceCounts = new List<KeyValuePair<string, int>>();
+
+        /// <summary>The last build can be removed: it was built in this game session and no build has started since.</summary>
+        public bool CanRemoveLast;
+
+        /// <summary>What removing the last build takes away, for the panel's dialog.</summary>
+        public string RemoveLastSummary = "";
+
+        /// <summary>The Building stage is the removal of the last build.</summary>
+        public bool Removing;
     }
 }

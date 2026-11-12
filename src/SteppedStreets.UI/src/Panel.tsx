@@ -9,6 +9,7 @@ import { ErrorBoundary } from "./lib/errorBoundary";
 import { LAYOUT_TIPS, SettingTip } from "./lib/tips";
 import {
     formatArea, isExperimental, JunctionPattern, MixPattern, Option, panelFraction, PanelPlace, ServiceCount, ServiceOption, Settings, StreetPlanting, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
+    LONGEST_PRESET_NAME, MOST_PRESETS, nextPresetName,
 } from "./lib/state";
 import { vanilla } from "./lib/vanilla";
 import { LAYOUT_ICONS } from "./lib/layoutIcons";
@@ -159,10 +160,13 @@ function Scroll({ className, innerClassName, nested = false, children }: React.P
         : <div ref={scroller} className={classes(styles.scroll, styles.plainScroll, className)}>{inner}</div>;
 }
 
-/** A button that opens an inline list. Without a label it spans the row, and children sit beside it. */
-function Picker({ label, options, value, disabled, onPick, initiallyOpen = false, bigIcons = false, children }: React.PropsWithChildren<{
+/**
+ * A button that opens an inline list. Without a label it spans the row, and children sit beside it. A placeholder shows while
+ * nothing listed is chosen; onRemove gives each listed option a delete button.
+ */
+function Picker({ label, options, value, disabled, onPick, initiallyOpen = false, bigIcons = false, placeholder, onRemove, children }: React.PropsWithChildren<{
     label?: string; options: Option[]; value: string; disabled: boolean; onPick: (name: string) => void; initiallyOpen?: boolean;
-    bigIcons?: boolean;
+    bigIcons?: boolean; placeholder?: string; onRemove?: (name: string) => void;
 }>) {
     // A row just added opens its list at once, so adding is one click to choose rather than two.
     const [open, setOpen] = useState(initiallyOpen);
@@ -178,9 +182,9 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
     // Collapsing or closing the panel removes the search box: it lets go of the keyboard first (the ref is gone by a plain effect).
     useLayoutEffect(() => () => search.current?.blur(), []);
     // A saved choice the game no longer lists still shows, so the button never reads blank.
-    const shown = options.some(option => option.name === value) ? options : [{ name: value, label: value }, ...options];
+    const shown = options.some(option => option.name === value) || placeholder !== undefined ? options : [{ name: value, label: value }, ...options];
     const chosen = shown.find(option => option.name === value);
-    const current = chosen?.label ?? value;
+    const current = chosen?.label ?? placeholder ?? value;
     // A long list (zones from other mods, every service building) gets a search box at its top.
     const searchable = vanilla.TextInput !== undefined && shown.length > SEARCH_FROM;
     const needle = query.trim().toLowerCase();
@@ -201,16 +205,24 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
             {searchable && vanilla.TextInput ? <div className={styles.searchRow}><vanilla.TextInput ref={search} className={styles.search}
                 value={query} placeholder="Search" onChange={event => setQuery(event.target.value)} /></div> : null}
             <Scroll className={styles.listScroll} innerClassName={styles.listInner} nested>
-                {listed.map((option, index) => <React.Fragment key={option.name}>
-                    {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}
-                    <Button className={classes(styles.listItem, bigIcons && styles.listItemTall)} selected={option.name === value}
-                        onSelect={() => { close(); if (option.name !== value) onPick(option.name); }}>
+                {listed.map((option, index) => {
+                    const item = <Button className={classes(styles.listItem, onRemove && styles.listRowItem, bigIcons && styles.listItemTall)}
+                        selected={option.name === value} onSelect={() => { close(); if (option.name !== value) onPick(option.name); }}>
                         {option.icon ? bigIcons
                             ? <div className={styles.layoutTile}><img className={styles.layoutIcon} src={option.icon} /></div>
                             : <img className={styles.optionIcon} src={option.icon} /> : null}
                         <div>{option.label}</div>
-                    </Button>
-                </React.Fragment>)}
+                    </Button>;
+                    return <React.Fragment key={option.name}>
+                        {option.group && option.group !== listed[index - 1]?.group ? <div className={styles.listGroup}>{option.group}</div> : null}
+                        {onRemove ? <div className={styles.listRow}>
+                            {item}
+                            <Button className={styles.remove} label={`Delete ${option.label}`} onSelect={() => onRemove(option.name)}>
+                                <img className={styles.closeIcon} src={closeIcon} />
+                            </Button>
+                        </div> : item}
+                    </React.Fragment>;
+                })}
                 {listed.length === 0 ? <div className={styles.noMatch}>Nothing matches "{query.trim()}"</div> : null}
             </Scroll>
         </div> : null}
@@ -309,6 +321,36 @@ function ZoningSection({ settings, zones, disabled }: { settings: Settings; zone
         <Picker label="Corner lots" options={options} value={settings.cornerZone} disabled={disabled} onPick={zone => act("setCornerZone", zone)} />
         <Picker label="Main street lots" options={options} value={settings.mainStreetZone} disabled={disabled}
             onPick={zone => act("setMainStreetZone", zone)} />
+    </Section>;
+}
+
+/**
+ * Saved sets of settings: pick one to load it, or name the current settings and save them; the cross by a listed preset
+ * deletes it. Without the game's text box (nothing to type in), Save takes the next free "Preset N".
+ */
+function PresetsSection({ presets, disabled }: { presets: string[]; disabled: boolean }) {
+    const [name, setName] = useState("");
+    const box = useRef<HTMLInputElement>(null);
+    // Collapsing or closing the panel removes the box: it lets go of the keyboard first, as the picker's search box does.
+    useLayoutEffect(() => () => box.current?.blur(), []);
+    const chosen = name.trim() || nextPresetName(presets);
+    const replaces = presets.some(preset => preset.toLowerCase() === chosen.toLowerCase());
+    const full = presets.length >= MOST_PRESETS && !replaces;
+    const TextInput = vanilla.TextInput;
+    return <Section title="Presets">
+        {presets.length > 0 ? <Picker label="Preset" options={presets.map(preset => ({ name: preset, label: preset }))} value=""
+            placeholder="Load a preset" disabled={disabled} onPick={preset => act("loadPreset", preset)}
+            onRemove={preset => act("deletePreset", preset)} /> : null}
+        <Row label="Save as">
+            {TextInput ? <TextInput ref={box} className={styles.presetName} value={name} placeholder={nextPresetName(presets)}
+                onChange={event => setName(event.target.value.slice(0, LONGEST_PRESET_NAME))} /> : null}
+            <Button className={classes(styles.statusButton, styles.presetSave)} disabled={disabled || full} onSelect={() => {
+                box.current?.blur();
+                act("savePreset", chosen);
+                setName("");
+            }}>{replaces ? "Replace" : "Save"}</Button>
+        </Row>
+        {full ? <div className={styles.layoutTip}>{`${MOST_PRESETS} presets at most. Delete one to save another.`}</div> : null}
     </Section>;
 }
 
@@ -460,6 +502,9 @@ function usePanelDrag(panel: React.RefObject<HTMLDivElement>, left: number, top:
 function NeighbourhoodPanel() {
     const state = useToolState();
     const [moreOpen, setMoreOpen] = useState(moreOpenMemory);
+    // The Remove dialog is the panel's own; it closes when the result it asks about goes.
+    const [removeAsked, setRemoveAsked] = useState(false);
+    useEffect(() => { if (state.stage !== "Built") setRemoveAsked(false); }, [state.stage]);
     const panel = useRef<HTMLDivElement>(null);
     const { place, beginDrag, resetPlace } = usePanelDrag(panel, state.settings.panelLeft, state.settings.panelTop);
     if (state.stage === "Closed") return null;
@@ -478,7 +523,7 @@ function NeighbourhoodPanel() {
     const serviceLabel = (name: string) => state.services.find(service => service.name === name)?.label ?? name;
     // Existing streets: no roads, so only the zoning, lot and greenery settings show.
     const existing = settings.existingStreets;
-    const buildLabel = existing ? (building ? "Zoning..." : state.stage === "Built" ? "Zoned" : "Zone")
+    const buildLabel = state.removing ? "Removing..." : existing ? (building ? "Zoning..." : state.stage === "Built" ? "Zoned" : "Zone")
         : building ? "Building..." : state.stage === "Built" ? "Built" : "Build";
 
     return <div className={classes(styles.dock, place && styles.dockMoved)}>
@@ -573,6 +618,8 @@ function NeighbourhoodPanel() {
                             <div className={styles.pickerLabel}>{moreOpen ? "Fewer settings" : "More settings"}</div>
                             <img className={classes(styles.chevron, moreOpen && styles.chevronOpen)} src={chevronIcon} />
                         </Button>
+
+                        {moreOpen ? <PresetsSection presets={state.presets} disabled={disabled} /> : null}
 
                         {existing ? <Section title="Greenery">
                             <ToggleRow label="Greenery" value={settings.trees} trigger="setTrees" disabled={disabled} />
@@ -684,6 +731,11 @@ function NeighbourhoodPanel() {
                                 <div className={styles.zoneName}>{serviceLabel(count.name)}</div>
                                 <div className={styles.zoneLots}>{`${count.count} ${count.count === 1 ? "building" : "buildings"}`}</div>
                             </div>) : null}
+                            {state.stage === "Built" && state.canRemoveLast ? <SettingTip label="Remove"><div className={styles.statusButtons}>
+                                <Button className={styles.statusButton} disabled={disabled} onSelect={() => setRemoveAsked(true)}>
+                                    <img className={styles.buttonIcon} src={trashIcon} /><div>Remove</div>
+                                </Button>
+                            </div></SettingTip> : null}
                             {messages.map((message, index) => <div key={index} className={styles.message}>
                                 <div className={styles.messageDot} />
                                 <div className={styles.messageText}>{message}</div>
@@ -729,6 +781,20 @@ function NeighbourhoodPanel() {
                                 <Button className={styles.secondary} onSelect={() => act("setConfirming", false)}>Cancel</Button>
                                 <Button className={styles.primary} onSelect={() => act("build")}>
                                     <div>{existing ? "Zone" : "Build"}</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
+                            </div>
+                        </div>
+                    </div> : null}
+
+                    {removeAsked && state.stage === "Built" && state.canRemoveLast ? <div className={styles.backdrop}>
+                        <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="stepped-streets-remove">
+                            <div className={styles.dialogTitle}>Remove the last build?</div>
+                            <div id="stepped-streets-remove" className={styles.dialogText}>
+                                Remove the roads, zoning, greenery and buildings this build placed? The ground changes stay.</div>
+                            {state.removeLastSummary ? <div className={styles.dialogDetail}>{`That is ${state.removeLastSummary}.`}</div> : null}
+                            <div className={styles.dialogButtons}>
+                                <Button className={styles.secondary} onSelect={() => setRemoveAsked(false)}>Cancel</Button>
+                                <Button className={styles.primary} onSelect={() => { setRemoveAsked(false); act("removeLast"); }}>
+                                    <div>Remove</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
                             </div>
                         </div>
                     </div> : null}
