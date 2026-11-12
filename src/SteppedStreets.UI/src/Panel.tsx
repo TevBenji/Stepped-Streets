@@ -6,7 +6,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { act, NumberTrigger, playSound, ToggleTrigger, useToolState } from "./lib/bindings";
 import { ErrorBoundary } from "./lib/errorBoundary";
-import { LAYOUT_TIPS, SettingTip } from "./lib/tips";
+import { LAYOUT_TIPS, SettingTip, STAT_TIPS } from "./lib/tips";
 import {
     formatArea, isExperimental, JunctionPattern, MixPattern, Option, panelFraction, PanelPlace, ServiceCount, ServiceOption, Settings, StreetPlanting, statusDetail, statusLine, thousands, ToolState, usesJunctions, zoneColour, ZoneShare,
     LONGEST_PRESET_NAME, MOST_PRESETS, nextPresetName,
@@ -164,9 +164,9 @@ function Scroll({ className, innerClassName, nested = false, children }: React.P
  * A button that opens an inline list. Without a label it spans the row, and children sit beside it. A placeholder shows while
  * nothing listed is chosen; onRemove gives each listed option a delete button.
  */
-function Picker({ label, options, value, disabled, onPick, initiallyOpen = false, bigIcons = false, placeholder, onRemove, children }: React.PropsWithChildren<{
+function Picker({ label, options, value, disabled, onPick, initiallyOpen = false, bigIcons = false, placeholder, onRemove, tipTitle, tip, children }: React.PropsWithChildren<{
     label?: string; options: Option[]; value: string; disabled: boolean; onPick: (name: string) => void; initiallyOpen?: boolean;
-    bigIcons?: boolean; placeholder?: string; onRemove?: (name: string) => void;
+    bigIcons?: boolean; placeholder?: string; onRemove?: (name: string) => void; tipTitle?: string; tip?: string;
 }>) {
     // A row just added opens its list at once, so adding is one click to choose rather than two.
     const [open, setOpen] = useState(initiallyOpen);
@@ -191,7 +191,7 @@ function Picker({ label, options, value, disabled, onPick, initiallyOpen = false
     const listed = needle ? shown.filter(option => option.label.toLowerCase().includes(needle)) : shown;
     // An inline list instead of a popup: the panel scrolls, and a popup would be clipped by it.
     return <>
-        <SettingTip label={label}><div className={styles.row}>
+        <SettingTip label={label ?? tipTitle} text={tip}><div className={styles.row}>
             {label ? <div className={styles.label}>{label}</div> : null}
             <Button className={styles.picker} disabled={disabled} selected={open} onSelect={() => open ? close() : setOpen(true)}>
                 {chosen?.icon ? <img className={bigIcons ? styles.layoutIconSmall : styles.optionIcon} src={chosen.icon} /> : null}
@@ -248,7 +248,8 @@ function Mix({ mix, zones, services, serviceOptions, disabled }: {
             const options = serviceOptions.filter(option => option.name === entry.name || !services.some(other => other.name === option.name))
                 .map(option => ({ name: option.name, label: option.group ? `${option.label} (${option.group})` : option.label, icon: option.icon }));
             return <div key={entry.name} className={styles.mixEntry}>
-                <Picker options={options} value={entry.name} disabled={disabled} initiallyOpen={entry.name === justAdded}
+                <Picker options={options} value={entry.name} disabled={disabled} initiallyOpen={entry.name === justAdded} tipTitle={label}
+                    tip="A service building on its own lot beside the streets, facing the road. How many sets the count."
                     onPick={name => { setJustAdded(null); replace({ name }); }}>
                     <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled}
                         onSelect={() => sendServices(services.filter((_, at) => at !== index))}>
@@ -295,7 +296,8 @@ function ZoneMix({ mix, zones, disabled, justAdded }: { mix: ZoneShare[]; zones:
             const label = labelOf(entry.zone) + (missing ? " (not installed)" : "");
             const lastKnown = !mix.some((other, at) => at !== index && known(other.zone));
             return <div key={entry.zone} className={styles.mixEntry}>
-                <Picker options={zones.filter(zone => zone.name === entry.zone || !mix.some(other => other.zone === zone.name))}
+                <Picker tipTitle={label} tip="Its share sets how many lots get this zone; Mix mode sets where they go."
+                    options={zones.filter(zone => zone.name === entry.zone || !mix.some(other => other.zone === zone.name))}
                     value={entry.zone} disabled={disabled} initiallyOpen={entry.zone === justAdded} onPick={zone => replace({ zone })}>
                     {/* Removing the last zone leaves no zoning; removing the last installed one beside missing ones is refused. */}
                     <Button className={styles.remove} label={`Remove ${label}`} disabled={disabled || (mix.length > 1 && lastKnown)}
@@ -386,10 +388,10 @@ function Steps({ state }: { state: ToolState }) {
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-    return <div className={styles.stat}>
+    return <SettingTip label={label} text={STAT_TIPS[label]}><div className={styles.stat}>
         <div className={styles.statLabel}>{label}</div>
         <Measure className={styles.statValue} text={value} />
-    </div>;
+    </div></SettingTip>;
 }
 
 const LAYOUTS: Option[] = [
@@ -570,6 +572,11 @@ function NeighbourhoodPanel() {
                                 <div>{state.areaClosed ? "Drag corners to reshape. Right-click to remove." : "Click the ground to add corners. Click the first one to finish."}</div>
                                 <div>Ctrl+Z to undo · Esc to go back</div>
                             </div> : null}
+                            {state.canRemoveLast && !building ? <SettingTip label="Remove"><div className={styles.statusButtons}>
+                                <Button className={styles.statusButton} disabled={disabled} onSelect={() => setRemoveAsked(true)}>
+                                    <img className={styles.buttonIcon} src={trashIcon} /><div>Remove last build</div>
+                                </Button>
+                            </div></SettingTip> : null}
                             {state.corners > 0 ? <div className={styles.statusButtons}>
                                 {state.stage === "Drawing" && state.corners >= 3 && !state.areaClosed
                                     ? <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("closeArea")}>Close area</Button> : null}
@@ -718,7 +725,7 @@ function NeighbourhoodPanel() {
                                 <Stat label="Steepest road" value={`${stats.steepestRoadPercent.toFixed(1)}%`} />
                                 <Stat label="Forest" value={percent(stats.wildPercent)} />
                                 <Stat label="Connected" value={stats.connected ? "Yes" : "No - built on its own"} />
-                                <Stat label="Trees" value={thousands(stats.trees)} />
+                                <Stat label="Greenery" value={thousands(stats.trees)} />
                             </div> : null}
                             {hasPlan ? state.zoneCounts.map(count => <div key={count.zone} className={styles.zoneCount}>
                                 <div className={styles.zoneDot} style={{ backgroundColor: zoneColour(count.zone) }} />
@@ -730,11 +737,6 @@ function NeighbourhoodPanel() {
                                 <div className={styles.zoneName}>{serviceLabel(count.name)}</div>
                                 <div className={styles.zoneLots}>{`${count.count} ${count.count === 1 ? "building" : "buildings"}`}</div>
                             </div>) : null}
-                            {state.stage === "Built" && state.canRemoveLast ? <SettingTip label="Remove"><div className={styles.statusButtons}>
-                                <Button className={styles.statusButton} disabled={disabled} onSelect={() => setRemoveAsked(true)}>
-                                    <img className={styles.buttonIcon} src={trashIcon} /><div>Remove</div>
-                                </Button>
-                            </div></SettingTip> : null}
                             {messages.map((message, index) => <div key={index} className={styles.message}>
                                 <div className={styles.messageDot} />
                                 <div className={styles.messageText}>{message}</div>
@@ -784,7 +786,7 @@ function NeighbourhoodPanel() {
                         </div>
                     </div> : null}
 
-                    {removeAsked && state.stage === "Built" && state.canRemoveLast ? <div className={styles.backdrop}>
+                    {removeAsked && !building && state.canRemoveLast ? <div className={styles.backdrop}>
                         <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="stepped-streets-remove">
                             <div className={styles.dialogTitle}>Remove the last build?</div>
                             <div id="stepped-streets-remove" className={styles.dialogText}>

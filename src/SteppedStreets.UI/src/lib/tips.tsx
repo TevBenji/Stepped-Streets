@@ -88,9 +88,25 @@ export const LAYOUT_TIPS: Record<string, string> = {
     BarcelonaSuperblock: "Three-by-three superblocks whose inner streets turn back to the edge round a central square.",
 };
 
-/** A setting's description on hover, in the game's tooltip bubble; rows without one are left as they are. */
-export function SettingTip({ label, children }: { label?: string; children: React.ReactElement }) {
-    const text = label ? SETTING_TIPS[label] : undefined;
+/** What each number in the plan and result means. */
+export const STAT_TIPS: Record<string, string> = {
+    "Roads": "Length of the new roads.",
+    "Lots": "Lots to zone. Each grows a house or shop once the city has demand for its zone.",
+    "Zoned cells": "Zone cells the lots cover, each 8 m square.",
+    "Cells to zone": "Empty zone cells along the streets that get your zone mix, each 8 m square.",
+    "Earth moved": "Cut and fill to level the roads and lots.",
+    "Steepest road": "The steepest grade on any new road.",
+    "Forest": "Share of the area too steep to build on, left as forest.",
+    "Connected": "Whether the new streets join your road network.",
+    "Greenery": "Trees, bushes, flowers and rocks to plant.",
+};
+
+/**
+ * A description on hover, in the game's tooltip bubble: the setting's own, or the text given for anything else.
+ * Without either it is left as it is.
+ */
+export function SettingTip({ label, text: given, children }: { label?: string; text?: string; children: React.ReactElement }) {
+    const text = given ?? (label ? SETTING_TIPS[label] : undefined);
     if (!text || !ui.Tooltip) return children;
     return <ui.Tooltip direction="right" delayTime={400} hideOnInteraction tooltip={<div className={styles.tip}>
         <strong>{label}</strong>
