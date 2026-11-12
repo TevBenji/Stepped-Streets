@@ -289,7 +289,7 @@ namespace SteppedStreets.Core.Neighbourhood
         }
     }
 
-    /// <summary>One free cell of one of the game's zone blocks near the area, for zoning streets that already exist.</summary>
+    /// <summary>One cell of one of the game's zone blocks near the area, for zoning streets that already exist.</summary>
     public struct ZoneCell
     {
         /// <summary>The block it belongs to: the same number for every cell of one block.</summary>
@@ -300,11 +300,14 @@ namespace SteppedStreets.Core.Neighbourhood
 
         public float2 Centre;
 
-        /// <summary>The block's height, for drawing the lot: nothing is levelled on existing streets.</summary>
+        /// <summary>The block's height (its road's), for drawing the lot and as the level a lot starts from when it is levelled.</summary>
         public float Height;
 
         /// <summary>The block's direction in (x, z): a unit vector from the back of the block towards its road.</summary>
         public float2 Forward;
+
+        /// <summary>Zoned, built on or blocked: no lot, building or greenery goes on it. False for a free cell.</summary>
+        public bool Taken;
     }
 
     /// <summary>The drawn area, the site and the player's settings.</summary>
@@ -330,10 +333,10 @@ namespace SteppedStreets.Core.Neighbourhood
 
         public NeighbourhoodStyle Style = NeighbourhoodStyle.ContourSuburb;
 
-        /// <summary>Zone the streets already in the area from <see cref="ZoneCells"/>: no new roads, no ground changes, no trees.</summary>
+        /// <summary>Zone the streets already in the area from <see cref="ZoneCells"/>: no new roads.</summary>
         public bool ExistingStreets;
 
-        /// <summary>The free cells of the game's zone blocks near the area; only filled for <see cref="ExistingStreets"/>.</summary>
+        /// <summary>The cells of the game's zone blocks near the area, free and taken; only filled for <see cref="ExistingStreets"/>.</summary>
         public ZoneCell[] ZoneCells = new ZoneCell[0];
 
         /// <summary>Half the new road's width, centreline to kerb.</summary>
@@ -407,6 +410,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>Frontage too short for a lot becomes a small park instead of grass.</summary>
         public bool PocketParks;
+
+        /// <summary>The small park buildings the game has, with their lot sizes, for <see cref="PocketParks"/> (counts unused).</summary>
+        public ServiceRequest[] Parks = new ServiceRequest[0];
 
         /// <summary>Existing streets: grade each lot into a level pad, as new streets do. Off unless asked: it changes the ground.</summary>
         public bool LevelExistingLots;

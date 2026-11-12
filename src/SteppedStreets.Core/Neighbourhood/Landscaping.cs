@@ -7,9 +7,10 @@ using Unity.Mathematics;
 namespace SteppedStreets.Core.Neighbourhood
 {
     /// <summary>
-    /// Trees and garden walls, placed last (video tips: landscape the banks and gaps, forest behind the homes, walls only
-    /// sparingly). Forest on ground too steep to build, trees on cut banks and in the gaps between lots, open grass on the
-    /// fill below houses so their view stays clear, nothing on lots or roads.
+    /// Trees, low greenery and garden walls, placed last (video tips: landscape the banks and gaps, forest behind the homes,
+    /// walls only sparingly). Forest on ground too steep to build, trees on cut banks and in the gaps between lots, open grass on
+    /// the fill below houses so their view stays clear; bushes along lot edges and road verges, flowers near the lots, a few
+    /// rocks on the slopes; nothing on lots, roads or their sidewalks.
     /// </summary>
     internal static class Landscaping
     {
@@ -18,13 +19,27 @@ namespace SteppedStreets.Core.Neighbourhood
         private const int MostTrees = 20000;
         private const float OpenView = 12f;
 
+        /// <summary>
+        /// How far greenery keeps off a lot's edge. Widen it to a cell (8 m) if houses turn out not to grow on lots beside it.
+        /// </summary>
+        internal const float LotMargin = 1.5f;
+
+        // Bushes, flowers and rocks come in groups, so their seeds lie wider apart than the trees.
+        private const float ClusterSpacing = 12f;
+
+        // A road's verge: the strip past its sidewalk where bushes line it.
+        private const float VergeWidth = 6f;
+
+        /// <param name="keepOff">True where nothing may be planted besides lots, roads and buildings: on existing streets, the
+        /// cells the player already zoned or something stands on. Null for none.</param>
         public static List<PlannedTree> Trees(NeighbourhoodPlan plan, List<PlannedLot> lots, SiteSurvey survey, NeighbourhoodRequest request,
-            System.Threading.CancellationToken cancellation = default)
+            System.Threading.CancellationToken cancellation = default, System.Func<float2, bool> keepOff = null)
         {
             var trees = new List<PlannedTree>();
             if (!request.Trees) return trees;
             float density = math.clamp(request.TreeDensity, 0.1f, 1f);
-            var roads = RoadBuckets(plan, request.RoadHalfWidth + 4f);
+            // Reaching past the verge, so a bush there finds the road it lines.
+            var roads = RoadBuckets(plan, request.RoadHalfWidth + VergeWidth);
             var pads = new SpatialBuckets<Pad>(32f);
             foreach (var lot in lots)
             {
@@ -33,13 +48,13 @@ namespace SteppedStreets.Core.Neighbourhood
                 Poly.Bounds(corners, out var low, out var high);
                 pads.Add(low - OpenView, high + OpenView, lot.Pad);
             }
-            var existing = new SpatialBuckets<(float2, float2, float)>(32f);
+            var existing = new SpatialBuckets<(float2 Start, float2 End, float HalfWidth)>(32f);
             foreach (var road in request.ExistingRoads ?? new ExistingRoad[0])
                 for (int point = 1; point < (road?.Points?.Length ?? 0); point++)
                 {
                     float2 start = road.Points[point - 1].xz, end = road.Points[point].xz;
-                    float clearance = road.HalfWidth + 4f;
-                    existing.Add(math.min(start, end) - clearance, math.max(start, end) + clearance, (start, end, clearance));
+                    float reach = road.HalfWidth + VergeWidth;
+                    existing.Add(math.min(start, end) - reach, math.max(start, end) + reach, (start, end, road.HalfWidth));
                 }
 
             int columns = (int)math.ceil((survey.BoundaryMaximum.x - survey.BoundaryMinimum.x) / TreeSpacing);
@@ -53,16 +68,17 @@ namespace SteppedStreets.Core.Neighbourhood
                     float2 point = survey.BoundaryMinimum + (new float2(column, row) + 0.15f + jitter * 0.7f) * TreeSpacing;
                     if (!Poly.Contains(survey.Boundary, point)) continue;
                     if (request.Blocked != null && request.Blocked(point)) continue;
+                    if (keepOff != null && keepOff(point)) continue;
                     if (NearRoad(roads, plan, point, request.RoadHalfWidth + 3.5f)) continue;
                     bool nearExisting = false;
-                    foreach (var (start, end, clearance) in existing.Near(point))
-                        if (Geometry.DistanceToSegment(point, start, end) < clearance) { nearExisting = true; break; }
+                    foreach (var (start, end, halfWidth) in existing.Near(point))
+                        if (Geometry.DistanceToSegment(point, start, end) < halfWidth + 4f) { nearExisting = true; break; }
                     if (nearExisting) continue;
 
                     bool onLot = false, nearLot = false, viewOpen = false;
                     foreach (var pad in pads.Near(point))
                     {
-                        if (LotLayout.InsidePad(pad, point, -1.5f)) { onLot = true; break; }
+                        if (LotLayout.InsidePad(pad, point, -LotMargin)) { onLot = true; break; }
                         if (LotLayout.InsidePad(pad, point, -OpenView)) nearLot = true;
                     }
                     if (onLot) continue;
@@ -88,6 +104,7 @@ namespace SteppedStreets.Core.Neighbourhood
                     });
                 }
             }
+            Clusters(trees, plan, pads, roads, existing, survey, request, keepOff, density, cancellation);
             if (trees.Count > MostTrees)
             {
                 // Thin evenly rather than cut off one side of the area.
@@ -98,6 +115,100 @@ namespace SteppedStreets.Core.Neighbourhood
                 trees = thinned;
             }
             return trees;
+        }
+
+        /// <summary>
+        /// Bush clusters along lot edges and road verges, small groups of flowers near the lots, and a few rocks, mostly on the
+        /// slopes, with an odd boulder on steep ground; a sparse bush or rock out in the open. Clear of the lots, buildings,
+        /// water, <paramref name="keepOff"/> and every road and its sidewalk (a road's half width includes it).
+        /// </summary>
+        private static void Clusters(List<PlannedTree> plants, NeighbourhoodPlan plan, SpatialBuckets<Pad> pads, SpatialBuckets<int2> roads,
+            SpatialBuckets<(float2 Start, float2 End, float HalfWidth)> existing, SiteSurvey survey, NeighbourhoodRequest request,
+            System.Func<float2, bool> keepOff, float density, System.Threading.CancellationToken cancellation)
+        {
+            // How far past the nearest road's edge a point is; far when no road is within its verge.
+            float PastKerb(float2 point)
+            {
+                float best = float.MaxValue;
+                foreach (var item in roads.Near(point))
+                {
+                    var points = plan.Roads[item.x].Points;
+                    best = math.min(best, Geometry.DistanceToSegment(point, points[item.y - 1].xz, points[item.y].xz) - request.RoadHalfWidth);
+                }
+                foreach (var (start, end, halfWidth) in existing.Near(point))
+                    best = math.min(best, Geometry.DistanceToSegment(point, start, end) - halfWidth);
+                return best;
+            }
+            bool Clear(float2 point, float kerb)
+            {
+                if (!Poly.Contains(survey.Boundary, point)) return false;
+                if (request.Blocked != null && request.Blocked(point)) return false;
+                if (keepOff != null && keepOff(point)) return false;
+                if (PastKerb(point) < kerb) return false;
+                foreach (var pad in pads.Near(point))
+                    if (LotLayout.InsidePad(pad, point, -LotMargin)) return false;
+                return true;
+            }
+
+            uint seed = request.Seed + 4099u;
+            int columns = (int)math.ceil((survey.BoundaryMaximum.x - survey.BoundaryMinimum.x) / ClusterSpacing);
+            int rows = (int)math.ceil((survey.BoundaryMaximum.y - survey.BoundaryMinimum.y) / ClusterSpacing);
+            for (int row = 0; row < rows; row++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                for (int column = 0; column < columns; column++)
+                {
+                    float2 jitter = new float2(Geometry.Hash01(seed, column, row * 2 + 1), Geometry.Hash01(seed, column, row * 2 + 2));
+                    float2 centre = survey.BoundaryMinimum + (new float2(column, row) + 0.15f + jitter * 0.7f) * ClusterSpacing;
+                    if (!Clear(centre, 1f)) continue;
+                    bool lotEdge = false, nearLot = false;
+                    foreach (var pad in pads.Near(centre))
+                    {
+                        if (LotLayout.InsidePad(pad, centre, -VergeWidth)) lotEdge = true;
+                        if (LotLayout.InsidePad(pad, centre, -OpenView)) nearLot = true;
+                    }
+                    float slope = survey.SlopeAt(centre), steep = request.SteepestBuildable;
+                    float pick = Geometry.Hash01(seed + 1u, column, row), size = Geometry.Hash01(seed + 2u, column, row);
+                    TreeKind kind;
+                    float chance, spread;
+                    int count;
+                    if (lotEdge || PastKerb(centre) < VergeWidth) { kind = TreeKind.Bush; chance = 0.4f; count = 3 + (int)(size * 3f); spread = 2.2f; }
+                    else if (nearLot) { kind = TreeKind.Flower; chance = 0.25f; count = 2 + (int)(size * 3f); spread = 1.4f; }
+                    else if (slope > steep * 0.5f)
+                    {
+                        // Sparse, and more of them the steeper it gets; an odd boulder where it is too steep to build.
+                        bool boulder = slope > steep && pick < 0.3f;
+                        kind = boulder ? TreeKind.Boulder : TreeKind.Rock;
+                        chance = 0.08f + 0.12f * math.saturate(slope / steep - 0.5f);
+                        count = boulder ? 1 : 1 + (int)(size * 3f);
+                        spread = 2.5f;
+                    }
+                    else
+                    {
+                        kind = pick < 0.2f ? TreeKind.Rock : TreeKind.Bush;
+                        chance = pick < 0.2f ? 0.03f : 0.12f;
+                        count = 1 + (int)(size * 3f);
+                        spread = 2.5f;
+                    }
+                    if (Geometry.Hash01(seed + 3u, column, row) >= chance * density) continue;
+                    // A boulder is about 5 m across, so it keeps further from the road.
+                    float kerb = kind == TreeKind.Boulder ? 4f : 1f;
+                    for (int member = 0; member < count; member++)
+                    {
+                        float angle = Geometry.Hash01(seed + 4u, column * 8 + member, row) * 2f * math.PI;
+                        float radius = member == 0 ? 0f : spread * math.sqrt(Geometry.Hash01(seed + 5u, column * 8 + member, row));
+                        float2 point = centre + new float2(math.cos(angle), math.sin(angle)) * radius;
+                        if (!Clear(point, kerb)) continue;
+                        float height = plan.Ground != null ? plan.Ground.HeightAt(point) : request.GroundHeight(point);
+                        plants.Add(new PlannedTree
+                        {
+                            Position = new float3(point.x, height, point.y),
+                            Kind = kind,
+                            Variation = Geometry.Hash(seed + 6u, column * 8 + member, row),
+                        });
+                    }
+                }
+            }
         }
 
         /// <summary>Garden walls along road shoulders where the ground beside the road is cut 0.8–3 m and no lot fronts it.</summary>

@@ -85,7 +85,8 @@ namespace SteppedStreets.Core.Neighbourhood
         public float2 Forward;
     }
 
-    public enum TreeKind { Conifer, Broadleaf }
+    /// <summary>What to plant: trees, then the low greenery and the rocks set among them.</summary>
+    public enum TreeKind { Conifer, Broadleaf, Bush, Flower, Rock, Boulder }
 
     public struct PlannedTree
     {
@@ -116,9 +117,9 @@ namespace SteppedStreets.Core.Neighbourhood
 
         /// <summary>
         /// At least one road (the area need not touch a road, so a standalone network is buildable too), or, on existing
-        /// streets, at least one cell to zone.
+        /// streets, at least one cell to zone or one building to place.
         /// </summary>
-        public bool Buildable => Roads.Count > 0 || ZonedCells > 0;
+        public bool Buildable => Roads.Count > 0 || ZonedCells > 0 || Buildings.Count > 0;
 
         public float RoadLength;
         public float SteepestRoadGrade;

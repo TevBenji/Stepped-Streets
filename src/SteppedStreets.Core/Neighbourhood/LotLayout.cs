@@ -35,8 +35,9 @@ namespace SteppedStreets.Core.Neighbourhood
             return existing;
         }
 
+        /// <param name="parks">Receives the pocket parks, when the request asks for them, on frontage the lots left.</param>
         public static List<PlannedLot> Plan(NeighbourhoodPlan plan, List<int> owners, SiteSurvey survey, NeighbourhoodRequest request,
-            List<string> messages, CancellationToken cancellation)
+            List<string> messages, CancellationToken cancellation, List<PlannedBuilding> parks = null)
         {
             float halfWidth = request.RoadHalfWidth;
             var segments = new SpatialBuckets<int3>(32f);
@@ -60,6 +61,7 @@ namespace SteppedStreets.Core.Neighbourhood
 
             var lots = new List<PlannedLot>();
             var reasons = new Dictionary<EmptyLotReason, int>();
+            var leftOver = new List<(EmptyLot Empty, int Road, Func<float2, bool> Blocked)>();
             for (int road = 0; road < plan.Roads.Count; road++)
             {
                 cancellation.ThrowIfCancellationRequested();
@@ -140,6 +142,22 @@ namespace SteppedStreets.Core.Neighbourhood
                     occupied.Add(low - 1f, high + 1f, kept);
                     lots.Add(new PlannedLot { Pad = kept, Road = road });
                 }
+
+                // Frontage the lots left (a street's end, a lot that was blocked) may take a pocket park once every street has its lots.
+                if (parks != null && request.PocketParks)
+                    foreach (var empty in stepPlan.EmptyLots)
+                        if (empty.Reason == EmptyLotReason.LeftOver || empty.Reason == EmptyLotReason.Blocked) leftOver.Add((empty, road, Blocked));
+            }
+            foreach (var (empty, road, blocked) in leftOver)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var park = FitPark(empty, road, request, blocked, parks);
+                if (park == null) continue;
+                parks.Add(park);
+                var corners = new float2[4];
+                for (int corner = 0; corner < 4; corner++) corners[corner] = park.Pad.Corners[corner].xz;
+                Poly.Bounds(corners, out var low, out var high);
+                occupied.Add(low - 1f, high + 1f, park.Pad);
             }
             foreach (var reason in new[] { EmptyLotReason.TooMuchEarthwork, EmptyLotReason.TooSteep })
                 if (reasons.TryGetValue(reason, out int count) && count > 0)
@@ -212,13 +230,64 @@ namespace SteppedStreets.Core.Neighbourhood
             int gap;
             if (request.LotSpacingCells >= 0) gap = request.LotSpacingCells;
             else if (request.Style == NeighbourhoodStyle.TerracedBlocks) gap = 0;
-            else
-            {
-                float slope = survey.SlopeAt(pad.PointAt(pad.WidthCells * 0.5f, pad.DepthCells * 0.5f));
-                gap = slope >= 0.75f * request.SteepestBuildable ? 2 : slope >= 0.5f * request.SteepestBuildable ? 1 : 0;
-            }
+            else gap = SlopeGap(survey.SlopeAt(pad.PointAt(pad.WidthCells * 0.5f, pad.DepthCells * 0.5f)), request);
             return kind == RoadKind.Lane ? math.max(gap, 2) : gap;
         }
+
+        /// <summary>Auto spacing: steeper ground gets more room between lots for the banks.</summary>
+        internal static int SlopeGap(float slope, NeighbourhoodRequest request) =>
+            slope >= 0.75f * request.SteepestBuildable ? 2 : slope >= 0.5f * request.SteepestBuildable ? 1 : 0;
+
+        /// <summary>
+        /// The biggest pocket park that fits a stretch of frontage the lots left: from a whole cell along its kerb, every cell
+        /// clear by the lots' own rules, levelled like a lot when lots are, and far enough from the other parks; null when none fits.
+        /// </summary>
+        private static PlannedBuilding FitPark(EmptyLot empty, int road, NeighbourhoodRequest request, Func<float2, bool> blocked,
+            List<PlannedBuilding> parks)
+        {
+            float2 origin = empty.Corners[0].xz, front = empty.Corners[1].xz - origin;
+            float frontage = math.length(front);
+            int width = (int)math.floor(frontage / StepPlanner.CellSize + 1e-3f);
+            if (width < 1 || !ServiceSites.FarFromParks(parks, (origin + empty.Corners[2].xz) * 0.5f)) return null;
+            float2 along = front / frontage, back = math.normalizesafe(empty.Corners[3].xz - origin);
+            float height = empty.Corners[0].y;
+            foreach (var size in ServiceSites.ParksThatFit(request, width, request.LotDepthCells, Geometry.Hash(request.Seed, road, (int)empty.Start)))
+                for (int offset = 0; offset + size.WidthCells <= width; offset++)
+                {
+                    float2 Point(float column, float row) => origin + along * ((offset + column) * StepPlanner.CellSize) + back * (row * StepPlanner.CellSize);
+                    bool clear = true;
+                    for (int column = 0; column < size.WidthCells && clear; column++)
+                        for (int row = 0; row < size.DepthCells && clear; row++)
+                            foreach (var sample in ParkSamples)
+                                if (blocked(Point(column + sample.x, row + sample.y))) { clear = false; break; }
+                    if (!clear) continue;
+                    float3 Corner(float column, float row) { var point = Point(column, row); return new float3(point.x, height, point.y); }
+                    var pad = new Pad
+                    {
+                        Side = empty.Side,
+                        Height = height,
+                        Start = empty.Start + offset * StepPlanner.CellSize,
+                        End = empty.Start + (offset + size.WidthCells) * StepPlanner.CellSize,
+                        WidthCells = size.WidthCells,
+                        DepthCells = size.DepthCells,
+                        Corners = new[] { Corner(0, 0), Corner(size.WidthCells, 0), Corner(size.WidthCells, size.DepthCells), Corner(0, size.DepthCells) },
+                    };
+                    if (request.LevelLots)
+                    {
+                        pad = Settle(pad, request);
+                        // A park's lot keeps its size.
+                        if (pad == null || pad.DepthCells != size.DepthCells) continue;
+                    }
+                    float2 centre = pad.PointAt(size.WidthCells * 0.5f, size.DepthCells * 0.5f);
+                    if (!ServiceSites.FarFromParks(parks, centre)) continue;
+                    return new PlannedBuilding { Name = size.Name, Pad = pad, Road = road, Position = new float3(centre.x, pad.Height, centre.y), Forward = -back };
+                }
+            return null;
+        }
+
+        // The middle of a cell and four points a metre in from its corners, in cells.
+        private static readonly float2[] ParkSamples =
+            { new float2(0.5f), new float2(0.125f), new float2(0.875f, 0.125f), new float2(0.125f, 0.875f), new float2(0.875f) };
 
         /// <summary>The same pad, keeping its first <paramref name="width"/> columns.</summary>
         internal static Pad Narrowed(Pad pad, int width)

@@ -162,6 +162,42 @@ namespace SteppedStreets.Core.Neighbourhood
             return best;
         }
 
+        /// <summary>Pocket parks keep this far apart, so short frontage here and there becomes a park, not every piece of it.</summary>
+        internal const float ParkSpacing = 200f;
+
+        /// <summary>
+        /// The request's parks that fit frontage <paramref name="width"/> cells wide and <paramref name="depth"/> deep, biggest
+        /// first; parks of one size in an order seeded by <paramref name="salt"/>, so neighbouring parks vary.
+        /// </summary>
+        internal static List<ServiceRequest> ParksThatFit(NeighbourhoodRequest request, int width, int depth, uint salt)
+        {
+            var fits = new List<(ServiceRequest Park, float Order)>();
+            var parks = request.Parks ?? new ServiceRequest[0];
+            for (int index = 0; index < parks.Length; index++)
+            {
+                var park = parks[index];
+                if (park == null || string.IsNullOrEmpty(park.Name) || park.WidthCells > width || park.DepthCells > depth) continue;
+                fits.Add((park, -park.WidthCells * park.DepthCells + Geometry.Hash01(salt, index, 0) * 0.5f));
+            }
+            fits.Sort((first, second) => first.Order.CompareTo(second.Order));
+            return fits.ConvertAll(fit => fit.Park);
+        }
+
+        internal static bool FarFromParks(List<PlannedBuilding> parks, float2 centre) =>
+            parks.TrueForAll(park => math.distancesq(park.Position.xz, centre) >= ParkSpacing * ParkSpacing);
+
+        /// <summary>Adds the pocket parks clear of every service building: those were placed over the lots, the parks beside them.</summary>
+        internal static void AddParks(List<PlannedBuilding> buildings, List<PlannedBuilding> parks)
+        {
+            int services = buildings.Count;
+            foreach (var park in parks)
+            {
+                bool clear = true;
+                for (int index = 0; index < services && clear; index++) clear = !Overlap(Quad(park.Pad), Quad(buildings[index].Pad), 0.5f);
+                if (clear) buildings.Add(park);
+            }
+        }
+
         /// <summary>
         /// Two convex quads overlap (separating axes), each grown by <paramref name="margin"/>. A segment passes as the quad
         /// (start, end, end, start) with a margin above zero: its zero-length edges give no axis, so they never separate.

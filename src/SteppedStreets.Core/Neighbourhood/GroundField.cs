@@ -129,7 +129,8 @@ namespace SteppedStreets.Core.Neighbourhood
 
         internal static GroundField Build(NeighbourhoodRequest request, NeighbourhoodPlan plan, List<PlannedLot> lots, CancellationToken cancellation)
         {
-            if (plan.Roads.Count == 0) return null;
+            // Existing streets plan no roads, only pads to level.
+            if (plan.Roads.Count == 0 && lots.Count == 0) return null;
             float halfWidth = request.RoadHalfWidth;
             float bankGrade = NeighbourhoodPlanner.EffectiveBankGrade(request);
             float bankReach = BankReach(request);
