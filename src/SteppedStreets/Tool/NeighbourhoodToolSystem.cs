@@ -204,6 +204,7 @@ namespace SteppedStreets.Tool
                 // A drag cut short goes back, or the outline would no longer match its plan.
                 if (dragging >= 0) RestoreDrag();
                 State.Confirming = false;
+                State.ConfirmingRemove = false;
                 Cursor = null;
                 HoveredCorner = -1;
                 // Planning takes every core for a few seconds, so a plan still being worked out stops with the tool and
@@ -294,10 +295,11 @@ namespace SteppedStreets.Tool
             bool control = keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
             bool escape = (Pressed(cancelAction) && !rawRightDown && !rightHeld) || (keyboard != null && keyboard.escapeKey.wasPressedThisFrame);
 
-            // The Build dialog is open: Esc closes it and the map takes nothing, so the plan stays the one being asked about.
-            if (State.Confirming)
+            // The Build or Remove dialog is open: Esc closes it and the map takes nothing, so the plan or the area stays the one
+            // being asked about.
+            if (State.Confirming || State.ConfirmingRemove)
             {
-                if (escape) SetConfirming(false);
+                if (escape) { SetConfirming(false); SetConfirmingRemove(false); }
                 return;
             }
             if (escape)

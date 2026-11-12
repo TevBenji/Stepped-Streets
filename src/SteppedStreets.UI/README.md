@@ -29,7 +29,8 @@ After a Release build, `pwsh -File tools/check-panel-json.ps1` checks the actual
 Group: `SteppedStreets`. Value: `state`, a `ValueBinding<string>` carrying JSON, written by `src/SteppedStreets/Panel/PanelSystem.cs`
 and read defensively by `src/lib/state.ts` (`readState` never throws and clamps every field):
 `stage` (Closed, Drawing, Planning, Planned, Building, Built, Failed), `corners`, `areaClosed`, `confirming` (the Build dialog is
-open; the tool clears it on Esc, a new plan and the build), `areaSquareMetres`, `summary`,
+open; the tool clears it on Esc, a new plan and the build), `confirmingRemove` (the Remove dialog is open; the tool clears it on
+Esc, when the removal starts and when there is no build left to remove), `areaSquareMetres`, `summary`,
 `messages`, `stats` (`roadKilometres`, `lots`, `zonedCells`, `earthCubicMetres`, `steepestRoadPercent`, `wildPercent`,
 `connected`, `trees`: every planned tree, bush, flower and rock), `zoneCounts` (`zone`/`lots`), `serviceCounts` (`name`/`count`, the planned buildings and pocket parks), `progress` (0–1),
 `settings` (the trigger values below, plus `steepGround`, `shapeGround`, `existingStreets`, `junctions`, `serviceMix` as `name`/`count` rows, `crosswalks`, `streetTrees`, `panelCollapsed`, and `panelLeft`/`panelTop`: fractions of the screen, negative for the usual docked place), `discord` (the mod has a Discord link, so the panel shows its Discord buttons), `presets` (the saved presets' names, trimmed,
@@ -46,6 +47,7 @@ it is the build report (the panel shows it under the status line). The state is 
 | `toggleTool`, `close` | none | Open/close the tool |
 | `clearArea`, `closeArea`, `undo` | none | Area editing |
 | `setConfirming` | bool | Open (only when Planned) or close the Build dialog; while it is open the tool ignores the map |
+| `setConfirmingRemove` | bool | Open (only while `canRemoveLast` and not Building) or close the Remove dialog; while it is open the tool ignores the map |
 | `build` | none | Build when Planned, after the UI confirmation; closes the dialog |
 | `reroll` | none | A new seed |
 | `removeLast` | none | Remove what the last build placed (roads, zoning, greenery, service buildings, walls, and houses grown on its lots) the way the bulldozer does; the ground stays. Refused while Building or when there is nothing to remove. Ends in Drawing with the report as the summary |

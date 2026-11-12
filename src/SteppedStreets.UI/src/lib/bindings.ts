@@ -30,7 +30,7 @@ export type ToggleTrigger = "setLevelLots" | "setRetainingWalls" | "setTrees" | 
 export function act(name: Action): void;
 export function act(name: TextTrigger, value: string): void;
 export function act(name: NumberTrigger, value: number): void;
-export function act(name: ToggleTrigger | "setConfirming" | "setPanelCollapsed", value: boolean): void;
+export function act(name: ToggleTrigger | "setConfirming" | "setConfirmingRemove" | "setPanelCollapsed", value: boolean): void;
 export function act(name: "setPanelPosition", left: number, top: number): void;
 export function act(name: string, ...values: (string | number | boolean)[]): void {
     try { trigger(GROUP, name, ...values); }

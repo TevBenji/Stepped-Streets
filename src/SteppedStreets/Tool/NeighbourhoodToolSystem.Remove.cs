@@ -150,6 +150,7 @@ namespace SteppedStreets.Tool
                 record.Houses = houses.Count;
                 targets.AddRange(houses);
                 SetConfirming(false);
+                SetConfirmingRemove(false);
                 World.GetOrCreateSystemManaged<BuildToolSystem>().Interrupted = false;
                 State.Stage = ToolStage.Building;
                 State.Removing = true;
@@ -244,6 +245,19 @@ namespace SteppedStreets.Tool
             State.CanRemoveLast = false;
             State.RemoveLastSummary = "";
             State.Removing = false;
+            State.ConfirmingRemove = false;
+        }
+
+        /// <summary>
+        /// The panel's Remove dialog opens (only while there is a build to remove and nothing is building) or closes. The panel
+        /// shows it from the state, so Esc on the map closes it, and the map takes nothing while it is open.
+        /// </summary>
+        public void SetConfirmingRemove(bool open)
+        {
+            open = open && State.CanRemoveLast && State.Stage != ToolStage.Building;
+            if (State.ConfirmingRemove == open) return;
+            State.ConfirmingRemove = open;
+            Touch();
         }
 
         /// <summary>Houses the game grew on the build's zoned lots, which weren't there before it.</summary>

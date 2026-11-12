@@ -99,6 +99,8 @@ export interface ToolState {
     areaClosed: boolean;
     /** The "Build this neighbourhood?" dialog is open; the tool owns it so Esc on the map can close it. */
     confirming: boolean;
+    /** The "Remove the last build?" dialog is open; the tool owns it like the Build dialog. */
+    confirmingRemove: boolean;
     areaSquareMetres: number;
     summary: string;
     messages: string[];
@@ -188,6 +190,7 @@ export function readState(raw: unknown): ToolState {
         corners: whole(state.corners, 0, 0, LARGEST),
         areaClosed: flag(state.areaClosed, false),
         confirming: flag(state.confirming, false),
+        confirmingRemove: flag(state.confirmingRemove, false),
         areaSquareMetres: number(state.areaSquareMetres, 0, 0, LARGEST),
         summary: text(state.summary),
         messages: Array.isArray(state.messages) ? state.messages.filter((value): value is string => typeof value === "string") : [],

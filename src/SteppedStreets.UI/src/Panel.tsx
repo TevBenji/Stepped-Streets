@@ -504,9 +504,6 @@ function usePanelDrag(panel: React.RefObject<HTMLDivElement>, left: number, top:
 function NeighbourhoodPanel() {
     const state = useToolState();
     const [moreOpen, setMoreOpen] = useState(moreOpenMemory);
-    // The Remove dialog is the panel's own; it closes when the result it asks about goes.
-    const [removeAsked, setRemoveAsked] = useState(false);
-    useEffect(() => { if (state.stage !== "Built") setRemoveAsked(false); }, [state.stage]);
     const panel = useRef<HTMLDivElement>(null);
     const { place, beginDrag, resetPlace } = usePanelDrag(panel, state.settings.panelLeft, state.settings.panelTop);
     if (state.stage === "Closed") return null;
@@ -516,7 +513,9 @@ function NeighbourhoodPanel() {
     // The tool clears it on Esc, on a new plan and when it builds.
     const confirming = state.stage === "Planned" && state.confirming;
     const building = state.stage === "Building";
-    const disabled = building || confirming;
+    // The tool's too: it clears it on Esc, when the removal starts and when there is nothing left to remove.
+    const confirmingRemove = state.confirmingRemove && state.canRemoveLast && !building;
+    const disabled = building || confirming || confirmingRemove;
     const hasPlan = (state.stage === "Planned" || state.stage === "Built" || state.stage === "Failed" || building)
         && (stats.lots > 0 || stats.roadKilometres > 0);
     // The tool also lists its summary among the messages; showing it twice reads as noise.
@@ -573,7 +572,7 @@ function NeighbourhoodPanel() {
                                 <div>Ctrl+Z to undo · Esc to go back</div>
                             </div> : null}
                             {state.canRemoveLast && !building ? <SettingTip label="Remove"><div className={styles.statusButtons}>
-                                <Button className={styles.statusButton} disabled={disabled} onSelect={() => setRemoveAsked(true)}>
+                                <Button className={styles.statusButton} disabled={disabled} onSelect={() => act("setConfirmingRemove", true)}>
                                     <img className={styles.buttonIcon} src={trashIcon} /><div>Remove last build</div>
                                 </Button>
                             </div></SettingTip> : null}
@@ -786,15 +785,15 @@ function NeighbourhoodPanel() {
                         </div>
                     </div> : null}
 
-                    {removeAsked && !building && state.canRemoveLast ? <div className={styles.backdrop}>
+                    {confirmingRemove ? <div className={styles.backdrop}>
                         <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="stepped-streets-remove">
                             <div className={styles.dialogTitle}>Remove the last build?</div>
                             <div id="stepped-streets-remove" className={styles.dialogText}>
                                 Remove the roads, zoning, greenery and buildings this build placed? The ground changes stay.</div>
                             {state.removeLastSummary ? <div className={styles.dialogDetail}>{`That is ${state.removeLastSummary}.`}</div> : null}
                             <div className={styles.dialogButtons}>
-                                <Button className={styles.secondary} onSelect={() => setRemoveAsked(false)}>Cancel</Button>
-                                <Button className={styles.primary} onSelect={() => { setRemoveAsked(false); act("removeLast"); }}>
+                                <Button className={styles.secondary} onSelect={() => act("setConfirmingRemove", false)}>Cancel</Button>
+                                <Button className={styles.primary} onSelect={() => act("removeLast")}>
                                     <div>Remove</div><img className={styles.pillIcon} src={circleGoIcon} /></Button>
                             </div>
                         </div>

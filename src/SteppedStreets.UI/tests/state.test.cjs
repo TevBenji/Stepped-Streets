@@ -31,6 +31,7 @@ test("missing, broken or non-object state keeps the tool closed with the default
         assert.equal(state.corners, 0);
         assert.equal(state.areaClosed, false);
         assert.equal(state.confirming, false);
+        assert.equal(state.confirmingRemove, false);
         assert.equal(state.areaSquareMetres, 0);
         assert.equal(state.summary, "");
         assert.equal(state.progress, 0);
@@ -171,6 +172,8 @@ test("enums are validated, wrong types and non-finite numbers fall back to defau
     assert.equal(readState({ stats: { connected: true } }).stats.connected, true);
     assert.equal(readState({ confirming: true }).confirming, true);
     assert.equal(readState({ confirming: "true" }).confirming, false);
+    assert.equal(readState({ confirmingRemove: true }).confirmingRemove, true);
+    for (const value of ["true", 1, null]) assert.equal(readState({ confirmingRemove: value }).confirmingRemove, false);
 });
 
 test("zone mix keeps valid rows, drops duplicates and falls back to the default", async () => {

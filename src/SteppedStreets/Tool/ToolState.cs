@@ -49,5 +49,8 @@ namespace SteppedStreets.Tool
 
         /// <summary>The Building stage is the removal of the last build.</summary>
         public bool Removing;
+
+        /// <summary>The panel's "Remove the last build?" dialog is open; while it is, the tool ignores the map and Esc closes it.</summary>
+        public bool ConfirmingRemove;
     }
 }
