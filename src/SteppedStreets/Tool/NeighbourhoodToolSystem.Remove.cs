@@ -264,24 +264,27 @@ namespace SteppedStreets.Tool
 
         private bool Gone(Entity entity) => !EntityManager.Exists(entity) || EntityManager.HasComponent<Deleted>(entity);
 
-        /// <summary>The objects and buildings of their own (not parts of another) standing in the record's box.</summary>
+        /// <summary>
+        /// The objects and buildings of their own (not parts of another) standing in the record's box: trees and plants, props,
+        /// walls and buildings, as Placemaker's clearing finds them; not vehicles or people.
+        /// </summary>
         private List<(Entity Entity, float3 Position)> Standing(BuildRecord record)
         {
-            var found = new Dictionary<Entity, float3>();
-            foreach (var type in new[] { ComponentType.ReadOnly<Game.Objects.Static>(), ComponentType.ReadOnly<Game.Buildings.Building>() })
-                using (var query = EntityManager.CreateEntityQuery(new EntityQueryDesc
+            var found = new List<(Entity, float3)>();
+            using (var query = EntityManager.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[] { ComponentType.ReadOnly<Game.Objects.Object>(), ComponentType.ReadOnly<Game.Objects.Transform>() },
+                Any = new[] { ComponentType.ReadOnly<Game.Objects.Plant>(), ComponentType.ReadOnly<Game.Objects.Static>(), ComponentType.ReadOnly<Game.Buildings.Building>() },
+                None = new[] { ComponentType.ReadOnly<Owner>(), ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Deleted>() },
+            }))
+            using (var entities = query.ToEntityArray(Allocator.Temp))
+            using (var transforms = query.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp))
+                for (int index = 0; index < entities.Length; index++)
                 {
-                    All = new[] { type, ComponentType.ReadOnly<Game.Objects.Transform>() },
-                    None = new[] { ComponentType.ReadOnly<Owner>(), ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Deleted>() },
-                }))
-                using (var entities = query.ToEntityArray(Allocator.Temp))
-                using (var transforms = query.ToComponentDataArray<Game.Objects.Transform>(Allocator.Temp))
-                    for (int index = 0; index < entities.Length; index++)
-                    {
-                        float2 position = transforms[index].m_Position.xz;
-                        if (math.all(position >= record.Low) && math.all(position <= record.High)) found[entities[index]] = transforms[index].m_Position;
-                    }
-            return found.Select(pair => (pair.Key, pair.Value)).ToList();
+                    float2 position = transforms[index].m_Position.xz;
+                    if (math.all(position >= record.Low) && math.all(position <= record.High)) found.Add((entities[index], transforms[index].m_Position));
+                }
+            return found;
         }
 
         /// <summary>The edges of their own (roads, paths) with an end or their middle in the record's box.</summary>
