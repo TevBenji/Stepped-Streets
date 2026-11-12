@@ -61,6 +61,48 @@ namespace SteppedStreets.Tool
         // cos 15°
         private const float CourseAlong = 0.966f;
 
+        /// <summary>
+        /// Whether Remove takes a new edge. Only one of a prefab the build laid courses with, and of those: one lying along the
+        /// courses, or one that can't be a piece of an edge of the city's of its own prefab that vanished in the build, where the
+        /// game reshaped the build's street at a level crossing. A highway or a railway never has the build's prefab; a road of
+        /// the city's of the street's own type the build split keeps its pieces, as in doubt a piece stays.
+        /// </summary>
+        internal static bool BuildsEdge<TPrefab>(IList<(TPrefab Prefab, float2[] Line)> courses, IEnumerable<(TPrefab Prefab, float2[] Line)> vanished,
+            TPrefab prefab, float2 start, float2 middle, float2 end, float2 direction) where TPrefab : IEquatable<TPrefab>
+        {
+            // An edge of no length can't be told apart: it stays.
+            if (math.lengthsq(direction) < 1e-8f) return false;
+            bool laid = false;
+            foreach (var course in courses) laid |= course.Prefab.Equals(prefab);
+            if (!laid) return false;
+            if (BuiltAlong(courses, prefab, start, middle, end, direction)) return true;
+            foreach (var (oldPrefab, line) in vanished)
+                if (PieceOf(line, middle, direction, oldPrefab.Equals(prefab))) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// Whether an edge may be a piece of an old edge that vanished: the same prefab, its middle within 4 m of the old line,
+        /// running within 20° of it. Loose on purpose: a piece it can't rule out stays.
+        /// </summary>
+        internal static bool PieceOf(float2[] oldLine, float2 middle, float2 direction, bool samePrefab)
+        {
+            if (!samePrefab || oldLine == null || math.lengthsq(direction) < 1e-8f) return false;
+            float2 heading = math.normalize(direction);
+            for (int index = 1; index < oldLine.Length; index++)
+            {
+                float2 along = oldLine[index] - oldLine[index - 1];
+                if (math.lengthsq(along) < 1e-8f) continue;
+                if (DistanceSquared(middle, oldLine[index - 1], oldLine[index]) <= PieceReach * PieceReach
+                    && math.abs(math.dot(math.normalize(along), heading)) >= PieceAlong) return true;
+            }
+            return false;
+        }
+
+        private const float PieceReach = 4f;
+        // cos 20°
+        private const float PieceAlong = 0.94f;
+
         internal static bool Inside(float2 point, float2[] quad)
         {
             bool positive = false;

@@ -34,6 +34,8 @@ namespace SteppedStreets.Tool
         {
             public float2 Low, High;
             public readonly HashSet<Entity> Before = new HashSet<Entity>();
+            /// <summary>The edges standing before the build with their prefab and line: a split one's pieces of the same prefab stay.</summary>
+            public readonly Dictionary<Entity, (Entity Prefab, float2[] Line)> EdgesBefore = new Dictionary<Entity, (Entity, float2[])>();
             /// <summary>The zoned lots' outlines, for the houses that grow on them.</summary>
             public readonly List<float2[]> Lots = new List<float2[]>();
             public readonly List<(string Zone, List<float2[]> Quads)> Zoned = new List<(string, List<float2[]>)>();
@@ -57,7 +59,11 @@ namespace SteppedStreets.Tool
                 record.Low = low - RecordMargin;
                 record.High = high + RecordMargin;
                 foreach (var (entity, _) in Standing(record)) record.Before.Add(entity);
-                foreach (var (edge, _) in StandingEdges(record)) record.Before.Add(edge);
+                foreach (var (edge, curve) in StandingEdges(record))
+                {
+                    record.Before.Add(edge);
+                    record.EdgesBefore[edge] = (PrefabOf(edge), Line(curve));
+                }
                 World.GetOrCreateSystemManaged<NetBuildSystem>().Emitted.Clear();
                 foreach (var lot in buildPlan.Lots)
                     if (lot.Zone.Length > 0) record.Lots.Add(lot.Pad.Corners.Select(corner => corner.xz).ToArray());
@@ -81,10 +87,11 @@ namespace SteppedStreets.Tool
         }
 
         /// <summary>
-        /// What the build added. Edges: only new ones of a prefab the build laid courses with, lying along those courses
-        /// (SiteGeometry.BuiltAlong), so a highway, a railway or a road of the city's that the build joined or crossed stays,
-        /// whatever pieces the game cut it into. Objects and buildings: what stands in the box now that didn't before, bar houses
-        /// grown meanwhile, which count only on the build's lots, when removing.
+        /// What the build added. Edges: only new ones of a prefab the build laid courses with, and of those the ones along the
+        /// courses or, where the game reshaped a course at a level crossing, the ones that can't be a piece of a city edge of their
+        /// own prefab the build split (SiteGeometry.BuildsEdge). A highway or a railway never has the build's prefab. Objects and
+        /// buildings: what stands in the box now that didn't before, bar houses grown meanwhile, which count only on the build's
+        /// lots, when removing.
         /// </summary>
         private void FinishTracking()
         {
@@ -93,12 +100,13 @@ namespace SteppedStreets.Tool
             try
             {
                 var courses = World.GetOrCreateSystemManaged<NetBuildSystem>().Emitted;
+                var vanished = record.EdgesBefore.Where(pair => Gone(pair.Key)).Select(pair => pair.Value).ToList();
                 foreach (var (edge, curve) in StandingEdges(record))
                 {
                     if (record.Before.Contains(edge)) continue;
                     float2 middle = MathUtils.Position(curve, 0.5f).xz;
                     float2 direction = MathUtils.Position(curve, 0.55f).xz - MathUtils.Position(curve, 0.45f).xz;
-                    if (!SiteGeometry.BuiltAlong(courses, PrefabOf(edge), curve.a.xz, middle, curve.d.xz, direction)) continue;
+                    if (!SiteGeometry.BuildsEdge(courses, vanished, PrefabOf(edge), curve.a.xz, middle, curve.d.xz, direction)) continue;
                     record.Created.Add(edge);
                     record.Edges++;
                 }
@@ -266,6 +274,14 @@ namespace SteppedStreets.Tool
 
         private Entity PrefabOf(Entity entity) => EntityManager.HasComponent<PrefabRef>(entity) ? EntityManager.GetComponentData<PrefabRef>(entity).m_Prefab : Entity.Null;
 
+        // An edge's line in 16 pieces: within a few centimetres of its curve.
+        private static float2[] Line(Bezier4x3 curve)
+        {
+            var line = new float2[17];
+            for (int index = 0; index < line.Length; index++) line[index] = MathUtils.Position(curve, index / 16f).xz;
+            return line;
+        }
+
         /// <summary>
         /// The objects and buildings of their own (not parts of another) standing in the record's box: trees and plants, props,
         /// walls and buildings, as Placemaker's clearing finds them; not vehicles or people.
@@ -289,11 +305,10 @@ namespace SteppedStreets.Tool
             return found;
         }
 
-        /// <summary>The edges of their own (roads, paths) with an end or their middle in the record's box.</summary>
+        /// <summary>The edges of their own (roads, paths, tracks) whose curve's bounds reach into the record's box, however long.</summary>
         private List<(Entity Edge, Bezier4x3 Curve)> StandingEdges(BuildRecord record)
         {
             var found = new List<(Entity, Bezier4x3)>();
-            bool Inside(float3 point) => math.all(point.xz >= record.Low) && math.all(point.xz <= record.High);
             using (var query = EntityManager.CreateEntityQuery(new EntityQueryDesc
             {
                 All = new[] { ComponentType.ReadOnly<Edge>(), ComponentType.ReadOnly<Curve>() },
@@ -304,7 +319,8 @@ namespace SteppedStreets.Tool
                 for (int index = 0; index < edges.Length; index++)
                 {
                     var curve = curves[index].m_Bezier;
-                    if (Inside(curve.a) || Inside(curve.d) || Inside(MathUtils.Position(curve, 0.5f))) found.Add((edges[index], curve));
+                    var bounds = MathUtils.Bounds(curve);
+                    if (math.all(bounds.max.xz >= record.Low) && math.all(bounds.min.xz <= record.High)) found.Add((edges[index], curve));
                 }
             return found;
         }
