@@ -340,6 +340,11 @@ folder, into `%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\M
 | `src/SteppedStreets.UI` | The panel: React and TypeScript, bundled for the game's UI |
 | `tools` | The Paradox Mods publishing script |
 
+## More mods by me
+
+- **[Big City Performance](https://mods.paradoxplaza.com/mods/166756/Windows)**: a million-person city runs at about normal speed instead of crawling.
+- **[Footbridge Builder](https://mods.paradoxplaza.com/mods/166416/Windows)**: hover a road and a footbridge appears, with ramps that join the sidewalk.
+
 ## Credits
 
 Stepped Streets is made by [TevBenji](https://github.com/TevBenji). Parts of the build code are adapted from
