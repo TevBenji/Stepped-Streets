@@ -74,9 +74,9 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Screenshot Value="Properties/Screenshots/17.png" />
 	<Screenshot Value="Properties/Screenshots/25.png" />
 	<Tag Value="Code Mod" />
-	<ModVersion Value="2.12.0" />
+	<ModVersion Value="2.12.1" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- Use existing does much more: greenery (trees, bushes, flowers, rocks) on the empty land, your service buildings along the streets, Space between lots, and Level lots (off by default).&#10;- Main road type: a wider road for the main streets and the links to your roads.&#10;- Street trees: the game's own grass or tree upgrade on new streets, or on the streets you zone with Use existing.&#10;- Footpaths through long blocks, joining the sidewalks without a crossing (new streets).&#10;- Pocket parks on frontage too short for a lot.&#10;- Corner lots and main-street lots can take their own zone: shops on the corners.&#10;- Presets: save all your settings under a name and load them in any city.&#10;- Remove last build: takes away the roads, zoning, greenery and buildings the last build placed (until your next build; the ground stays).&#10;- Bushes, flowers and rocks among the trees in Build new too, and hover tips on everything in the panel.&#10;- From 2.11.0: Road Builder roads in the road picker, and a Crosswalks switch." />
+	<ChangeLog Value="- Fixed: the service buildings and parks the mod places now come with their own paths and areas, as when you place them yourself, so people can walk in from the sidewalk and the No Pedestrian Access icon no longer shows. Buildings placed by an earlier version are not changed.&#10;- From 2.12.0: Use existing does much more, a main road type, street trees, footpaths, pocket parks, corner shops, presets and Remove last build." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
