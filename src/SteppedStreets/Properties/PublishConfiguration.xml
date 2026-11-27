@@ -76,7 +76,7 @@ Parts of the build code are adapted from **Placemaker** by jackwrichards (GPL-3.
 	<Tag Value="Code Mod" />
 	<ModVersion Value="2.12.1" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="- Fixed: the service buildings and parks the mod places now come with their own paths and areas, as when you place them yourself, so people can walk in from the sidewalk and the No Pedestrian Access icon no longer shows. Buildings placed by an earlier version are not changed.&#10;- From 2.12.0: Use existing does much more, a main road type, street trees, footpaths, pocket parks, corner shops, presets and Remove last build." />
+	<ChangeLog Value="- Fixed: the service buildings and parks the mod places now come with their own paths and areas, as when you place them yourself, so people can walk in from the sidewalk and the No Pedestrian Access icon no longer shows. Buildings placed by an earlier version are not changed.&#10;- Services now come with their own power and track connections too, so some show the game's usual icons until you connect them, like Powerline Not Connected on a transformer or No Train Access on a subway station.&#10;- From 2.12.0: Use existing does much more, a main road type, street trees, footpaths, pocket parks, corner shops, presets and Remove last build." />
 	<!--The forum thread whose replies show as the Discussion on the mod page-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/mod-stepped-streets-hillside-neighbourhoods-in-one-go-discussion-feedback.1948297/" />
 	<ExternalLink Type="github" Url="https://github.com/TevBenji/Stepped-Streets" />
