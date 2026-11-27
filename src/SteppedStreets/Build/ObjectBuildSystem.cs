@@ -4,13 +4,15 @@
 // Upgraded composition flags on the definition). Object definitions follow ParkingLotTool's
 // "field by field like ObjectToolBaseSystem" ObjectDefinition. Credits: tomkpunkt, Ti4goc,
 // KruemelGames (GPL-3.0).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: trees, bushes, flowers and rocks (prefabs chosen by name from the game's) and service buildings only, live ground heights, batches of 1500 definitions per frame and the standalone build-tool cadence; no nets, scaling, grouping or audit machinery.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: trees, bushes, flowers and rocks (prefabs chosen by name from the game's) and service buildings only, live ground heights, batches of 1500 definitions per frame and the standalone build-tool cadence; no nets, scaling, grouping or audit machinery. 2.12.1: a building's own paths and areas go with it, as the game's object tool makes them.
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Colossal.Mathematics;
 using Game;
 using Game.Common;
+using Game.Net;
 using Game.Prefabs;
 using Game.Simulation;
 using Game.Tools;
@@ -265,6 +267,11 @@ namespace SteppedStreets.Build
         {
             var heights = _terrain.GetHeightData(true);
             int end = math.min(_objects.Count, _cursor + PerFrame);
+            // The buildings' own paths are nets too: room for them in the terrain's road cull list first (TerrainCullGuard.cs).
+            int paths = 0;
+            for (int index = _cursor; index < end; index++)
+                if (EntityManager.HasBuffer<Game.Prefabs.SubNet>(_objects[index].Prefab)) paths += EntityManager.GetBuffer<Game.Prefabs.SubNet>(_objects[index].Prefab, true).Length;
+            if (paths > 0) TerrainCullGuard.Reserve(_terrain, paths);
             for (; _cursor < end; _cursor++)
             {
                 var item = _objects[_cursor];
@@ -289,8 +296,148 @@ namespace SteppedStreets.Build
                     m_Elevation = 0f,
                 });
                 EntityManager.AddComponent<Updated>(definition);
+                if (EntityManager.HasComponent<BuildingData>(item.Prefab)) EmitParts(item, position, rotation, ref heights);
                 _placed++;
             }
+        }
+
+        /// <summary>
+        /// A building's own paths and areas (a park's walks, a station's forecourt), as definitions owned by the building's.
+        /// The game makes them only from definitions: its object tool and its zoned growth both send them with the building
+        /// (Game.Tools.ObjectToolBaseSystem.UpdateSubNets and UpdateSubAreas, Game.Simulation.ZoneSpawnSystem.Spawn). Without
+        /// them the building's pedestrian access points have no path to the street, and the game shows No Pedestrian Access on
+        /// every service building and park (a player's report, 17 November 2026; reproduced in the 2.12.1 in-game test).
+        /// </summary>
+        private void EmitParts(Placement item, float3 position, quaternion rotation, ref TerrainHeightData heights)
+        {
+            var owner = new OwnerDefinition { m_Prefab = item.Prefab, m_Position = position, m_Rotation = rotation };
+            var random = new Unity.Mathematics.Random((uint)item.Seed | 1u);
+            // Read everything first: creating the definitions below invalidates the prefab's buffers.
+            var courses = new List<(Entity Prefab, NetCourse Course, CompositionFlags Upgrades)>();
+            if (EntityManager.HasBuffer<Game.Prefabs.SubNet>(item.Prefab))
+            {
+                var subNets = EntityManager.GetBuffer<Game.Prefabs.SubNet>(item.Prefab, true);
+                // A node shared by pieces sits at the average of their ends, as the object tool puts it.
+                var nodes = new List<float4>();
+                void AddEnd(int index, float3 point)
+                {
+                    if (index < 0) return;
+                    while (nodes.Count <= index) nodes.Add(float4.zero);
+                    nodes[index] += new float4(point, 1f);
+                }
+                foreach (var subNet in subNets) { AddEnd(subNet.m_NodeIndex.x, subNet.m_Curve.a); AddEnd(subNet.m_NodeIndex.y, subNet.m_Curve.d); }
+                for (int node = 0; node < nodes.Count; node++) nodes[node] /= math.max(1f, nodes[node].w);
+                var geometry = GetComponentLookup<NetGeometryData>(true);
+                bool leftHand = World.GetOrCreateSystemManaged<Game.City.CityConfigurationSystem>().leftHandTraffic;
+                for (int index = 0; index < subNets.Length; index++)
+                {
+                    var subNet = NetUtils.GetSubNet(subNets, index, leftHand, ref geometry);
+                    geometry.TryGetComponent(subNet.m_Prefab, out var netGeometry);
+                    courses.Add((subNet.m_Prefab, Course(subNet, netGeometry, nodes, position, rotation, ref heights), subNet.m_Upgrades));
+                }
+            }
+            var areas = new List<(Entity Prefab, int Seed, bool Lot, Game.Areas.Node[] Corners)>();
+            if (EntityManager.HasBuffer<Game.Prefabs.SubArea>(item.Prefab) && EntityManager.HasBuffer<SubAreaNode>(item.Prefab))
+            {
+                var subAreas = EntityManager.GetBuffer<Game.Prefabs.SubArea>(item.Prefab, true);
+                var areaNodes = EntityManager.GetBuffer<SubAreaNode>(item.Prefab, true);
+                var spawnable = GetComponentLookup<SpawnableObjectData>(true);
+                var chosen = new NativeParallelHashMap<Entity, int>(4, Allocator.Temp);
+                try
+                {
+                    foreach (var subArea in subAreas)
+                    {
+                        Entity prefab = subArea.m_Prefab;
+                        int seed;
+                        // A placeholder area (one of several surfaces) is picked as the object tool picks it.
+                        if (EntityManager.HasBuffer<PlaceholderObjectElement>(prefab))
+                        {
+                            if (!Game.Areas.AreaUtils.SelectAreaPrefab(EntityManager.GetBuffer<PlaceholderObjectElement>(prefab, true), spawnable, chosen, ref random, out prefab, out seed)) continue;
+                        }
+                        else seed = random.NextInt();
+                        if (!EntityManager.HasComponent<AreaGeometryData>(prefab)) continue;
+                        var corners = new Game.Areas.Node[subArea.m_NodeRange.y - subArea.m_NodeRange.x + 1];
+                        int from = ObjectToolBaseSystem.GetFirstNodeIndex(areaNodes, subArea.m_NodeRange);
+                        for (int corner = 0; corner < corners.Length; corner++)
+                        {
+                            var local = areaNodes[from];
+                            corners[corner] = new Game.Areas.Node(Game.Objects.ObjectUtils.LocalToWorld(position, rotation, local.m_Position),
+                                local.m_ParentMesh >= 0 ? local.m_Position.y : float.MinValue);
+                            if (++from == subArea.m_NodeRange.y) from = subArea.m_NodeRange.x;
+                        }
+                        areas.Add((prefab, seed, EntityManager.GetComponentData<AreaGeometryData>(prefab).m_Type == Game.Areas.AreaType.Lot, corners));
+                    }
+                }
+                finally { chosen.Dispose(); }
+            }
+
+            foreach (var (prefab, course, upgrades) in courses)
+            {
+                var definition = EntityManager.CreateEntity();
+                _definitions.Add(definition);
+                EntityManager.AddComponentData(definition, new CreationDefinition { m_Prefab = prefab, m_RandomSeed = random.NextInt() });
+                EntityManager.AddComponent<Updated>(definition);
+                EntityManager.AddComponentData(definition, owner);
+                EntityManager.AddComponentData(definition, course);
+                if (!upgrades.Equals(default(CompositionFlags))) EntityManager.AddComponentData(definition, new Upgraded { m_Flags = upgrades });
+            }
+            foreach (var (prefab, seed, lot, corners) in areas)
+            {
+                var definition = EntityManager.CreateEntity();
+                _definitions.Add(definition);
+                // The object tool hides every area but the lot while it previews; Apply builds them all.
+                EntityManager.AddComponentData(definition, new CreationDefinition { m_Prefab = prefab, m_RandomSeed = seed, m_Flags = lot ? 0 : CreationFlags.Hidden });
+                EntityManager.AddComponent<Updated>(definition);
+                EntityManager.AddComponentData(definition, owner);
+                var buffer = EntityManager.AddBuffer<Game.Areas.Node>(definition);
+                foreach (var corner in corners) buffer.Add(corner);
+            }
+        }
+
+        /// <summary>One of a building's paths in the world, as Game.Tools.ObjectToolBaseSystem.CreateSubNet lays it for a new building.</summary>
+        // ponytail: no water paths; the services list leaves out floating and waterway buildings, so none has one.
+        private static NetCourse Course(Game.Prefabs.SubNet subNet, NetGeometryData geometry, List<float4> nodes, float3 position, quaternion rotation, ref TerrainHeightData heights)
+        {
+            var local = subNet.m_Curve;
+            var curve = Game.Objects.ObjectUtils.LocalToWorld(position, rotation, local);
+            bool startOnMesh = subNet.m_ParentMesh.x >= 0, endOnMesh = subNet.m_ParentMesh.y >= 0;
+            // A path on the ground follows it, lifted by its own height in the prefab; one that flattens the ground, or that
+            // runs on the building, keeps the building's heights.
+            if (!(startOnMesh && endOnMesh) && (geometry.m_Flags & Game.Net.GeometryFlags.FlattenTerrain) == 0)
+            {
+                curve = NetUtils.AdjustPosition(new Curve { m_Bezier = curve }, startOnMesh, startOnMesh | endOnMesh, endOnMesh, ref heights).m_Bezier;
+                curve.a.y += local.a.y;
+                curve.b.y += local.b.y;
+                curve.c.y += local.c.y;
+                curve.d.y += local.d.y;
+            }
+            var transform = new Game.Objects.Transform(position, rotation);
+            var course = new NetCourse { m_Curve = curve, m_Length = MathUtils.Length(curve), m_FixedIndex = -1 };
+            course.m_StartPosition = new CoursePos
+            {
+                m_Position = subNet.m_NodeIndex.x >= 0 ? Game.Objects.ObjectUtils.LocalToWorld(transform, nodes[subNet.m_NodeIndex.x].xyz) : curve.a,
+                m_Rotation = NetUtils.GetNodeRotation(MathUtils.StartTangent(curve), rotation),
+                m_CourseDelta = 0f,
+                m_Elevation = local.a.y,
+                m_ParentMesh = subNet.m_ParentMesh.x,
+                m_Flags = CoursePosFlags.IsFirst,
+            };
+            course.m_EndPosition = new CoursePos
+            {
+                m_Position = subNet.m_NodeIndex.y >= 0 ? Game.Objects.ObjectUtils.LocalToWorld(transform, nodes[subNet.m_NodeIndex.y].xyz) : curve.d,
+                m_Rotation = NetUtils.GetNodeRotation(MathUtils.EndTangent(curve), rotation),
+                m_CourseDelta = 1f,
+                m_Elevation = local.d.y,
+                m_ParentMesh = subNet.m_ParentMesh.y,
+                m_Flags = CoursePosFlags.IsLast,
+            };
+            // A loop starts and ends on the same node.
+            if (course.m_StartPosition.m_Position.Equals(course.m_EndPosition.m_Position))
+            {
+                course.m_StartPosition.m_Flags |= CoursePosFlags.IsLast;
+                course.m_EndPosition.m_Flags |= CoursePosFlags.IsFirst;
+            }
+            return course;
         }
 
         /// <summary>Which buildings stand where they were put (same prefab within 6 m); the rest are named as missing.</summary>

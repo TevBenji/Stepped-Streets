@@ -2,7 +2,7 @@
 // An edge goes as CreationDefinition { m_Original, Delete } with a NetCourse along its own curve between its own nodes; an
 // object or building as CreationDefinition { m_Original, Delete } with an ObjectDefinition where it stands (SuiteFixture's
 // fixture clearing, BuildService.Owner.cs's clearing of trees and props).
-// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: a standalone system for Remove last neighbourhood that takes a list of entities, 1500 a frame through the invisible build tool, and counts what is gone afterwards.
+// Adapted from Placemaker (jackwrichards, GPL-3.0). Modified by TevBenji, 2026-11: a standalone system for Remove last neighbourhood that takes a list of entities, 1500 a frame through the invisible build tool, and counts what is gone afterwards. 2.12.1: a building's own paths and areas go with it, as the game's bulldozer takes them.
 
 using System;
 using System.Collections.Generic;
@@ -53,6 +53,7 @@ namespace SteppedStreets.Build
             _emittedFrame = _applyFrame = -1;
             try
             {
+                for (int index = _targets.Count - 1; index >= 0; index--) AddParts(_targets[index]);
                 if (_targets.Count == 0) { Finish("nothing to remove"); return; }
                 _tool.Activate();
                 _activationFrame = UnityEngine.Time.frameCount;
@@ -129,6 +130,29 @@ namespace SteppedStreets.Build
                         },
                     });
                 }
+                else if (EntityManager.HasComponent<Node>(target))
+                {
+                    // A path's loose node, as the bulldozer takes one: a course of no length on it.
+                    var node = EntityManager.GetComponentData<Node>(target);
+                    var definition = Definition(target);
+                    EntityManager.AddComponentData(definition, new NetCourse
+                    {
+                        m_Curve = new Bezier4x3(node.m_Position, node.m_Position, node.m_Position, node.m_Position),
+                        m_FixedIndex = -1,
+                        m_StartPosition = new CoursePos { m_Entity = target, m_Position = node.m_Position, m_Rotation = node.m_Rotation, m_CourseDelta = 0f },
+                        m_EndPosition = new CoursePos { m_Entity = target, m_Position = node.m_Position, m_Rotation = node.m_Rotation, m_CourseDelta = 1f },
+                    });
+                }
+                else if (EntityManager.HasBuffer<Game.Areas.Node>(target))
+                {
+                    var corners = EntityManager.GetBuffer<Game.Areas.Node>(target, true).ToNativeArray(Unity.Collections.Allocator.Temp);
+                    var definition = Definition(target);
+                    // The bulldozer hides every area but the lot while it previews the removal.
+                    if (!EntityManager.HasComponent<Game.Areas.Lot>(target))
+                        EntityManager.SetComponentData(definition, new CreationDefinition { m_Original = target, m_Flags = CreationFlags.Delete | CreationFlags.Hidden });
+                    EntityManager.AddBuffer<Game.Areas.Node>(definition).CopyFrom(corners);
+                    corners.Dispose();
+                }
                 else if (EntityManager.HasComponent<Game.Objects.Transform>(target))
                 {
                     var transform = EntityManager.GetComponentData<Game.Objects.Transform>(target);
@@ -146,6 +170,34 @@ namespace SteppedStreets.Build
                     });
                 }
             }
+        }
+
+        /// <summary>
+        /// A building's own paths (its edges, and any node that ends none of them) and areas, as the game's bulldozer lists them
+        /// (Game.Tools.BulldozeToolSystem.AddEntity and AddSubNets). Deleting only the building took its paths and areas but left
+        /// their nodes standing (2.12.1 in-game test).
+        /// </summary>
+        private void AddParts(Entity building)
+        {
+            if (!EntityManager.HasComponent<Game.Buildings.Building>(building)) return;
+            if (EntityManager.HasBuffer<SubNet>(building))
+                foreach (var part in EntityManager.GetBuffer<SubNet>(building, true))
+                    if (EntityManager.HasComponent<Edge>(part.m_SubNet) || !EndsOwnPath(part.m_SubNet, building)) _targets.Add(part.m_SubNet);
+            if (EntityManager.HasBuffer<Game.Areas.SubArea>(building))
+                foreach (var part in EntityManager.GetBuffer<Game.Areas.SubArea>(building, true)) _targets.Add(part.m_Area);
+        }
+
+        /// <summary>A node at either end of one of the owner's own edges goes with that edge.</summary>
+        private bool EndsOwnPath(Entity node, Entity owner)
+        {
+            if (!EntityManager.HasBuffer<ConnectedEdge>(node)) return false;
+            foreach (var connected in EntityManager.GetBuffer<ConnectedEdge>(node, true))
+            {
+                var edge = EntityManager.GetComponentData<Edge>(connected.m_Edge);
+                if ((edge.m_Start == node || edge.m_End == node) && EntityManager.HasComponent<Owner>(connected.m_Edge)
+                    && EntityManager.GetComponentData<Owner>(connected.m_Edge).m_Owner == owner) return true;
+            }
+            return false;
         }
 
         private Entity Definition(Entity original)
